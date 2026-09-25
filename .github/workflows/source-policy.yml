@@ -1,0 +1,38 @@
+name: Source Policy
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reject generated runtime as source of truth
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files --error-unmatch app/ui.js >/dev/null 2>&1; then
+            echo "::error::app/ui.js is generated runtime and must not be the source of truth."
+            exit 1
+          fi
+          if git ls-files --error-unmatch app/worker.js >/dev/null 2>&1; then
+            echo "::error::app/worker.js is generated runtime and must not be the source of truth."
+            exit 1
+          fi
+
+      - name: Reject known parallel Sketch overlays
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e app/sketch-phase1.js
+          test ! -e app/sketch-phase1.css
+
+      - name: Require architecture records
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f docs/ARCHITECTURE.md
+          test -f docs/RESOLVED_PROBLEMS.md
