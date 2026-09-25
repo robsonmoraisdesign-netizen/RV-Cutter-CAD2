@@ -1,0 +1,98 @@
+name: Baseline 14.22 CI
+
+on:
+  push:
+    branches:
+      - chore/import-14.22
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'app/**'
+      - 'qa*'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/baseline-ci.yml'
+
+jobs:
+  build-and-test:
+    name: Build and test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Build generated runtime
+        run: npm run build
+
+      - name: Copy Manifold WASM from locked dependency
+        shell: node {0}
+        run: |
+          const fs=require('fs');
+          const path=require('path');
+          function walk(dir){
+            for(const name of fs.readdirSync(dir)){
+              const p=path.join(dir,name);
+              const st=fs.statSync(p);
+              if(st.isDirectory()){ const r=walk(p); if(r) return r; }
+              else if(name==='manifold.wasm') return p;
+            }
+          }
+          const wasm=walk(path.join(process.cwd(),'node_modules','manifold-3d'));
+          if(!wasm) throw new Error('manifold.wasm not found in manifold-3d package');
+          fs.copyFileSync(wasm,path.join(process.cwd(),'app','manifold.wasm'));
+          console.log('Copied',wasm,'-> app/manifold.wasm');
+
+      - name: Syntax check source and generated runtime
+        shell: node {0}
+        run: |
+          const fs=require('fs');
+          const path=require('path');
+          const cp=require('child_process');
+          const roots=['src','app'];
+          const exts=new Set(['.js','.mjs','.cjs']);
+          const files=[];
+          function walk(dir){
+            for(const name of fs.readdirSync(dir)){
+              const p=path.join(dir,name);
+              const st=fs.statSync(p);
+              if(st.isDirectory()) walk(p);
+              else if(exts.has(path.extname(name))) files.push(p);
+            }
+          }
+          for(const r of roots) walk(r);
+          for(const f of files) cp.execFileSync(process.execPath,['--check',f],{stdio:'inherit'});
+          console.log('Syntax OK:',files.length,'files');
+
+      - name: Run baseline QA
+        run: npm test
+
+      - name: Verify generated runtime is derived and untracked
+        shell: node {0}
+        run: |
+          const fs=require('fs');
+          for(const p of ['app/ui.js','app/worker.js','app/manifold.wasm']){
+            if(!fs.existsSync(p)) throw new Error('Missing runtime artifact: '+p);
+            if(fs.statSync(p).size===0) throw new Error('Empty runtime artifact: '+p);
+          }
+
+      - name: Upload generated runtime
+        uses: actions/upload-artifact@v4
+        with:
+          name: rv-cutter-14.22-runtime-${{ matrix.os }}
+          path: |
+            app/ui.js
+            app/worker.js
+            app/manifold.wasm
+          if-no-files-found: error
+          retention-days: 14
