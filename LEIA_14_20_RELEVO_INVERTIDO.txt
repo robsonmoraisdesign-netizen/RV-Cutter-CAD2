@@ -1,0 +1,8 @@
+NOVO — INVERTER RELEVO
+
+Na seção Relevo existe o botão rápido “Relevo para fora · inverter para dentro”.
+
+Para fora: o desenho é elevado acima da base.
+Para dentro: o mesmo desenho é gravado/rebaixado na base.
+
+O software memoriza separadamente a última altura externa e a última profundidade interna. Ao alternar novamente, o valor anterior é restaurado.

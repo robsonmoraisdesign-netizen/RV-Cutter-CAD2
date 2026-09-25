@@ -1,0 +1,36 @@
+RV Cutter CAD 14.17 — fonte do aplicativo entregue
+
+Node 22 ou superior:
+  npm ci
+  npm run build
+  npm test
+  npm start
+
+app/ corresponde a resources/app/ do aplicativo Windows.
+Não é necessário recompilar para usar o executável entregue.
+
+Motor incremental:
+  src/dependencies.mjs — grafo, chaves, caches e ownership dos sólidos nativos
+  src/geometry.mjs — etapas de perfil e construção/validação das malhas
+  src/worker.mjs — motor ativo e codificação STL/ZIP
+  src/result-store.mjs — cache persistente e verificação de versão
+  src/ui.mjs — sessões, fila, memória, desfazer e exportação incremental
+  src/viewer.mjs e presentation.mjs — buffers, normais e descarte da cena
+  app/catalog.cjs — migração e índice de metadados separados
+
+Testes adicionais:
+  node qa1417-engine.mjs
+  node qa1417-native.mjs
+  node qa1417-catalog.cjs
+
+Interface (instalação adicional para desenvolvimento):
+  npm install --no-save playwright
+  npx playwright install chromium
+  node qa1416-runtime.cjs app regressao
+  node qa1417-session.cjs app sessao
+  node qa1417-export.cjs app exportacao
+Opcional: RV_CHROMIUM indica um Chromium instalado.
+Os testes servem o aplicativo em 127.0.0.1:8088 e escrevem relatórios/capturas.
+
+Os binários Windows são os do pacote fornecido; os recursos do aplicativo foram
+atualizados. A validação executada aqui não equivale a um teste nativo no Windows.
