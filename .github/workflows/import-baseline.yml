@@ -5,7 +5,7 @@ on:
     branches:
       - chore/import-14.22
     paths:
-      - '.baseline-import/**'
+      - '.baseline-import/part15.b64'
 
 permissions:
   contents: write
