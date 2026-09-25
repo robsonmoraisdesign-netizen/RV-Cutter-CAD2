@@ -1,0 +1,67 @@
+name: Import 14.22 Baseline
+
+on:
+  push:
+    branches:
+      - chore/import-14.22
+    paths:
+      - '.baseline-import/**'
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    if: ${{ !contains(github.event.head_commit.message, '[baseline extracted]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout import branch
+        uses: actions/checkout@v4
+        with:
+          ref: chore/import-14.22
+          fetch-depth: 0
+
+      - name: Reconstruct source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d .baseline-import
+          cat .baseline-import/part*.b64 | tr -d '\r\n' | base64 -d > /tmp/rv-cutter-14.22.tar.gz
+          tar -tzf /tmp/rv-cutter-14.22.tar.gz >/tmp/baseline-files.txt
+          tar -xzf /tmp/rv-cutter-14.22.tar.gz -C .
+
+      - name: Verify baseline source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f src/ui.mjs
+          test -f src/editor.mjs
+          test -f src/geometry.mjs
+          test -f src/viewer.mjs
+          test -f src/worker.mjs
+          test -f app/index.html
+          test -f app/main.cjs
+          test -f app/preload.cjs
+          test -f app/style.css
+          test -f package-lock.json
+          grep -q '"version": "14.22.0"' package.json
+          test ! -e app/sketch-phase1.js
+          test ! -e app/sketch-phase1.css
+
+      - name: Remove staging archive
+        shell: bash
+        run: rm -rf .baseline-import
+
+      - name: Commit extracted baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Nothing to commit."
+            exit 0
+          fi
+          git commit -m "chore: import 14.22 source baseline [baseline extracted]"
+          git push origin HEAD:chore/import-14.22
