@@ -1,0 +1,22 @@
+node_modules/
+dist/
+release/
+build/
+*.log
+.DS_Store
+Thumbs.db
+
+# Runtime generated from source
+app/ui.js
+app/worker.js
+
+# Local recovery/catalog data
+*.rvcad
+*.bak
+trash/
+recovery.rvcad
+
+# Test/browser artifacts
+audit-*.png
+test-results/
+playwright-report/
