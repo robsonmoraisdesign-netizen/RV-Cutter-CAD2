@@ -4,7 +4,10 @@ on:
   push:
     branches:
       - chore/import-14.22
+      - baseline/14.22
   pull_request:
+    branches:
+      - main
     paths:
       - 'src/**'
       - 'app/**'
@@ -12,10 +15,12 @@ on:
       - 'docs/baseline-14.22-manifest.json'
       - 'package.json'
       - 'package-lock.json'
+      - '.gitattributes'
       - '.github/workflows/baseline-ci.yml'
 
 jobs:
   build-and-test:
+    if: github.event_name != 'pull_request' || github.head_ref == 'chore/import-14.22'
     name: Build and test (${{ matrix.os }})
     strategy:
       fail-fast: false
@@ -129,7 +134,6 @@ jobs:
           if (Test-Path "$out/Codigo-fonte/app/manifold.wasm") { Remove-Item -Force "$out/Codigo-fonte/app/manifold.wasm" }
           Copy-Item -Force 'VALIDACAO_14_22.txt' "$out/"
           "Source commit: $env:GITHUB_SHA" | Set-Content -Encoding UTF8 "$out/SOURCE_COMMIT.txt"
-          Get-ChildItem $out | Select-Object Name,Length
 
       - name: Upload Windows x64 portable
         if: runner.os == 'Windows'
