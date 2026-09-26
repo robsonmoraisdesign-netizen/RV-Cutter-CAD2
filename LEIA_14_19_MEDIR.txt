@@ -1,0 +1,16 @@
+RV CUTTER CAD 14.19 — FERRAMENTA MEDIR
+
+Esta revisão mantém a atualização em código-fonte.
+
+Arquivo principal da nova função:
+  src/measure-tool.js
+
+Para o app empacotado, a mesma fonte é copiada para:
+  app/measure-tool.js
+
+O index.html carrega o módulo depois de ui.js/layout-v14.js.
+Não há alteração no motor geométrico, Manifold ou worker.
+
+Uso:
+  M ou botão Medir -> clique P1 -> clique P2.
+  O painel informa X/Y/Z, planos, distância linear e ângulo entre faces.

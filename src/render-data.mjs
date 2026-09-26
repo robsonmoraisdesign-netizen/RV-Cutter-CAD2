@@ -1,0 +1,6 @@
+// Prepare smooth display geometry in the geometry worker, never in the UI thread.
+import * as T from 'three';
+import {weightedNormals} from './presentation.mjs';
+import {classifyDisplayRole} from './role-classifier.mjs';
+export function prepareDisplay(result){for(const part of result.parts){if(part.renderData)continue;const roles={cutterBase:[],blade:[],stampBase:[],relief:[]},p=result.params;for(let i=0;i<part.indices.length;i+=3){const ids=[part.indices[i],part.indices[i+1],part.indices[i+2]],role=classifyDisplayRole(part,result,ids);roles[role].push(...ids);}part.renderData={};for(const [role,ids]of Object.entries(roles)){if(!ids.length)continue;const g=new T.BufferGeometry();g.setAttribute('position',new T.BufferAttribute(part.positions,part.stride));g.setIndex(ids);const smooth=weightedNormals(g,p);part.renderData[role]={positions:smooth.attributes.position.array,normals:smooth.attributes.normal.array,indices:smooth.index.array};g.dispose();smooth.dispose();}}return result;}
+export function buffers(result){return result.parts.flatMap(p=>[p.positions.buffer,p.indices.buffer,...Object.values(p.renderData||{}).flatMap(r=>[r.positions.buffer,r.normals.buffer,r.indices.buffer])]);}

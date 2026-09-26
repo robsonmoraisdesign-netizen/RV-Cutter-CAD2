@@ -1,0 +1,14 @@
+# Reproducible source checkout across Windows/Linux
+* text=auto eol=lf
+
+# Binary baseline/test assets
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.stl binary
+*.wasm binary
+*.zip binary
+*.exe binary
+*.dll binary
+*.pak binary
+*.bin binary

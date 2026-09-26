@@ -1,0 +1,18 @@
+RV Cutter CAD 14.20 — Relevo invertido
+
+Implementado no código-fonte e no runtime:
+- parâmetro persistente reliefInverted;
+- botão rápido na seção Relevo;
+- memória separada da altura para fora e profundidade para dentro;
+- relevo positivo usa união; relevo invertido usa subtração booleana na base;
+- integrado preserva a lâmina e grava apenas a base;
+- relevo invertido continua classificado visualmente como componente Relevo;
+- profundidade é ajustada ao inverter se o valor salvo não couber na base.
+
+Testes executados:
+- qa148-runtime-worker.mjs: PASS
+- qa1419-measure.cjs: PASS
+- qa1420-invert-relief.mjs: PASS
+- sintaxe de app/ui.js, app/worker.js e módulos-fonte: PASS
+
+O motor paramétrico existente foi estendido apenas no nó de carimbo/relevo; cortador, chanfro, exportação e ferramenta Medir permanecem preservados.

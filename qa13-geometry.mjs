@@ -1,0 +1,27 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {kernel,build,defaults,editContours,contains,stl,combineParts,checkMesh} from './src/geometry.mjs';
+import {layout} from './src/viewer.mjs';
+const m=await kernel();
+const square=[[[-.5,-.5],[.5,-.5],[.5,.5],[-.5,.5]]];
+const p={...defaults,size:50,mode:'separate',chamfer:true,wall:1.2,tip:.3,chamferHeight:3,stampBase:4,relief:3};
+const r=build(m,square,p),blade=r.parts[0];
+const xsAt=z=>{let xs=[];for(let i=0;i<blade.positions.length;i+=3)if(Math.abs(blade.positions[i+2]-z)<1e-4)xs.push(Math.abs(blade.positions[i]));return Math.max(...xs)};
+assert.ok(Math.abs(xsAt(p.height)-(25+p.clearance+p.tip))<.005,'tip thickness');
+assert.ok(Math.abs(xsAt(p.height-p.chamferHeight)-(25+p.clearance+p.wall))<.005,'chamfer shoulder height');
+assert.equal(r.parts[1].bounds.max[2],7,'independent stamp base');
+const objects=[{id:'test',visible:true,result:r}],nested=layout(objects,true)[0],spread=layout(objects,false)[0];
+assert.deepEqual(nested.parts[0].position,nested.parts[1].position,'concentric placement');
+assert.ok(spread.parts[0].position[0]+blade.bounds.max[0]<spread.parts[1].position[0]+r.parts[1].bounds.min[0]);
+const merged=combineParts(spread.parts);assert.equal(stl(merged).byteLength,84+merged.indices.length/3*50);assert.equal(checkMesh({numProp:3,vertProperties:merged.positions,triVerts:merged.indices}).open,0);
+console.log('PASS tip, chamfer height, stamp height, nested XY, separated export, combined topology');
+const loops=JSON.parse(fs.readFileSync('test-pig-loops.json'));
+const region=[[-.65,-.65],[0,-.65],[0,.65],[-.65,.65]];
+for(const chamfer of [false,true])for(const delta of [.3,-.3]){const rr=build(m,loops,{...defaults,mode:'separate',chamfer,wallEdits:[{region,delta}]});assert.equal(rr.parts[0].bodies,1);assert.equal(rr.parts[0].stats.nonmanifold,0);console.log('PASS regional blade',chamfer,delta);}
+const ink=[[[-.4,-.4],[.4,-.4],[.4,.4],[-.4,.4]],[[-.35,-.35],[-.35,.35],[.35,.35],[.35,-.35]]];
+const changed=editContours(m,ink,{type:'thickness',distance:1,size:50,region});
+const a=new m.CrossSection(ink,'EvenOdd'),b=new m.CrossSection(changed,'EvenOdd'),right=new m.CrossSection([[[.01,-1],[1,-1],[1,1],[.01,1]]],'EvenOdd');
+const dif=m.CrossSection.union([a.subtract(b),b.subtract(a)]);assert.ok(dif.area()>0);assert.ok(dif.intersect(right).area()<1e-7,'outside region unchanged');
+let drawn=editContours(m,ink,{type:'stroke',width:1,size:50,points:[[-.2,0],[.2,0]]});assert.ok(drawn.length>ink.length);let erased=editContours(m,drawn,{type:'stroke',width:2,size:50,points:[[0,-.1],[0,.1]],subtract:true});assert.ok(erased.length>0);
+let offset=editContours(m,ink,{type:'offset',selected:0,distance:.5,size:50});assert.ok(Math.max(...offset[0].map(p=>p[0]))>.4);
+console.log('PASS 2D regional ink, drawing, erasing, offset');

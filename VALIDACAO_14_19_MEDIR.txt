@@ -1,0 +1,52 @@
+RV Cutter CAD 14.19 — Ferramenta Medir
+Base: 14.18.1 Importação Corrigida
+
+REGRA DESTA REVISÃO
+A atualização foi implementada em código-fonte. O executável Electron não foi
+editado nem recompilado. A aplicação carrega a nova ferramenta como módulo JS
+local (measure-tool.js), e a mesma fonte está preservada em Codigo-fonte/src.
+
+FUNÇÃO MEDIR
+- Botão "Medir" inserido na barra do viewport; atalho M.
+- Primeiro clique define P1 em uma face/ponto da malha exibida.
+- Segundo clique define P2.
+- Resultados: ΔX, ΔY, ΔZ, XY, XZ, YZ, distância linear 3D e ângulo entre faces.
+- Coordenadas XYZ de P1 e P2 disponíveis no painel.
+- Linhas auxiliares: X vermelho, Y verde, Z azul e distância direta tracejada.
+- Nova medição, Limpar e Escape/Sair.
+- Disponível em Modelo 3D e Apresentação; não interfere no editor 2D.
+
+DESEMPENHO / ARQUITETURA
+- A ferramenta apenas lê a BufferGeometry já existente no viewport.
+- Não envia mensagens ao worker, não chama Manifold e não regenera geometria.
+- Teste de picking usa AABB antes de testar triângulos.
+- Picking ocorre somente no clique, não continuamente no movimento do mouse.
+- Overlay é SVG 2D independente do render 3D.
+
+CÓDIGO-FONTE
+Fonte principal:
+  Codigo-fonte/src/measure-tool.js
+Cópia carregada pelo app:
+  Codigo-fonte/app/measure-tool.js
+Runtime local:
+  resources/app/measure-tool.js
+Entrada:
+  app/index.html / resources/app/index.html carregam measure-tool.js depois do UI.
+
+MOTOR PRESERVADO (SHA-256 idêntico à 14.18.1)
+- resources/app/worker.js
+- resources/app/manifold.wasm
+- Codigo-fonte/src/geometry.mjs
+- Codigo-fonte/src/worker.mjs
+- Codigo-fonte/src/editor.mjs
+
+VALIDAÇÕES EXECUTADAS
+- node --check em measure-tool.js: OK
+- node --check no ui.js existente: OK
+- qa1419-measure.cjs: OK
+- teste sintético de interseção raio/triângulo: OK
+- confirmação estática de que a ferramenta não chama worker.postMessage/build: OK
+
+LIMITAÇÃO
+O clique visual exato e a sensação de interação devem ser confirmados no Windows
+real, especialmente com projetos grandes e câmera ortográfica/perspectiva.

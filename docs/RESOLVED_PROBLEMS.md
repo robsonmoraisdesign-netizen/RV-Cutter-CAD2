@@ -16,3 +16,5 @@ Este arquivo é permanente. Um problema corrigido não deve ser apagado; deve ga
 | R-010 | QA obsoleto permanecendo como falha silenciosa | Teste stale deve ser atualizado/removido e registrado. |
 | R-011 | Entrega declarada validada sem execução real | Só marcar PASS para teste realmente executado; limitações devem ficar explícitas. |
 | R-012 | Função visual presente, mas sem modelo arquitetônico real | Botão/UI não conta como função concluída sem estado, persistência, comportamento e teste. |
+| R-013 | ZIP de staging enviado com sufixo `(1)` não acionou o importador que esperava nome exato | Arquivo de staging deve ser normalizado antes da importação; automações não podem depender de um nome de upload frágil. |
+| R-014 | Verificação SHA da baseline falhou apenas no Windows por conversão LF→CRLF no checkout | `.gitattributes` deve fixar `eol=lf` para texto e marcar binários explicitamente antes de comparar hashes. |
