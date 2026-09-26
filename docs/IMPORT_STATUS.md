@@ -12,42 +12,33 @@ Branch: `chore/import-14.22`
 - [x] `src/` autoral completo importado
 - [x] `app/` autoral importado
 - [x] QA textual importado
-- [x] Build reproduzível: `npm ci` + `npm run build` passaram no GitHub Actions em Linux e Windows
-- [x] Sintaxe do fonte e runtime gerado passou em Linux e Windows
-- [ ] Fixtures/assets binários e JSON pesados importados
-- [ ] `npm test` completo aprovado
+- [x] Fixtures/assets binários e JSON pesados importados do ZIP original
+- [x] ZIP de staging removido após a importação
+- [x] Build reproduzível: `npm ci` + `npm run build` passaram no GitHub Actions em Linux e Windows antes da importação dos fixtures
+- [x] Sintaxe do fonte e runtime gerado passou em Linux e Windows antes da importação dos fixtures
+- [ ] `npm test` completo aprovado com a baseline integral
 - [ ] Runtime Windows empacotado a partir do commit da baseline
 - [ ] PR da baseline para `main`
 
-## Diagnóstico do CI
+## Importação integral do pacote
 
-O primeiro CI completo chegou corretamente até `npm test` em Linux e Windows.
-A falha atual é **somente por fixture ausente**:
+O ZIP original foi recebido em `baseline-upload/`, normalizado para o nome esperado e processado pelo workflow **Import uploaded 14.22 archive**.
 
-```text
-Error: ENOENT: no such file or directory, open 'test-pig-loops.json'
-```
+Commit automático resultante:
 
-Portanto o código-fonte compila, os bundles são gerados e a sintaxe passa. O próximo passo não é alterar o motor: é completar a importação dos assets históricos de QA.
+`fbddaa490f98abf775a834610342d828b9253c4a`
 
-## Caminho controlado para concluir a importação
+Arquivos confirmados após a extração incluem:
 
-Foi criado o workflow `.github/workflows/import-uploaded-baseline.yml`.
+- `test-pig-loops.json`
+- `test-rose-loops.json`
+- `fixtures/rosa-original.stl`
+- `app/examples/pig.jpg`
+- `app/examples/cow.jpg`
+- `app/examples/flowers.png`
 
-Ao adicionar o ZIP original:
+Os artefatos derivados `app/ui.js`, `app/worker.js` e `app/manifold.wasm` continuam fora do código-fonte versionado e devem ser produzidos pelo build.
 
-```text
-baseline-upload/RV_Cutter_CAD_14_22_CODIGO_FONTE.zip
-```
+## Próximo gate
 
-na branch `chore/import-14.22`, o GitHub Actions:
-
-1. valida que o pacote é 14.22.0;
-2. localiza automaticamente a raiz aninhada do fonte;
-3. importa examples/fixtures/JSONs necessários;
-4. mantém `app/ui.js`, `app/worker.js` e `app/manifold.wasm` como artefatos derivados;
-5. apaga o ZIP de staging;
-6. commita a baseline completa;
-7. dispara novamente o CI Linux/Windows.
-
-Isso evita reconstruir manualmente arquivos binários pela API de texto do conector.
+Executar novamente o CI Linux/Windows sobre a baseline completa. O merge para `main` só poderá ocorrer após analisar todos os testes e registrar qualquer incompatibilidade histórica como problema conhecido ou corrigido.
