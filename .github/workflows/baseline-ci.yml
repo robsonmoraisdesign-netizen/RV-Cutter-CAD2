@@ -9,6 +9,7 @@ on:
       - 'src/**'
       - 'app/**'
       - 'qa*'
+      - 'docs/baseline-14.22-manifest.json'
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/baseline-ci.yml'
@@ -28,6 +29,9 @@ jobs:
         with:
           node-version: '22'
           cache: npm
+
+      - name: Verify immutable 14.22 source baseline
+        run: node qa-baseline-integrity.cjs
 
       - name: Install locked dependencies
         run: npm ci
@@ -96,3 +100,42 @@ jobs:
             app/manifold.wasm
           if-no-files-found: error
           retention-days: 14
+
+      - name: Assemble Windows x64 portable from locked Electron
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $out = 'dist/RV_Cutter_CAD_14_22_Windows_x64'
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          Copy-Item -Recurse -Force 'node_modules/electron/dist/*' $out
+          if (Test-Path "$out/electron.exe") {
+            Rename-Item "$out/electron.exe" 'RV Cutter CAD.exe'
+          } else {
+            throw 'electron.exe not found in locked Electron distribution'
+          }
+          if (Test-Path "$out/resources/default_app.asar") {
+            Remove-Item -Force "$out/resources/default_app.asar"
+          }
+          New-Item -ItemType Directory -Force -Path "$out/resources/app" | Out-Null
+          Copy-Item -Recurse -Force 'app/*' "$out/resources/app"
+          New-Item -ItemType Directory -Force -Path "$out/Codigo-fonte" | Out-Null
+          Copy-Item -Recurse -Force 'src' "$out/Codigo-fonte/src"
+          Copy-Item -Recurse -Force 'app' "$out/Codigo-fonte/app"
+          Copy-Item -Force 'package.json','package-lock.json','docs/baseline-14.22-manifest.json' "$out/Codigo-fonte/"
+          Get-ChildItem -File 'qa*' | Copy-Item -Destination "$out/Codigo-fonte/"
+          if (Test-Path "$out/Codigo-fonte/app/ui.js") { Remove-Item -Force "$out/Codigo-fonte/app/ui.js" }
+          if (Test-Path "$out/Codigo-fonte/app/worker.js") { Remove-Item -Force "$out/Codigo-fonte/app/worker.js" }
+          if (Test-Path "$out/Codigo-fonte/app/manifold.wasm") { Remove-Item -Force "$out/Codigo-fonte/app/manifold.wasm" }
+          Copy-Item -Force 'VALIDACAO_14_22.txt' "$out/"
+          "Source commit: $env:GITHUB_SHA" | Set-Content -Encoding UTF8 "$out/SOURCE_COMMIT.txt"
+          Get-ChildItem $out | Select-Object Name,Length
+
+      - name: Upload Windows x64 portable
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: RV_Cutter_CAD_14_22_Windows_x64
+          path: dist/RV_Cutter_CAD_14_22_Windows_x64
+          if-no-files-found: error
+          retention-days: 30
