@@ -5,7 +5,7 @@
   "main": "app/main.cjs",
   "scripts": {
     "build": "esbuild src/ui.mjs --bundle --minify --outfile=app/ui.js --format=iife --platform=browser --external:node:* && esbuild src/worker.mjs --bundle --minify --outfile=app/worker.js --format=esm --platform=browser --external:node:*",
-    "test": "node qa13-geometry.mjs && node qa14-bevel.mjs && node qa14-corners.mjs && node qa148-expansion-linked.mjs && node qa148-runtime-worker.mjs && node qa14-export-center.mjs && node qa13-catalog.cjs && node qa1422-inverted-relief-volume.mjs",
+    "test": "node qa13-geometry.mjs && node qa14-bevel.mjs && node qa14-corners.mjs && node qa148-expansion-linked.mjs && node qa148-runtime-worker.mjs && node qa14-export-center.mjs && node qa13-catalog.cjs && node qa1422-inverted-relief-volume.mjs && node qa-sketch-phase1.mjs",
     "start": "electron app"
   },
   "keywords": [],
