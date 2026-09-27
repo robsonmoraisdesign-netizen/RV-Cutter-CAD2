@@ -252,7 +252,8 @@ window.addEventListener('keydown',e=>{
    if(!$('sketchShortcutPalette').hidden){toggleSketchShortcutPalette(false);return;}
    activateSketchTool('select');editor.sketch.clearSelection();editor.render();return;
   }
-  const map={d:'dimension',m:'trim',l:'sketch-line',r:'rectangle',c:'circle',a:'arc'};
+  if(e.key==='Enter'&&editor.getTool()==='bezier'){e.preventDefault();editor.finishBezier();return;}
+  const map={d:'dimension',m:'trim',l:'sketch-line',r:'rectangle',c:'circle',a:'arc',b:'bezier'};
   if(map[k]&&!e.ctrlKey&&!e.metaKey&&!e.altKey){e.preventDefault();activateSketchTool(map[k]);return;}
   if(e.key==='Delete'){editor.removeNode();return;}
  }
