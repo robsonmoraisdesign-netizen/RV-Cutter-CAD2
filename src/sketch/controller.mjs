@@ -1,11 +1,11 @@
-import {cloneSketch,line,circle,arc,rectangle,addEntity,addConstraint,addDimension,getEntity,removeEntity} from './model.mjs';
+import {cloneSketch,line,circle,arc,bezier,rectangle,addEntity,addConstraint,addDimension,getEntity,removeEntity} from './model.mjs';
 import {sketchFromObject,resolveDocument} from './document.mjs';
 import {sketchStatus,entityStates} from './diagnostics.mjs';
 import {trimEntity,extendLine,entityBounds} from './operations.mjs';
 
 const radial=e=>['circle','arc'].includes(e.type);
 const lineLength=e=>Math.hypot(e.end[0]-e.start[0],e.end[1]-e.start[1]);
-const measuredValue=e=>e.type==='line'?lineLength(e):e.radius;
+const measuredValue=e=>e.type==='line'?lineLength(e):['circle','arc'].includes(e.type)?e.radius:null;
 
 // Domain/controller shared by the existing SVG editor; no second editor or overlay app.
 export function createSketchController(api){
@@ -26,6 +26,7 @@ export function createSketchController(api){
   }else{let e;
    if(type==='line')e=line(a,b);
    if(type==='circle')e=circle(a,Math.hypot(b[0]-a[0],b[1]-a[1]));
+   if(type==='bezier')e=bezier(a);
    if(type==='arc'){
     const d=2*(a[0]*(b[1]-c[1])+b[0]*(c[1]-a[1])+c[0]*(a[1]-b[1]));
     if(Math.abs(d)<1e-8)throw Error('Os três pontos do arco não podem estar alinhados.');
@@ -77,6 +78,7 @@ export function createSketchController(api){
  function dimension(value,driving=true){return transact(s=>{
   if(selected.length!==1)throw Error('Selecione uma linha, círculo ou arco para cotar.');
   const e=getEntity(s,selected[0]),type={line:'lineLength',circle:'circleRadius',arc:'arcRadius'}[e.type];
+  if(!type)throw Error('A cota direta desta fase suporta linha, círculo e arco.');
   const v=driving?Number(value):measuredValue(e);
   if(!(v>0&&Number.isFinite(v)))throw Error('Informe uma cota maior que zero.');
   const old=s.dimensions.find(d=>d.entity===e.id&&d.type===type);
@@ -86,7 +88,10 @@ export function createSketchController(api){
   const e=getEntity(s,entity);
   if(s.constraints.some(c=>c.type==='fixed'&&c.entity===entity))throw Error('Entidade fixada: remova Fixar antes de mover.');
   if(e.type==='line')e[which]=[...p];
-  else if(which==='center')e.center=[...p];
+  else if(e.type==='bezier'){
+   const i=which==='start'?0:which==='end'?e.points.length-1:typeof which==='string'&&which.startsWith('control:')?Number(which.slice(8)):-1;
+   if(!Number.isInteger(i)||!e.points[i])throw Error('Ponto de controle Bézier inválido.');e.points[i]=[...p];
+  }else if(which==='center')e.center=[...p];
   else if(which==='radius')e.radius=Math.hypot(p[0]-e.center[0],p[1]-e.center[1]);
   else if(e.type==='arc'){e[which==='start'?'startAngle':'endAngle']=Math.atan2(p[1]-e.center[1],p[0]-e.center[0]);}
  },[entity]);}
