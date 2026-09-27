@@ -18,8 +18,11 @@ export function createSketchController(api){
   api.changed({geometryChanged});return true;
  }catch(e){api.status(e.message);return false;}}
  function create(type,a,b,c,options={}){return transact(s=>{
-  if(type==='rectangle')selected=rectangle(s,a,b);
-  else{let e;
+  if(type==='rectangle'){
+   selected=rectangle(s,a,b);
+   if(options.startRef)addConstraint(s,'coincident',{a:{entity:selected[0],point:'start'},b:options.startRef});
+   if(options.endRef)addConstraint(s,'coincident',{a:{entity:selected[1],point:'end'},b:options.endRef});
+  }else{let e;
    if(type==='line')e=line(a,b);
    if(type==='circle')e=circle(a,Math.hypot(b[0]-a[0],b[1]-a[1]));
    if(type==='arc'){
@@ -31,7 +34,11 @@ export function createSketchController(api){
    }
    if(!e)throw Error('Ferramenta desconhecida.');
    addEntity(s,e);selected=[e.id];
-   if(e.type==='line'&&['horizontal','vertical'].includes(options.autoConstraint))addConstraint(s,options.autoConstraint,{entity:e.id});
+   if(e.type==='line'){
+    if(['horizontal','vertical'].includes(options.autoConstraint))addConstraint(s,options.autoConstraint,{entity:e.id});
+    if(options.startRef)addConstraint(s,'coincident',{a:{entity:e.id,point:'start'},b:options.startRef});
+    if(options.endRef)addConstraint(s,'coincident',{a:{entity:e.id,point:'end'},b:options.endRef});
+   }else if(e.type==='circle'&&options.centerRef)addConstraint(s,'coincident',{a:{entity:e.id,point:'center'},b:options.centerRef});
   }points=[];
  },selected);}
  function constrain(type){return transact(s=>{
