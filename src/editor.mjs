@@ -2,7 +2,7 @@ import {createSketchController} from './sketch/controller.mjs';
 import {simplify} from './geometry.mjs';
 
 export function createEditor(svg,api){
- let view=[-.65,-.65,1.3,1.3],tool='select',selected=-1,node=-1,region=null,drag=null,hoveredEntity=null,inference=null;
+ let view=[-.65,-.65,1.3,1.3],tool='select',selected=-1,node=-1,region=null,drag=null,hoveredEntity=null,inference=null,bezierClicks=[],bezierHover=null;
  const NS='http://www.w3.org/2000/svg';
  const el=(tag,attrs)=>{const o=document.createElementNS(NS,tag);Object.entries(attrs).forEach(([k,v])=>v!==undefined&&v!==null&&o.setAttribute(k,v));return o;};
  const sketch=createSketchController(api);let arcClicks=[];
@@ -11,8 +11,9 @@ export function createEditor(svg,api){
  const path=points=>'M'+points.map(([x,y])=>`${x},${-y}`).join('L');
  const nativePoint=q=>{const o=api.object(),n=sketch.native();return [q[0]*o.params.size+n.profileCenter[0],q[1]*o.params.size+n.profileCenter[1]];};
  const localPoint=(p,n)=>{const size=api.object().params.size;return [(p[0]-n.profileCenter[0])/size,(p[1]-n.profileCenter[1])/size];};
- const entityMid=e=>e.type==='line'?[(e.start[0]+e.end[0])/2,(e.start[1]+e.end[1])/2]:[...e.center];
- const entityName=e=>({line:'Linha',circle:'Círculo',arc:'Arco'}[e?.type]||'Entidade');
+ const bezierPoint=(points,t)=>{let work=points.map(p=>[...p]);for(let level=work.length-1;level>0;level--)for(let i=0;i<level;i++)work[i]=[work[i][0]*(1-t)+work[i+1][0]*t,work[i][1]*(1-t)+work[i+1][1]*t];return work[0];};
+ const entityMid=e=>e.type==='line'?[(e.start[0]+e.end[0])/2,(e.start[1]+e.end[1])/2]:e.type==='bezier'?bezierPoint(e.points,.5):[...e.center];
+ const entityName=e=>({line:'Linha',circle:'Círculo',arc:'Arco',bezier:'Bézier'}[e?.type]||'Entidade');
  const constraintLabel=t=>({horizontal:'H',vertical:'V',coincident:'●',midpoint:'◇',fixed:'F',parallel:'∥',perpendicular:'⊥',equal:'=',concentric:'◎',collinear:'—',tangent:'T'}[t]||'?');
  const ruleName=t=>({horizontal:'Horizontal',vertical:'Vertical',coincident:'Coincidente',midpoint:'Ponto médio',fixed:'Fixar',parallel:'Paralela',perpendicular:'Perpendicular',equal:'Igual',concentric:'Concêntrica',collinear:'Colinear',tangent:'Tangente',lineLength:'Comprimento',circleRadius:'Raio',arcRadius:'Raio do arco'}[t]||t);
  const normAngle=a=>Math.atan2(Math.sin(a),Math.cos(a));
@@ -37,7 +38,9 @@ export function createEditor(svg,api){
       {point:lineMid(e),relation:{type:'midpoint',line:e.id},referenceId:e.id,icon:'◇'}
     );
    }else if(e.type==='circle')candidates.push({point:e.center,relation:{type:'coincident',ref:{entity:e.id,point:'center'}},referenceId:e.id,icon:'●'});
-   else if(e.type==='arc'){
+   else if(e.type==='bezier'){
+    e.points.forEach((p,i)=>candidates.push({point:p,relation:{type:'coincident',ref:{entity:e.id,point:`control:${i}`}},referenceId:e.id,icon:'●'}));
+   }else if(e.type==='arc'){
     candidates.push({point:e.center,relation:{type:'coincident',ref:{entity:e.id,point:'center'}},referenceId:e.id,icon:'●'});
     for(const key of ['start','end']){const a=e[key+'Angle'];candidates.push({point:[e.center[0]+Math.cos(a)*e.radius,e.center[1]+Math.sin(a)*e.radius],relation:{type:'coincident',ref:{entity:e.id,point:key}},referenceId:e.id,icon:'●'});}
    }
@@ -154,12 +157,32 @@ export function createEditor(svg,api){
    const cc=localPoint(e.center,n),r=e.radius/o.params.size;
    svg.appendChild(el('circle',{cx:cc[0],cy:-cc[1],r,class:'sketch-entity-hit','vector-effect':'non-scaling-stroke','data-entity':e.id}));
    svg.appendChild(el('circle',{...common,cx:cc[0],cy:-cc[1],r}));
+  }else if(e.type==='bezier'){
+   const pts=Array.from({length:65},(_,i)=>localPoint(bezierPoint(e.points,i/64),n)),d=path(pts);
+   svg.appendChild(el('path',{d,class:'sketch-entity-hit','vector-effect':'non-scaling-stroke','data-entity':e.id}));
+   svg.appendChild(el('path',{...common,d}));
+   if(chosen){
+    const controls=e.points.map(p=>localPoint(p,n));
+    svg.appendChild(el('path',{d:path(controls),class:'sketch-bezier-polygon','vector-effect':'non-scaling-stroke','pointer-events':'none'}));
+   }
   }else{
    let sweep=((e.endAngle-e.startAngle)%(2*Math.PI)+2*Math.PI)%(2*Math.PI);sweep=e.ccw?(sweep||2*Math.PI):(sweep?sweep-2*Math.PI:-2*Math.PI);
    const pts=Array.from({length:65},(_,i)=>localPoint([e.center[0]+Math.cos(e.startAngle+sweep*i/64)*e.radius,e.center[1]+Math.sin(e.startAngle+sweep*i/64)*e.radius],n)),d=path(pts);
    svg.appendChild(el('path',{d,class:'sketch-entity-hit','vector-effect':'non-scaling-stroke','data-entity':e.id}));
    svg.appendChild(el('path',{...common,d}));
   }
+ }
+ function renderBezierDraft(n){
+  if(tool!=='bezier'||(!bezierClicks.length&&!bezierHover))return;
+  const points=bezierClicks.map(x=>x.point);if(bezierHover)points.push(bezierHover.point);
+  if(!points.length)return;
+  const local=points.map(p=>localPoint(p,n));
+  if(local.length>=2){
+   svg.appendChild(el('path',{d:path(local),class:'sketch-bezier-polygon draft','vector-effect':'non-scaling-stroke','pointer-events':'none'}));
+   const curve=Array.from({length:65},(_,i)=>localPoint(bezierPoint(points,i/64),n));
+   svg.appendChild(el('path',{d:path(curve),class:'sketch-preview-shape bezier-preview','vector-effect':'non-scaling-stroke','pointer-events':'none'}));
+  }
+  for(const p of local)svg.appendChild(el('circle',{cx:p[0],cy:-p[1],r:view[2]*.006,class:'sketch-bezier-control','vector-effect':'non-scaling-stroke','pointer-events':'none'}));
  }
  function renderBox(){
   if(drag?.kind!=='box-select')return;
@@ -182,12 +205,12 @@ export function createEditor(svg,api){
    if(info.count===0)meta.textContent='Selecione a geometria diretamente no canvas. As linhas possuem uma área de captura ampliada.';
    else if(info.count===1){
     const e=info.primary;
-    meta.textContent=e.type==='line'?`Comprimento atual: ${info.value.toFixed(2)} mm`:e.type==='circle'?`Raio atual: ${info.value.toFixed(2)} mm`:`Raio do arco: ${info.value.toFixed(2)} mm`;
+    meta.textContent=e.type==='line'?`Comprimento atual: ${info.value.toFixed(2)} mm`:e.type==='circle'?`Raio atual: ${info.value.toFixed(2)} mm`:e.type==='arc'?`Raio do arco: ${info.value.toFixed(2)} mm`:`Bézier de grau ${Math.max(1,e.points.length-1)} · ${e.points.length} pontos de controle`;
    }else meta.textContent='Seleção múltipla pronta para restrições entre entidades.';
   }
-  if(dim){dim.disabled=info.count!==1;if(info.count===1&&!dim.matches(':focus'))dim.value=(info.dimension?.value??info.value).toFixed(2);}
-  if(driving){driving.disabled=info.count!==1;driving.checked=info.dimension?.driving!==false;}
-  if(apply)apply.disabled=info.count!==1;
+  if(dim){const canDimension=info.count===1&&Number.isFinite(info.value);dim.disabled=!canDimension;if(canDimension&&!dim.matches(':focus'))dim.value=(info.dimension?.value??info.value).toFixed(2);}
+  if(driving){driving.disabled=info.count!==1||!Number.isFinite(info.value);driving.checked=info.dimension?.driving!==false;}
+  if(apply)apply.disabled=info.count!==1||!Number.isFinite(info.value);
   const rules=$('sketchRules');if(rules){const previous=rules.value;rules.replaceChildren();for(const c of sketch.rules()){const option=document.createElement('option');option.value=c.id;option.textContent=ruleName(c.type)+(c.value!==undefined?' · '+c.value.toFixed(2)+' mm':'');rules.appendChild(option);}if([...rules.options].some(o=>o.value===previous))rules.value=previous;}
   const construction=$('toggleConstruction');if(construction){construction.disabled=!info.count;construction.classList.toggle('active',!!info.entities.length&&info.entities.every(e=>e.construction));}
   const del=$('deleteSketchEntity');if(del)del.disabled=!info.count;
@@ -208,7 +231,7 @@ export function createEditor(svg,api){
    for(const e of n.entities){
     const chosen=sketch.selected().includes(e.id);appendEntityShape(e,n,o,stateMap.get(e.id)||'under',chosen);
     if(chosen&&tool==='select'){
-     const handles=e.type==='line'?[['start',e.start],['end',e.end]]:[['center',e.center],['radius',[e.center[0]+e.radius,e.center[1]]]];
+     const handles=e.type==='line'?[['start',e.start],['end',e.end]]:e.type==='bezier'?e.points.map((p,i)=>[`control:${i}`,p]):[['center',e.center],['radius',[e.center[0]+e.radius,e.center[1]]]];
      if(e.type==='arc')for(const key of ['start','end']){const a=e[key+'Angle'];handles.push([key,[e.center[0]+Math.cos(a)*e.radius,e.center[1]+Math.sin(a)*e.radius]]);}
      for(const [key,p] of handles){const cc=localPoint(p,n);svg.appendChild(el('circle',{cx:cc[0],cy:-cc[1],r:view[2]*.006,fill:sketch.points().some(p=>p.entity===e.id&&p.point===key)?'#f4b860':'#eef4f3',stroke:'#258d7d','stroke-width':1,'vector-effect':'non-scaling-stroke','data-entity':e.id,'data-handle':key}));}
     }
@@ -229,16 +252,16 @@ export function createEditor(svg,api){
    const target=drag.endRelation?drag.end:drag.start,cc=localPoint(target,n);
    svg.appendChild(el('circle',{cx:cc[0],cy:-cc[1],r:view[2]*.009,class:'sketch-snap-marker','vector-effect':'non-scaling-stroke'}));
   }
-  renderBox();renderInference(n);updateInspector(n);
+  renderBezierDraft(n);renderBox();renderInference(n);updateInspector(n);
   const selection=$('selection');
-  if(selection)selection.textContent=drag?.kind==='box-select'?(drag.end?.[0]<drag.start[0]?'Seleção cruzada: toca a janela para selecionar.':'Seleção por janela: a entidade precisa ficar dentro.'):region?'Região selecionada para edição de contorno.':sketch.selected().length?`${sketch.selected().length} entidade(s) selecionada(s) · Shift adiciona à seleção`:selected>=0?`Contorno ${selected+1} · ${o.loops[selected]?.length||0} pontos`:tool==='trim'?'Trim: clique no trecho que deseja remover.':tool==='extend'?'Extend: clique perto da extremidade que deseja prolongar.':tool==='dimension'?'Cota: clique em uma linha, círculo ou arco.':'Clique para selecionar · arraste no vazio para seleção por janela.';
+  if(selection)selection.textContent=drag?.kind==='box-select'?(drag.end?.[0]<drag.start[0]?'Seleção cruzada: toca a janela para selecionar.':'Seleção por janela: a entidade precisa ficar dentro.'):region?'Região selecionada para edição de contorno.':sketch.selected().length?`${sketch.selected().length} entidade(s) selecionada(s) · Shift adiciona à seleção`:selected>=0?`Contorno ${selected+1} · ${o.loops[selected]?.length||0} pontos`:tool==='trim'?'Trim: clique no trecho que deseja remover.':tool==='extend'?'Extend: clique perto da extremidade que deseja prolongar.':tool==='dimension'?'Cota: clique em uma linha, círculo ou arco.':tool==='bezier'?(bezierClicks.length?'Bézier: continue clicando · duplo clique ou Enter conclui.':'Bézier: clique para iniciar a curva.'):'Clique para selecionar · arraste no vazio para seleção por janela.';
  }
- function reset(){view=[-.65,-.65,1.3,1.3];selected=-1;node=-1;region=null;drag=null;arcClicks=[];hoveredEntity=null;inference=null;sketch.reset();closeInlineDimension();render();}
+ function reset(){view=[-.65,-.65,1.3,1.3];selected=-1;node=-1;region=null;drag=null;arcClicks=[];bezierClicks=[];bezierHover=null;hoveredEntity=null;inference=null;sketch.reset();closeInlineDimension();render();}
  async function operate(op){const o=api.object();if(!o||!contourMode())return;const original=o.loops;try{api.status('Aplicando edição vetorial…');const loops=await api.request({action:'edit',loops:original,op:{...op,size:o.params.size}});if(api.object()?.id!==o.id||o.loops!==original){api.status('Edição cancelada porque o objeto mudou.');return;}api.history();delete o.sketch;o.loops=loops;selected=-1;node=-1;api.changed();render();}catch(e){api.status(e.message);}}
 
  function closeInlineDimension(){const box=$('sketchInlineDimension');if(box)box.hidden=true;}
  function openInlineDimension(entityId,clientX,clientY){
-  sketch.select(entityId);render();const info=sketch.selectionInfo();if(info.count!==1)return;
+  sketch.select(entityId);render();const info=sketch.selectionInfo();if(info.count!==1||!Number.isFinite(info.value)){api.status('Cota direta disponível para linha, círculo e arco nesta fase.');return;}
   const box=$('sketchInlineDimension'),input=$('sketchInlineDimensionValue'),label=$('sketchInlineDimensionLabel'),vp=$('viewport').getBoundingClientRect();
   label.textContent=info.primary.type==='line'?'Comprimento':info.primary.type==='circle'?'Raio':'Raio do arco';
   input.value=(info.dimension?.value??info.value).toFixed(2);
@@ -265,6 +288,14 @@ export function createEditor(svg,api){
    beginPrimitive(q,{suppress:e.shiftKey});render();return;
   }
   if(tool==='arc'){arcClicks.push(nativePoint(q));if(arcClicks.length===3){sketch.create('arc',...arcClicks);arcClicks=[];}else api.status('Arco de 3 pontos · clique '+(arcClicks.length+1)+' de 3.');render();return;}
+  if(tool==='bezier'){
+   const raw=nativePoint(q),snap=e.shiftKey?{point:raw,relation:null}:snapNative(raw,sketch.native());
+   if(e.detail>=2&&bezierClicks.length>=2){
+    const last=bezierClicks.at(-1)?.point;if(!last||Math.hypot(last[0]-snap.point[0],last[1]-snap.point[1])>1e-5)bezierClicks.push({point:snap.point,relation:snap.relation});
+    finishBezier();return;
+   }
+   bezierClicks.push({point:snap.point,relation:snap.relation});bezierHover=null;api.status('Bézier: clique para adicionar pontos de controle · duplo clique ou Enter para concluir.');render();return;
+  }
   if(entity&&tool==='select'){
    const handle=e.target.dataset.handle;sketch.select(entity,handle==='radius'?null:handle,e.shiftKey);if(handle&&!e.shiftKey)drag={kind:'entity-point',entity,handle,start:q};render();return;
   }
@@ -280,8 +311,8 @@ export function createEditor(svg,api){
  svg.onpointermove=e=>{
   const o=api.object();if(!o)return;
   hoveredEntity=e.target?.dataset?.entity||null;
-  if(!drag){render();return;}
   const q=point(e);
+  if(!drag){if(tool==='bezier'&&bezierClicks.length){const raw=nativePoint(q),snap=e.shiftKey?{point:raw,relation:null}:snapNative(raw,sketch.native());bezierHover={point:snap.point,relation:snap.relation};inference=snap.relation?{...snap,point:snap.point,type:snap.relation.type}:null;}render();return;}
   if(drag.kind==='primitive'){updatePrimitiveDraft(q,{suppress:e.shiftKey||drag.suppress});render();return;}
   if(drag.kind==='box-select'){drag.end=q;render();return;}
   if(drag.kind==='entity-point'){drag.end=nativePoint(q);return;}
@@ -316,10 +347,16 @@ export function createEditor(svg,api){
   api.history();delete o.sketch;p.splice(at,0,q);node=at;api.changed();render();
  };
  function removeNode(){if(sketch.selected().length){sketch.remove();render();return;}const o=api.object();if(!contourMode())return;if(selected>=0&&node>=0&&o?.loops[selected].length>3){api.history();delete o.sketch;o.loops[selected].splice(node,1);node=-1;api.changed();render();}}
- function setTool(t){tool=t;arcClicks=[];drag=null;inference=null;closeInlineDimension();render();}
+ function finishBezier(){
+  if(bezierClicks.length<2){bezierClicks=[];bezierHover=null;inference=null;render();return false;}
+  const points=bezierClicks.map(x=>x.point),relations=bezierClicks.map(x=>x.relation||null),ok=sketch.create('bezier',points,null,null,{controlRelations:relations});
+  if(ok)api.status(`Bézier criada · grau ${Math.max(1,points.length-1)} · ${points.length} pontos de controle.`);
+  bezierClicks=[];bezierHover=null;inference=null;render();return ok;
+ }
+ function setTool(t){tool=t;arcClicks=[];bezierClicks=[];bezierHover=null;drag=null;inference=null;closeInlineDimension();render();}
  return {
   sketch,render,reset,fit:()=>{view=[-.65,-.65,1.3,1.3];render()},
-  setTool,getTool:()=>tool,openInlineDimension,
+  setTool,getTool:()=>tool,openInlineDimension,finishBezier,
   removeNode,clearRegion:()=>{region=null;render()},
   offset:distance=>{if(selected<0){api.status('Selecione um contorno primeiro.');return;}operate({type:'offset',selected,distance});},
   thickness:distance=>operate({type:'thickness',distance,region}),
