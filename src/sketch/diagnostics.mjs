@@ -1,8 +1,8 @@
 import {entityEndpoint} from './model.mjs';
 
-const fields=e=>e.type==='line'?['start.0','start.1','end.0','end.1']:e.type==='circle'?['center.0','center.1','radius']:['center.0','center.1','radius','startAngle','endAngle'];
+const fields=e=>e.type==='line'?['start.0','start.1','end.0','end.1']:e.type==='circle'?['center.0','center.1','radius']:e.type==='arc'?['center.0','center.1','radius','startAngle','endAngle']:e.type==='bezier'?e.points.flatMap((_,i)=>[`points.${i}.0`,`points.${i}.1`]):[];
 const read=(o,key)=>key.split('.').reduce((v,k)=>v[k],o);
-function write(o,key,value){const ks=key.split('.');if(ks.length===1)o[key]=value;else o[ks[0]][ks[1]]=value;}
+function write(o,key,value){const ks=key.split('.');let target=o;for(let i=0;i<ks.length-1;i++)target=target[ks[i]];target[ks.at(-1)]=value;}
 const lineVec=e=>[e.end[0]-e.start[0],e.end[1]-e.start[1]];
 const lineLen=e=>Math.hypot(...lineVec(e));
 const mid=e=>[(e.start[0]+e.end[0])/2,(e.start[1]+e.end[1])/2];
