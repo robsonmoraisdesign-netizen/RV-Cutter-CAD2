@@ -182,3 +182,30 @@ body.drawer-collapsed .project-drawer-v4{visibility:hidden;pointer-events:none}
 #editor .sketch-point-visible.entity-conflict{fill:#cf4646}
 #editor .sketch-point-visible.entity-selected{fill:#df8c2f}
 #editor .sketch-point-hit:hover + .sketch-point-visible{fill:#ee9a37!important;stroke:#ee9a37!important}
+
+
+/* 14.26 · inspector harmony — remove legacy navy card language */
+.right .config-3d{background:var(--v4-surface)!important;color:var(--v4-text2)}
+.right .scope-block,.right .mode-block{margin-bottom:14px!important}
+.right .segmented{background:var(--v4-bg)!important;border:1px solid var(--v4-line2)!important;padding:2px!important;border-radius:6px!important}
+.right .segmented button{height:28px!important;padding:0 7px!important;background:transparent!important;color:var(--v4-muted)!important;font-size:8px!important;box-shadow:none!important}
+.right .segmented button.active{background:var(--v4-surface3)!important;color:var(--v4-text)!important}
+.right .mode-grid{gap:5px!important}
+.right .mode-grid button{min-height:48px!important;padding:8px!important;background:var(--v4-surface2)!important;border:1px solid var(--v4-line2)!important;color:var(--v4-text2)!important;font-size:8px!important;box-shadow:none!important;border-radius:7px!important}
+.right .mode-grid button:hover{background:var(--v4-surface3)!important;border-color:var(--v4-line)!important;color:var(--v4-text)!important}
+.right .mode-grid button.active{background:var(--v4-brandSoft)!important;border-color:var(--v4-brand)!important;color:var(--v4-text)!important;box-shadow:inset 2px 0 0 var(--v4-brand)!important}
+.right .mode-icon{font-size:13px!important;color:var(--v4-brand2)!important}
+.right .parameter-stack{gap:6px!important}
+.right .param-group,.right .option-card,.right .protection-hint{background:transparent!important;border:1px solid var(--v4-line2)!important;border-radius:7px!important;box-shadow:none!important}
+.right .param-group>summary,.right .option-card>summary{min-height:34px!important;padding:8px 10px!important;background:transparent!important;border:0!important;color:var(--v4-text2)!important;font-size:8.5px!important}
+.right .param-group[open]>summary,.right .option-card[open]>summary{background:color-mix(in srgb,var(--v4-surface3) 42%,transparent)!important;border-bottom:1px solid var(--v4-line2)!important}
+.right .param-content,.right .option-body{padding:7px 10px 10px!important}
+.right .range-pair{grid-template-columns:1fr 72px!important;gap:6px!important;margin:7px 0 10px!important}
+.right .range-pair label,.right .field,.right .check{font-size:8px!important;color:var(--v4-text2)!important}
+.right .range-pair input[type=number],.right .field select,.right .field input{background:var(--v4-bg)!important;border:1px solid var(--v4-line)!important;color:var(--v4-text)!important;border-radius:5px!important;font-size:8px!important;padding:6px 7px!important}
+.right .range-pair input[type=range]{accent-color:var(--v4-brand)!important}
+.right .protection-hint{padding:8px 9px!important;margin:7px 0 10px!important;color:var(--v4-muted)!important}
+.right .secondary-accent{background:var(--v4-brandSoft)!important;border-color:color-mix(in srgb,var(--v4-brand) 45%,var(--v4-line))!important;color:var(--v4-brand2)!important}
+.right #savedPreset{background:var(--v4-bg)!important;border-color:var(--v4-line)!important}
+.right #objectMetrics{background:var(--v4-surface)!important;border-bottom:1px solid var(--v4-line2)!important}
+.right .metric-row,.right .metric-part{background:transparent!important;border-color:var(--v4-line2)!important}
