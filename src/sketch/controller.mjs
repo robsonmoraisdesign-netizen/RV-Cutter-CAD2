@@ -1,6 +1,7 @@
 import {cloneSketch,line,circle,arc,rectangle,addEntity,addConstraint,addDimension,getEntity,removeEntity} from './model.mjs';
 import {sketchFromObject,resolveDocument} from './document.mjs';
-import {sketchStatus} from './diagnostics.mjs';
+import {sketchStatus,entityStates} from './diagnostics.mjs';
+import {trimEntity,extendLine,entityBounds} from './operations.mjs';
 
 const radial=e=>['circle','arc'].includes(e.type);
 const lineLength=e=>Math.hypot(e.end[0]-e.start[0],e.end[1]-e.start[1]);
@@ -36,15 +37,30 @@ export function createSketchController(api){
    addEntity(s,e);selected=[e.id];
    if(e.type==='line'){
     if(['horizontal','vertical'].includes(options.autoConstraint))addConstraint(s,options.autoConstraint,{entity:e.id});
-    if(options.startRef)addConstraint(s,'coincident',{a:{entity:e.id,point:'start'},b:options.startRef});
-    if(options.endRef)addConstraint(s,'coincident',{a:{entity:e.id,point:'end'},b:options.endRef});
-   }else if(e.type==='circle'&&options.centerRef)addConstraint(s,'coincident',{a:{entity:e.id,point:'center'},b:options.centerRef});
+    if(options.parallelRef)addConstraint(s,'parallel',{first:options.parallelRef,second:e.id});
+    const applyInference=(which,rel)=>{
+      if(!rel)return;
+      if(rel.type==='coincident')addConstraint(s,'coincident',{a:{entity:e.id,point:which},b:rel.ref});
+      if(rel.type==='midpoint')addConstraint(s,'midpoint',{point:{entity:e.id,point:which},line:rel.line});
+    };
+    applyInference('start',options.startRelation|| (options.startRef?{type:'coincident',ref:options.startRef}:null));
+    applyInference('end',options.endRelation|| (options.endRef?{type:'coincident',ref:options.endRef}:null));
+   }else if(e.type==='circle'){
+    const rel=options.centerRelation||(options.centerRef?{type:'coincident',ref:options.centerRef}:null);
+    if(rel?.type==='coincident')addConstraint(s,'coincident',{a:{entity:e.id,point:'center'},b:rel.ref});
+    if(rel?.type==='midpoint')addConstraint(s,'midpoint',{point:{entity:e.id,point:'center'},line:rel.line});
+   }
   }points=[];
  },selected);}
  function constrain(type){return transact(s=>{
   if(type==='coincident'){
    if(points.length!==2)throw Error('Selecione dois pontos com Shift para aplicar Coincidente.');
    addConstraint(s,type,{a:points[0],b:points[1]});
+  }else if(type==='midpoint'){
+   if(points.length!==1)throw Error('Selecione um ponto e uma linha para aplicar Ponto médio.');
+   const lineId=selected.find(id=>id!==points[0].entity&&getEntity(s,id).type==='line');
+   if(!lineId)throw Error('Selecione também a linha de referência com Shift.');
+   addConstraint(s,'midpoint',{point:points[0],line:lineId});
   }else if(['parallel','perpendicular','equal','concentric','collinear','tangent'].includes(type)){
    if(selected.length!==2)throw Error('Selecione exatamente duas entidades para esta restrição.');
    const [a,b]=selected.map(id=>getEntity(s,id));
@@ -80,18 +96,43 @@ export function createSketchController(api){
   if(point&&!points.some(p=>p.entity===entity&&p.point===point)){points.push({entity,point});if(points.length>2)points.shift();}
   statusCache=null;
  }
+ function setSelection(ids,extend=false){
+  const valid=[...new Set(ids)].filter(id=>native()?.entities.some(e=>e.id===id));
+  if(!extend){selected=[];points=[];}
+  for(const id of valid)if(!selected.includes(id))selected.push(id);
+  statusCache=null;
+ }
  function clearSelection(){selected=[];points=[];statusCache=null;}
  function remove(){return transact(s=>{if(!selected.length)throw Error('Selecione uma entidade.');selected.forEach(id=>removeEntity(s,id));selected=[];points=[];});}
  function rules(){const s=native();if(!s)return [];return [...s.constraints,...s.dimensions].filter(c=>selected.includes(c.entity)||selected.includes(c.a?.entity)||selected.includes(c.b?.entity)||selected.includes(c.first)||selected.includes(c.second));}
  function removeRule(id){return transact(s=>{s.constraints=s.constraints.filter(c=>c.id!==id);s.dimensions=s.dimensions.filter(c=>c.id!==id);});}
  function toggleConstruction(){return transact(s=>{if(!selected.length)throw Error('Selecione uma entidade.');for(const id of selected){const e=getEntity(s,id);e.construction=!e.construction;}},selected);}
+ function trim(entityId,clickPoint){
+  let report=null;const ok=transact(s=>{report=trimEntity(s,entityId,clickPoint);selected=selected.filter(id=>s.entities.some(e=>e.id===id));points=[];},[entityId]);
+  if(ok&&report)api.status(report.removed?'Entidade removida pelo Trim.':`Trim aplicado${report.split?' · entidade dividida':''}${report.relationsRemoved?' · relações incompatíveis removidas: '+report.relationsRemoved:''}.`);
+  return ok;
+ }
+ function extend(entityId,clickPoint){
+  let report=null;const ok=transact(s=>{report=extendLine(s,entityId,clickPoint);selected=[entityId];points=[];},[entityId]);
+  if(ok&&report)api.status(`Linha estendida até o próximo limite${report.relationsRemoved?' · relações incompatíveis removidas: '+report.relationsRemoved:''}.`);
+  return ok;
+ }
+ function selectBox(bounds,{crossing=false,extend=false}={}){
+  const s=native();if(!s)return [];
+  const ids=s.entities.filter(e=>{
+   const b=entityBounds(e);if(!b)return false;
+   return crossing?!(b.maxX<bounds.minX||b.minX>bounds.maxX||b.maxY<bounds.minY||b.minY>bounds.maxY):(b.minX>=bounds.minX&&b.maxX<=bounds.maxX&&b.minY>=bounds.minY&&b.maxY<=bounds.maxY);
+  }).map(e=>e.id);
+  setSelection(ids,extend);return ids;
+ }
  function convert(){const o=api.object();if(!o?.sketch)return;api.history();delete o.sketch;selected=[];points=[];invalidate();api.changed();api.status('Sketch convertido em contornos. Desfazer restaura as entidades e restrições.');}
  function describe(){const s=native();if(!s)return {label:'Sketch vazio',state:'free',dof:0};if(statusCache?.source===s)return statusCache.value;statusCache={source:s,value:sketchStatus(s,lastSolution)};return statusCache.value;}
+ function states(){const s=native();return s?entityStates(s,lastSolution):new Map();}
  function selectionInfo(){
   const s=native();if(!s||!selected.length)return {count:0,entities:[],primary:null,rules:[]};
   const entities=selected.map(id=>getEntity(s,id)),primary=entities.length===1?entities[0]:null;
   const dim=primary?s.dimensions.find(d=>d.entity===primary.id):null;
   return {count:entities.length,entities:structuredClone(entities),primary:primary?structuredClone(primary):null,value:primary?measuredValue(primary):null,dimension:dim?structuredClone(dim):null,rules:structuredClone(rules())};
  }
- return {native,create,constrain,dimension,movePoint,select,clearSelection,remove,rules,removeRule,toggleConstruction,convert,describe,selectionInfo,reset:()=>{selected=[];points=[];lastSolution=null;invalidate();},selected:()=>selected,points:()=>points};
+ return {native,create,constrain,dimension,movePoint,select,setSelection,selectBox,clearSelection,remove,rules,removeRule,toggleConstruction,trim,extend,convert,describe,states,selectionInfo,reset:()=>{selected=[];points=[];lastSolution=null;invalidate();},selected:()=>selected,points:()=>points};
 }
