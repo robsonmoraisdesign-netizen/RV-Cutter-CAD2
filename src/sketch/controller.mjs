@@ -50,6 +50,13 @@ export function createSketchController(api){
     const rel=options.centerRelation||(options.centerRef?{type:'coincident',ref:options.centerRef}:null);
     if(rel?.type==='coincident')addConstraint(s,'coincident',{a:{entity:e.id,point:'center'},b:rel.ref});
     if(rel?.type==='midpoint')addConstraint(s,'midpoint',{point:{entity:e.id,point:'center'},line:rel.line});
+   }else if(e.type==='bezier'){
+    for(const [i,rel] of (options.controlRelations||[]).entries()){
+      if(!rel)continue;
+      const point={entity:e.id,point:`control:${i}`};
+      if(rel.type==='coincident')addConstraint(s,'coincident',{a:point,b:rel.ref});
+      if(rel.type==='midpoint')addConstraint(s,'midpoint',{point,line:rel.line});
+    }
    }
   }points=[];
  },selected);}
