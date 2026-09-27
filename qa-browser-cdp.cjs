@@ -43,6 +43,8 @@ async function cdp(url){
   })();`});
   await send('Page.navigate',{url:'http://127.0.0.1:8092/'});await waitFor(async()=>{const r=await send('Runtime.evaluate',{expression:'document.readyState==="complete" && !!window.RVTest',returnByValue:true});return r.result.value;},60000);
   const evalv=async expression=>(await send('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true})).result.value;
+  assert(await evalv("document.querySelector('#home').classList.contains('home-v4')"),'V4 library must be active');
+  const homeShot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync('audit-home-14.25.png',Buffer.from(homeShot.data,'base64'));
   await evalv("document.querySelector('#newProject').click(); true");
   await waitFor(()=>evalv("RVTest.state.screen==='studio' && RVTest.state.stage==='2d'"));
   await evalv("document.querySelector('[data-tool=\"circle\"]').click(); true");
@@ -59,7 +61,12 @@ async function cdp(url){
   await waitFor(()=>evalv("Math.abs(RVTest.active().params.size-36)<0.001"));
   assert(await evalv("document.querySelectorAll('.sketch-dimension').length>=1"),'Driving dimension must render on canvas');
   assert(await evalv("document.querySelector('#sketchStatusChip').dataset.state.length>0"),'Sketch status must render');
-  const shot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync('audit-sketch-14.24.png',Buffer.from(shot.data,'base64'));
+  const shot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync('audit-sketch-14.25.png',Buffer.from(shot.data,'base64'));
+  await evalv("document.querySelector('#tab3d').click();true");await waitFor(()=>evalv("RVTest.state.stage==='3d'"));
+  const shot3d=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync('audit-3d-14.25.png',Buffer.from(shot3d.data,'base64'));
+  await evalv("document.querySelector('#tabPresentation').click();true");await waitFor(()=>evalv("RVTest.state.stage==='presentation'"));
+  const shotPres=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync('audit-presentation-14.25.png',Buffer.from(shotPres.data,'base64'));
+  await evalv("document.querySelector('#tab2d').click();true");await waitFor(()=>evalv("RVTest.state.stage==='2d'"));
   await evalv("document.querySelector('#homeBtn').click();true");await waitFor(()=>evalv("document.querySelector('#leaveProjectDialog').open"));
   await evalv("document.querySelector('#leaveCancel').click();true");await waitFor(()=>evalv("!document.querySelector('#leaveProjectDialog').open"));
   assert.equal(await evalv("RVTest.state.screen"),'studio');
@@ -87,7 +94,7 @@ async function cdp(url){
   assert.deepEqual(exceptions.map(e=>e.params?.exceptionDetails?.text),[]);
   assert.deepEqual(severe.map(e=>e.params?.entry?.text),[]);
   dev.close();
-  console.log('CDP browser smoke: Sketch draw + dimension + Cancel + Save + reopen + Discard + full session close PASS');
+  console.log('CDP browser smoke: V4 Home + 3D + Sketch + Presentation + project lifecycle PASS');
  }finally{
   proc.kill('SIGKILL');server.close();fs.rmSync(userData,{recursive:true,force:true});
   if(proc.exitCode&&!proc.killed)console.error(stderr.slice(-4000));
