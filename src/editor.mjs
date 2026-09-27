@@ -152,7 +152,7 @@ export function createEditor(svg,api){
   if(e.type==='point'){
    const p=localPoint(e.position,n),r=view[2]*.006;
    svg.appendChild(el('circle',{cx:p[0],cy:-p[1],r:r*2.2,class:'sketch-point-hit','data-entity':e.id}));
-   svg.appendChild(el('circle',{...common,cx:p[0],cy:-p[1],r}));
+   svg.appendChild(el('circle',{...common,class:common.class+' sketch-point-visible',cx:p[0],cy:-p[1],r}));
   }else if(e.type==='line'){
    const d=path([localPoint(e.start,n),localPoint(e.end,n)]);
    svg.appendChild(el('path',{d,class:'sketch-entity-hit','vector-effect':'non-scaling-stroke','data-entity':e.id}));
