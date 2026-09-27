@@ -1,6 +1,6 @@
 export const SKETCH_SCHEMA_VERSION = 1;
 const id = (prefix='sk') => `${prefix}-${globalThis.crypto.randomUUID()}`;
-const TYPES = new Set(['line','circle','arc']);
+const TYPES = new Set(['line','circle','arc','bezier']);
 const PAIR_LINE = new Set(['parallel','perpendicular','collinear']);
 const PAIR_RADIAL = new Set(['concentric']);
 const finite = n => Number.isFinite(n) && Math.abs(n) <= 1e6;
@@ -18,6 +18,10 @@ export function arc(center,radius,startAngle,endAngle,options={}) {
   const c=circle(center,radius,options);
   if (![startAngle,endAngle].every(finite)) throw Error('Ângulo inválido.');
   return {...c,id:options.id||id('arc'),type:'arc',startAngle,endAngle,ccw:options.ccw!==false};
+}
+export function bezier(points,options={}) {
+  if(!Array.isArray(points)||points.length<2||points.length>16)throw Error('Bézier requer entre 2 e 16 pontos de controle.');
+  return {id:options.id||id('bezier'),type:'bezier',points:points.map(point),construction:!!options.construction};
 }
 export function getEntity(sketch,entityId) {
   const e=sketch.entities.find(x=>x.id===entityId);
@@ -63,6 +67,13 @@ export function entityEndpoint(entity,which) {
     const a=entity[which==='start'?'startAngle':'endAngle'];
     return [entity.center[0]+Math.cos(a)*entity.radius,entity.center[1]+Math.sin(a)*entity.radius];
   }
+  if(entity.type==='bezier'){
+    if(which==='start')return [...entity.points[0]];
+    if(which==='end')return [...entity.points.at(-1)];
+    if(typeof which==='string'&&which.startsWith('control:')){
+      const i=Number(which.slice(8));if(Number.isInteger(i)&&entity.points[i])return [...entity.points[i]];
+    }
+  }
   throw Error(`Referência de ponto inválida: ${entity.type}.${which}`);
 }
 function validatePairRef(s,c,kind){
@@ -92,6 +103,7 @@ export function validateSketch(s) {
   function checkEntity(e) {
     if (!TYPES.has(e.type)) throw Error('Tipo de entidade não suportado.');
     if (e.type==='line') { point(e.start);point(e.end);if(Math.hypot(e.end[0]-e.start[0],e.end[1]-e.start[1])<1e-8)throw Error('Linha sem comprimento.');}
+    else if(e.type==='bezier'){if(!Array.isArray(e.points)||e.points.length<2||e.points.length>16)throw Error('Bézier inválida.');e.points.forEach(point);}
     else {point(e.center);if(!finite(e.radius)||e.radius<=0)throw Error('Raio inválido.');}
     if(e.type==='arc' && ![e.startAngle,e.endAngle].every(finite))throw Error('Ângulo inválido.');
   }
