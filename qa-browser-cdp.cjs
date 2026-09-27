@@ -25,6 +25,22 @@ async function cdp(url){
   const target=await waitFor(async()=>{const list=await (await fetch('http://127.0.0.1:9223/json/list')).json();return list.find(x=>x.type==='page');},45000);
   const dev=await cdp(target.webSocketDebuggerUrl),send=dev.send;
   await send('Page.enable');await send('Runtime.enable');await send('Log.enable');await send('Emulation.setDeviceMetricsOverride',{width:1500,height:900,deviceScaleFactor:1,mobile:false});
+  await send('Page.addScriptToEvaluateOnNewDocument',{source:`(()=>{
+    const records=new Map();let presets=[];
+    globalThis.desktop={
+      catalogSave:async data=>{const p=JSON.parse(data);records.set(p.id,data);return {id:p.id};},
+      catalogList:async()=>[...records.values()].map(data=>{const p=JSON.parse(data);return {id:p.id,name:p.name,updatedAt:p.savedAt,count:p.objects.length,preview:p.objects[0]?.loops?.[0]?.filter((_,i)=>i%8===0),previewImage:p.previewImage||null};}).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)),
+      catalogOpen:async id=>records.get(id)??null,
+      catalogRename:async(id,name)=>{const raw=records.get(id);if(!raw)return false;const p=JSON.parse(raw);p.name=name;records.set(id,JSON.stringify(p));return true;},
+      catalogDelete:async id=>records.delete(id),
+      presetsList:async()=>presets,
+      presetsSave:async rows=>(presets=structuredClone(rows),true),
+      autosave:async()=>true,
+      recovery:async()=>null,
+      clearRecovery:async()=>true,
+      save:async()=>'/tmp/qa-output'
+    };
+  })();`});
   await send('Page.navigate',{url:'http://127.0.0.1:8092/'});await waitFor(async()=>{const r=await send('Runtime.evaluate',{expression:'document.readyState==="complete" && !!window.RVTest',returnByValue:true});return r.result.value;},60000);
   const evalv=async expression=>(await send('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true})).result.value;
   await evalv("document.querySelector('#newProject').click(); true");
