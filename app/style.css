@@ -60,3 +60,123 @@ body.presenting .config-3d,body.presenting #thickness2d,body.presenting .viewpor
 
 /* Sketch tools integrated into the existing editor toolbar. */
 #editTools{max-height:38vh;overflow:auto}.edit-tool-group{flex-wrap:wrap}.sketch-controls{margin-top:6px;border-top:1px solid var(--border,#344557);padding-top:6px}.sketch-controls summary{cursor:pointer}.sketch-controls-body{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px 0}.sketch-controls-body input{width:84px}.sketch-controls-body small{flex-basis:100%}#saveState[data-state="error"]{color:#ff9898}#saveState[data-state="dirty"]{color:#f2c76b}#saveState[data-state="saved"]{color:#8cdbb4}
+
+
+/* ========================================================================
+   Sketch 2D workspace — CAD-first interaction
+   Clean graphite shell, neutral canvas and restrained teal interaction.
+   ======================================================================== */
+body.sketching .workspace{background:#20272d}
+body.sketching #viewport{background:#dfe4e6}
+body.sketching #editor{background-color:#edf1f2;background-image:linear-gradient(#d4dbde 1px,transparent 1px),linear-gradient(90deg,#d4dbde 1px,transparent 1px),linear-gradient(#c3cdd1 1px,transparent 1px),linear-gradient(90deg,#c3cdd1 1px,transparent 1px);background-size:20px 20px,20px 20px,100px 100px,100px 100px;background-position:center center}
+body.sketching .toolbar{background:#252d33;border-color:#384249}
+body.sketching .tabs{background:#1f262c;border-color:#3b464d}
+body.sketching .tabs button{color:#a9b4bb}
+body.sketching .tabs .active{background:#37434a;color:#f0f5f4;box-shadow:none}
+body.sketching .right{background:#252d33;border-left-color:#39434a}
+body.sketching .left{background:#252d33;border-right-color:#39434a}
+
+#editTools.sketch-ribbon{max-height:none;overflow:visible;padding:0;background:#2a3339;border-bottom:1px solid #414c53;position:relative;z-index:15}
+.sketch-commandbar{min-height:48px;display:flex;align-items:center;gap:5px;padding:6px 10px;background:#2a3339}
+.sketch-command,.sketch-menu>summary{height:34px;display:flex;align-items:center;gap:7px;padding:0 10px;border:1px solid transparent;border-radius:7px;background:transparent;color:#d1d9dc;font-size:11px;font-weight:600;white-space:nowrap;cursor:pointer;list-style:none}
+.sketch-command:hover,.sketch-menu>summary:hover,.sketch-menu[open]>summary{background:#354149;border-color:#4a5961;color:#fff}
+.sketch-command.active{background:#dce9e6;color:#1d514a;border-color:#a9cbc4}
+.sketch-command-icon{font-size:14px;color:#7fd0c0;line-height:1}
+.sketch-command.active .sketch-command-icon{color:#2a7468}
+.sketch-menu{position:relative}
+.sketch-menu>summary::-webkit-details-marker{display:none}
+.sketch-menu .chevron{font-size:9px;color:#8e9da4;margin-left:1px}
+.sketch-menu-popover{position:absolute;left:0;top:39px;width:260px;padding:6px;background:#303a40;border:1px solid #526069;border-radius:9px;box-shadow:0 16px 40px #1117;z-index:80}
+.sketch-menu-popover>button{width:100%;display:grid;grid-template-columns:30px 1fr;align-items:center;gap:7px;text-align:left;padding:8px;border:0;background:transparent;color:#e0e7e9;border-radius:6px}
+.sketch-menu-popover>button:hover{background:#3b484f}
+.sketch-menu-popover>button.active{background:#3b514f;color:#eef9f7}
+.sketch-menu-popover strong{display:block;font-size:11px;font-weight:650}
+.sketch-menu-popover small{display:block;color:#94a4ab;font-size:9px;margin-top:2px}
+.menu-icon{width:26px;height:26px;display:grid;place-items:center;border-radius:6px;background:#273036;color:#83cdbf;font-size:15px}
+.sketch-menu-separator{padding:7px 8px 4px;border-top:1px solid #465159;margin-top:5px}
+.sketch-menu-separator span{font-size:8px;letter-spacing:1.3px;color:#829198}
+.constraint-menu{width:235px;display:grid;grid-template-columns:1fr 1fr;gap:3px}
+.constraint-menu>button{display:flex;grid-template-columns:none;gap:8px;padding:7px}
+.constraint-icon{width:22px;height:22px;display:grid;place-items:center;border:1px solid #536168;border-radius:5px;color:#8bd0c2;font-weight:700}
+.sketch-status-chip{margin-left:auto;display:flex;align-items:center;gap:6px;max-width:215px;padding:6px 9px;border:1px solid #4a555d;border-radius:999px;color:#aebbc0;font-size:9.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:#242c31}
+.sketch-status-chip .status-dot{width:7px;height:7px;border-radius:50%;background:#839198;flex:none}
+.sketch-status-chip[data-state="partial"] .status-dot{background:#e0b15f}
+.sketch-status-chip[data-state="defined"] .status-dot{background:#62c5a9}
+.sketch-status-chip[data-state="free"] .status-dot{background:#7ea8c2}
+.sketch-status-chip[data-state="conflict"] .status-dot{background:#e27777}
+.sketch-contextbar{min-height:30px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:5px 12px;background:#232b30;border-top:1px solid #353f46;color:#a6b2b8}
+.sketch-contextbar #selection{font-size:9.5px;color:#c0cbcf}
+.sketch-context-hint{font-size:8.5px;color:#7f8e95;white-space:nowrap}
+
+.sketch-inspector{display:block;margin:0 0 12px}
+.sketch-inspector[hidden]{display:none}
+.sketch-inspector-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding-bottom:11px;border-bottom:1px solid #3c474e}
+.sketch-inspector-head h2{font-size:16px;margin:0;color:#e5ecee}
+.inspector-badge{font-size:9px;padding:4px 7px;border:1px solid #4c5a62;border-radius:999px;color:#91a1a8}
+.sketch-selection-meta{font-size:10px;line-height:1.5;color:#95a4aa;margin:10px 1px 14px}
+.sketch-property-group{padding:12px 0;border-top:1px solid #39434a}
+.sketch-property-group:first-of-type{border-top:0}
+.sketch-dimension-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px;align-items:center}
+.sketch-dimension-row input{min-width:0;width:100%;background:#1e262b;border:1px solid #506069;color:#eef5f4;border-radius:6px;padding:7px 8px;text-align:right;font-variant-numeric:tabular-nums}
+.sketch-dimension-row>span{font-size:10px;color:#8e9ca2}
+.sketch-dimension-row button{padding:7px 9px;font-size:10px}
+.sketch-driving{align-items:flex-start;flex-wrap:wrap}
+.sketch-driving small{color:#7e8e95;font-size:8.5px}
+.property-group-title{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.property-group-title .mini-label{margin:0}
+.text-button{border:0;background:transparent;color:#87cabc;padding:3px 0;font-size:9px}
+.text-button:hover{background:transparent;color:#b7e2d9}
+#sketchRules{width:100%;min-height:84px;background:#1e262b;border:1px solid #46545c;color:#cbd5d8;border-radius:7px;padding:4px;font-size:10px}
+#sketchRules option{padding:5px 6px;border-radius:4px}
+.sketch-inspector-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0}
+.sketch-inspector-actions .danger-quiet{margin:0;width:auto;border:1px solid #574148}
+.sketch-secondary-action{margin:2px 0 9px;background:#303b42;border-color:#4b5961}
+.legacy-sketch-tools{margin-top:9px}
+.legacy-tool-row{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin:7px 0}
+.legacy-tool-row button{font-size:9px;padding:6px}
+.right.editing-2d .config-heading{display:none}
+.right.editing-2d #sketchInspector{display:block}
+.right.editing-2d #thickness2d[hidden]{display:none}
+.right.editing-2d #thickness2d:not([hidden]){display:block;border-top:1px solid #3b464d;padding-top:12px;margin-top:12px}
+body.sketching #dimensions{display:none}
+
+#editor .sketch-axis{stroke:#a9b6bb;stroke-width:1}
+#editor .sketch-axis-x{stroke:#b88686}
+#editor .sketch-axis-y{stroke:#86a58f}
+#editor .sketch-origin{fill:#f8fbfb;stroke:#7f9198;stroke-width:1}
+#editor .sketch-derived-profile{fill:#84b7ae}
+#editor .sketch-preview-shape{fill:none;stroke:#d28a3e;stroke-width:1.6}
+#editor .sketch-inference-line{stroke:#60a998;stroke-width:1;stroke-dasharray:5 4;opacity:.75}
+#editor .sketch-svg-text{font-family:Inter,Segoe UI,sans-serif;dominant-baseline:middle;text-anchor:middle;pointer-events:none}
+#editor .sketch-dimension{fill:#33484d;font-size:1.7%;font-weight:650;paint-order:stroke;stroke:#edf1f2;stroke-width:.005;pointer-events:auto;cursor:pointer}
+#editor .sketch-dimension.driven{fill:#728187;font-weight:500}
+#editor .sketch-live-dimension{fill:#8b5e2d;font-size:1.65%;font-weight:650;paint-order:stroke;stroke:#edf1f2;stroke-width:.005}
+#editor .sketch-constraint-badge{fill:#2d756a;font-size:1.5%;font-weight:800;paint-order:stroke;stroke:#edf1f2;stroke-width:.005}
+#editor path[data-entity],#editor circle[data-entity]{cursor:pointer}
+#editor path[data-entity]:hover,#editor circle[data-entity]:hover{stroke:#258b7c!important}
+
+.leave-project-dialog{width:min(460px,calc(100vw - 36px));text-align:center;padding:28px}
+.leave-project-dialog .dialog-symbol{width:40px;height:40px;display:grid;place-items:center;margin:0 auto 12px;border-radius:12px;background:#29433f;color:#8cd2c3}
+.leave-project-dialog h2{margin-bottom:7px}
+.leave-project-dialog p{max-width:390px;margin:0 auto;color:#9aa9af}
+.leave-dialog-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-top:22px}
+.leave-dialog-actions button{min-height:36px}
+#leaveDiscard{background:#313a40;color:#d2d9dc;border-color:#4b565d}
+#leaveCancel{background:transparent;color:#a9b4b9}
+
+#saveState[data-state="error"]{color:#ff9898}
+#saveState[data-state="dirty"]{color:#e6bd70}
+#saveState[data-state="saving"]{color:#8db4cf}
+#saveState[data-state="saved"]{color:#8bd1b7}
+
+@media(max-width:1050px){
+ .sketch-context-hint{display:none}
+ .sketch-status-chip{max-width:160px}
+ .sketch-command,.sketch-menu>summary{padding:0 7px}
+}
+@media(max-width:760px){
+ .sketch-commandbar{flex-wrap:wrap}
+ .sketch-status-chip{margin-left:0}
+ .sketch-menu-popover{position:fixed;left:12px;right:12px;top:120px;width:auto}
+ .leave-dialog-actions{grid-template-columns:1fr}
+}
