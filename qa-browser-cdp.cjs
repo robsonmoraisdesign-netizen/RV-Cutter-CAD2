@@ -47,6 +47,21 @@ async function cdp(url){
   await evalv("document.querySelector('#homeBtn').click();true");await waitFor(()=>evalv("document.querySelector('#leaveProjectDialog').open"));
   await evalv("document.querySelector('#leaveCancel').click();true");await waitFor(()=>evalv("!document.querySelector('#leaveProjectDialog').open"));
   assert.equal(await evalv("RVTest.state.screen"),'studio');
+
+  // SAVE: persist the current semantic Sketch, close every active resource, and show it in the library.
+  await evalv("document.querySelector('#homeBtn').click();true");await waitFor(()=>evalv("document.querySelector('#leaveProjectDialog').open"));
+  await evalv("document.querySelector('#leaveSave').click();true");await waitFor(()=>evalv("RVTest.state.screen==='home'"));
+  assert.equal(await evalv("RVTest.state.objects.length"),0);
+  assert.equal(await evalv("RVTest.diagnostics().worker"),false);
+  assert(await evalv("RVTest.catalog().then(x=>x.length>=1)"),'Saved project must exist in the library');
+
+  // Reopen from the library; this must create a fresh session and restore semantic entities.
+  await waitFor(()=>evalv("document.querySelectorAll('.recent-card').length>=1"));
+  await evalv("document.querySelector('.recent-card').click();true");await waitFor(()=>evalv("RVTest.state.screen==='studio'"));
+  assert.equal(await evalv("RVTest.active().sketch.entities[0].type"),'circle');
+  assert.equal(await evalv("RVTest.active().sketch.entities[0].radius"),18);
+
+  // DISCARD: leave the reopened project without writing a new library version and fully tear down the session.
   await evalv("document.querySelector('#homeBtn').click();true");await waitFor(()=>evalv("document.querySelector('#leaveProjectDialog').open"));
   await evalv("document.querySelector('#leaveDiscard').click();true");await waitFor(()=>evalv("RVTest.state.screen==='home'"));
   assert.equal(await evalv("RVTest.state.objects.length"),0);
@@ -56,7 +71,7 @@ async function cdp(url){
   assert.deepEqual(exceptions.map(e=>e.params?.exceptionDetails?.text),[]);
   assert.deepEqual(severe.map(e=>e.params?.entry?.text),[]);
   dev.close();
-  console.log('CDP browser smoke: Sketch draw + dimension + Cancel + Discard + full session close PASS');
+  console.log('CDP browser smoke: Sketch draw + dimension + Cancel + Save + reopen + Discard + full session close PASS');
  }finally{
   proc.kill('SIGKILL');server.close();fs.rmSync(userData,{recursive:true,force:true});
   if(proc.exitCode&&!proc.killed)console.error(stderr.slice(-4000));
