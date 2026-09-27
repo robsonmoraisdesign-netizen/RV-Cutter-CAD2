@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {createSketch,line,circle,bezier,addEntity,addConstraint} from './src/sketch/model.mjs';
+import {createSketch,sketchPoint,line,circle,bezier,addEntity,addConstraint} from './src/sketch/model.mjs';
 import {solveSketch} from './src/sketch/solver.mjs';
 import {entityStates,sketchStatus} from './src/sketch/diagnostics.mjs';
 import {trimEntity,extendLine} from './src/sketch/operations.mjs';
@@ -7,6 +7,15 @@ import {resolveProfiles} from './src/sketch/profile.mjs';
 import {scaleSketch} from './src/sketch/document.mjs';
 
 const d=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
+
+// Point remains semantic and can be constrained to another entity's midpoint.
+{
+ const s=createSketch(),base=line([0,0],[20,0],{id:'base-point'}),p=sketchPoint([4,6],{id:'point'});
+ addEntity(s,base);addEntity(s,p);addConstraint(s,'midpoint',{point:{entity:'point',point:'point'},line:'base-point'});
+ const solved=solveSketch(s);
+ assert.equal(solved.sketch.entities.find(e=>e.id==='point').type,'point');
+ assert.ok(d(solved.sketch.entities.find(e=>e.id==='point').position,[10,0])<1e-6);
+}
 
 // Midpoint is a persistent geometric relation.
 {
