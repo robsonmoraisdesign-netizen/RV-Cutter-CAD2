@@ -280,7 +280,9 @@ export function createEditor(svg,api){
   const o=api.object();if(!o)return;svg.setPointerCapture(e.pointerId);const q=point(e),n=e.target.dataset.node,l=e.target.dataset.loop,entity=e.target.dataset.entity;
   if(e.button===1||e.button===2){drag={kind:'pan',x:e.clientX,y:e.clientY,view:[...view]};return;}
   if(e.target.dataset.dimensionEntity){openInlineDimension(e.target.dataset.dimensionEntity,e.clientX,e.clientY);return;}
-  if(entity&&tool==='trim'){sketch.trim(entity,nativePoint(q));hoveredEntity=null;inference=null;render();return;}
+  if(entity&&tool==='trim'){
+   const seen=new Set([entity]);sketch.trim(entity,nativePoint(q));drag={kind:'trim-sweep',seen};hoveredEntity=null;inference=null;render();return;
+  }
   if(entity&&tool==='extend'){sketch.extend(entity,nativePoint(q));hoveredEntity=null;inference=null;render();return;}
   if(entity&&tool==='dimension'){openInlineDimension(entity,e.clientX,e.clientY);return;}
   if(['sketch-line','rectangle','circle'].includes(tool)){
@@ -314,6 +316,11 @@ export function createEditor(svg,api){
   const q=point(e);
   if(!drag){if(tool==='bezier'&&bezierClicks.length){const raw=nativePoint(q),snap=e.shiftKey?{point:raw,relation:null}:snapNative(raw,sketch.native());bezierHover={point:snap.point,relation:snap.relation};inference=snap.relation?{...snap,point:snap.point,type:snap.relation.type}:null;}render();return;}
   if(drag.kind==='primitive'){updatePrimitiveDraft(q,{suppress:e.shiftKey||drag.suppress});render();return;}
+  if(drag.kind==='trim-sweep'){
+   const hit=document.elementFromPoint(e.clientX,e.clientY)?.closest?.('[data-entity]'),id=hit?.dataset?.entity;
+   if(id&&!drag.seen.has(id)){drag.seen.add(id);sketch.trim(id,nativePoint(q));}
+   render();return;
+  }
   if(drag.kind==='box-select'){drag.end=q;render();return;}
   if(drag.kind==='entity-point'){drag.end=nativePoint(q);return;}
   if(drag.kind==='node'){o.loops[selected][node]=q;render();}
