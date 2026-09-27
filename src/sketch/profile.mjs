@@ -16,10 +16,21 @@ function arcPoints(e,segments){
   });
 }
 
+function bezierPoint(points,t){
+  let work=points.map(clone);
+  for(let level=work.length-1;level>0;level--)for(let i=0;i<level;i++)work[i]=[work[i][0]*(1-t)+work[i+1][0]*t,work[i][1]*(1-t)+work[i+1][1]*t];
+  return work[0];
+}
+function bezierPoints(e,segments){
+  const n=Math.max(12,Math.min(segments,Math.max(24,(e.points.length-1)*18)));
+  return Array.from({length:n+1},(_,i)=>bezierPoint(e.points,i/n));
+}
+
 function segmentFromEntity(e,curveSegments){
   if(e.construction)return null;
   if(e.type==='line')return {id:e.id,points:[clone(e.start),clone(e.end)]};
   if(e.type==='arc')return {id:e.id,points:arcPoints(e,curveSegments)};
+  if(e.type==='bezier')return {id:e.id,points:bezierPoints(e,curveSegments)};
   return null;
 }
 

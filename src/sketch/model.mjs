@@ -1,6 +1,6 @@
 export const SKETCH_SCHEMA_VERSION = 1;
 const id = (prefix='sk') => `${prefix}-${globalThis.crypto.randomUUID()}`;
-const TYPES = new Set(['line','circle','arc']);
+const TYPES = new Set(['point','line','circle','arc','bezier']);
 const PAIR_LINE = new Set(['parallel','perpendicular','collinear']);
 const PAIR_RADIAL = new Set(['concentric']);
 const finite = n => Number.isFinite(n) && Math.abs(n) <= 1e6;
@@ -9,6 +9,7 @@ const point = p => {
   return [...p];
 };
 export function createSketch({units='mm'}={}) { return {schemaVersion:1,units,entities:[],constraints:[],dimensions:[]}; }
+export function sketchPoint(position,options={}) { return {id:options.id||id('point'),type:'point',position:point(position),construction:!!options.construction}; }
 export function line(start,end,options={}) { return {id:options.id||id('line'),type:'line',start:point(start),end:point(end),construction:!!options.construction}; }
 export function circle(center,radius,options={}) {
   if (!finite(radius) || radius <= 0) throw Error('Raio inválido.');
@@ -18,6 +19,10 @@ export function arc(center,radius,startAngle,endAngle,options={}) {
   const c=circle(center,radius,options);
   if (![startAngle,endAngle].every(finite)) throw Error('Ângulo inválido.');
   return {...c,id:options.id||id('arc'),type:'arc',startAngle,endAngle,ccw:options.ccw!==false};
+}
+export function bezier(points,options={}) {
+  if(!Array.isArray(points)||points.length<2||points.length>16)throw Error('Bézier requer entre 2 e 16 pontos de controle.');
+  return {id:options.id||id('bezier'),type:'bezier',points:points.map(point),construction:!!options.construction};
 }
 export function getEntity(sketch,entityId) {
   const e=sketch.entities.find(x=>x.id===entityId);
@@ -53,15 +58,23 @@ export function rectangle(sketch,a,b,options={}) {
 export function removeEntity(sketch,entityId) {
   getEntity(sketch,entityId);
   sketch.entities=sketch.entities.filter(e=>e.id!==entityId);
-  sketch.constraints=sketch.constraints.filter(c=>![c.entity,c.a?.entity,c.b?.entity,c.first,c.second].includes(entityId));
+  sketch.constraints=sketch.constraints.filter(c=>![c.entity,c.a?.entity,c.b?.entity,c.point?.entity,c.line,c.first,c.second].includes(entityId));
   sketch.dimensions=sketch.dimensions.filter(d=>d.entity!==entityId);
 }
 export function entityEndpoint(entity,which) {
+  if(entity.type==='point'&&which==='point')return [...entity.position];
   if (entity.type==='line' && ['start','end'].includes(which)) return [...entity[which]];
   if (['circle','arc'].includes(entity.type) && which==='center') return [...entity.center];
   if (entity.type==='arc' && ['start','end'].includes(which)) {
     const a=entity[which==='start'?'startAngle':'endAngle'];
     return [entity.center[0]+Math.cos(a)*entity.radius,entity.center[1]+Math.sin(a)*entity.radius];
+  }
+  if(entity.type==='bezier'){
+    if(which==='start')return [...entity.points[0]];
+    if(which==='end')return [...entity.points.at(-1)];
+    if(typeof which==='string'&&which.startsWith('control:')){
+      const i=Number(which.slice(8));if(Number.isInteger(i)&&entity.points[i])return [...entity.points[i]];
+    }
   }
   throw Error(`Referência de ponto inválida: ${entity.type}.${which}`);
 }
@@ -91,7 +104,9 @@ export function validateSketch(s) {
   }
   function checkEntity(e) {
     if (!TYPES.has(e.type)) throw Error('Tipo de entidade não suportado.');
-    if (e.type==='line') { point(e.start);point(e.end);if(Math.hypot(e.end[0]-e.start[0],e.end[1]-e.start[1])<1e-8)throw Error('Linha sem comprimento.');}
+    if(e.type==='point')point(e.position);
+    else if (e.type==='line') { point(e.start);point(e.end);if(Math.hypot(e.end[0]-e.start[0],e.end[1]-e.start[1])<1e-8)throw Error('Linha sem comprimento.');}
+    else if(e.type==='bezier'){if(!Array.isArray(e.points)||e.points.length<2||e.points.length>16)throw Error('Bézier inválida.');e.points.forEach(point);}
     else {point(e.center);if(!finite(e.radius)||e.radius<=0)throw Error('Raio inválido.');}
     if(e.type==='arc' && ![e.startAngle,e.endAngle].every(finite))throw Error('Ângulo inválido.');
   }
@@ -104,6 +119,11 @@ export function validateSketch(s) {
     } else if(c.type==='coincident') {
       for(const ref of [c.a,c.b])entityEndpoint(getEntity(s,ref?.entity),ref?.point);
       if(c.a.entity===c.b.entity&&c.a.point===c.b.point)throw Error('Selecione dois pontos diferentes.');
+    } else if(c.type==='midpoint') {
+      const p=getEntity(s,c.point?.entity),ln=getEntity(s,c.line);
+      entityEndpoint(p,c.point?.point);
+      if(ln.type!=='line')throw Error('Ponto médio requer uma linha de referência.');
+      if(c.point.entity===c.line)throw Error('Ponto médio requer entidades diferentes.');
     } else if(PAIR_LINE.has(c.type)) validatePairRef(s,c,'line');
     else if(PAIR_RADIAL.has(c.type)) validatePairRef(s,c,'radial');
     else if(c.type==='equal'){
