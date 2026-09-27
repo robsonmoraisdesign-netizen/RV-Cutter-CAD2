@@ -2,7 +2,7 @@
 <header class="app-header v4-top">
   <button class="brand v4-brand" id="homeBtn" title="Biblioteca de projetos">
     <span class="brand-mark">RV</span>
-    <span class="brand-copy"><strong>RV Cutter CAD</strong><small id="projectLabel">Biblioteca de projetos</small></span>
+    <span class="brand-copy"><strong>RV Cutter CAD <em id="appVersion" class="brand-version"></em></strong><small id="projectLabel">Biblioteca de projetos</small></span>
   </button>
   <nav class="workspace-nav" aria-label="Workspaces">
     <button id="tabHome" class="workspace-tab active">Início</button>
@@ -51,7 +51,7 @@
   <button id="railVisual" class="rail-tool" title="Visualização">◉</button>
 </aside>
 <aside class="left project-drawer-v4">
-  <div class="drawer-v4-head"><div><span class="section-eyebrow">ESTRUTURA DO PROJETO</span><h2 id="drawerProjectName">Projeto</h2></div><span id="drawerSelectionCount" class="count-badge">1 selecionado</span></div>
+  <div class="drawer-v4-head"><div class="drawer-title-edit"><span class="section-eyebrow">ESTRUTURA DO PROJETO</span><div class="project-title-row"><input id="name" aria-label="Nome do projeto" value="Novo projeto"><button id="renameProject" class="icon-button" title="Renomear projeto" aria-label="Renomear projeto">✎</button></div></div><span id="drawerSelectionCount" class="count-badge">1 selecionado</span></div>
   <div class="scope-v4"><span>ESCOPO DE EDIÇÃO</span><div class="scope-v4-buttons"><button data-scope-choice="active" class="active">Objeto</button><button data-scope-choice="selection">Seleção</button><button data-scope-choice="all">Todos</button></div></div>
   <div class="sidebar-heading legacy-sidebar-heading"><div><span class="section-eyebrow">PROJETO</span><h2>Objetos</h2></div><span id="objectCount" class="count-badge">0 objetos</span></div>
   <button id="import" class="import"><span class="import-plus">+</span><span><strong>Adicionar desenho</strong><small>PNG, JPG, WebP ou SVG preenchido</small></span></button>
