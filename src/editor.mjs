@@ -2,7 +2,7 @@ import {createSketchController} from './sketch/controller.mjs';
 import {simplify} from './geometry.mjs';
 
 export function createEditor(svg,api){
- let view=[-.65,-.65,1.3,1.3],tool='select',selected=-1,node=-1,region=null,drag=null;
+ let view=[-.65,-.65,1.3,1.3],tool='select',selected=-1,node=-1,region=null,drag=null,hoveredEntity=null,inference=null;
  const NS='http://www.w3.org/2000/svg';
  const el=(tag,attrs)=>{const o=document.createElementNS(NS,tag);Object.entries(attrs).forEach(([k,v])=>v!==undefined&&v!==null&&o.setAttribute(k,v));return o;};
  const sketch=createSketchController(api);let arcClicks=[];
@@ -13,30 +13,65 @@ export function createEditor(svg,api){
  const localPoint=(p,n)=>{const size=api.object().params.size;return [(p[0]-n.profileCenter[0])/size,(p[1]-n.profileCenter[1])/size];};
  const entityMid=e=>e.type==='line'?[(e.start[0]+e.end[0])/2,(e.start[1]+e.end[1])/2]:[...e.center];
  const entityName=e=>({line:'Linha',circle:'Círculo',arc:'Arco'}[e?.type]||'Entidade');
- const constraintLabel=t=>({horizontal:'H',vertical:'V',coincident:'●',fixed:'F',parallel:'∥',perpendicular:'⊥',equal:'=',concentric:'◎',collinear:'—',tangent:'T'}[t]||'?');
- const ruleName=t=>({horizontal:'Horizontal',vertical:'Vertical',coincident:'Coincidente',fixed:'Fixar',parallel:'Paralela',perpendicular:'Perpendicular',equal:'Igual',concentric:'Concêntrica',collinear:'Colinear',tangent:'Tangente',lineLength:'Comprimento',circleRadius:'Raio',arcRadius:'Raio do arco'}[t]||t);
+ const constraintLabel=t=>({horizontal:'H',vertical:'V',coincident:'●',midpoint:'◇',fixed:'F',parallel:'∥',perpendicular:'⊥',equal:'=',concentric:'◎',collinear:'—',tangent:'T'}[t]||'?');
+ const ruleName=t=>({horizontal:'Horizontal',vertical:'Vertical',coincident:'Coincidente',midpoint:'Ponto médio',fixed:'Fixar',parallel:'Paralela',perpendicular:'Perpendicular',equal:'Igual',concentric:'Concêntrica',collinear:'Colinear',tangent:'Tangente',lineLength:'Comprimento',circleRadius:'Raio',arcRadius:'Raio do arco'}[t]||t);
+ const normAngle=a=>Math.atan2(Math.sin(a),Math.cos(a));
+ const lineAngle=e=>Math.atan2(e.end[1]-e.start[1],e.end[0]-e.start[0]);
+ const lineMid=e=>[(e.start[0]+e.end[0])/2,(e.start[1]+e.end[1])/2];
+ const pointSegmentDistance=(p,e)=>{const dx=e.end[0]-e.start[0],dy=e.end[1]-e.start[1],q=dx*dx+dy*dy||1,t=Math.max(0,Math.min(1,((p[0]-e.start[0])*dx+(p[1]-e.start[1])*dy)/q)),x=e.start[0]+dx*t,y=e.start[1]+dy*t;return Math.hypot(p[0]-x,p[1]-y);};
 
  function contourMode(){if(api.object()?.sketch?.entities.length){api.status('Para editar contornos derivados, use Converter em contornos. O Sketch paramétrico permanece editável.');return false;}return true;}
  function snapLine(start,end){
   const dx=end[0]-start[0],dy=end[1]-start[1],m=Math.max(Math.abs(dx),Math.abs(dy),1e-9),threshold=.075;
-  if(Math.abs(dy)/m<threshold)return {end:[end[0],start[1]],inference:'horizontal'};
-  if(Math.abs(dx)/m<threshold)return {end:[start[0],end[1]],inference:'vertical'};
-  return {end,inference:null};
+  if(Math.abs(dy)/m<threshold)return {end:[end[0],start[1]],inference:'horizontal',icon:'H'};
+  if(Math.abs(dx)/m<threshold)return {end:[start[0],end[1]],inference:'vertical',icon:'V'};
+  return {end,inference:null,icon:null};
  }
  function snapNative(p,n){
   const candidates=[];
   for(const e of n?.entities||[]){
-   if(e.type==='line'){candidates.push({point:e.start,ref:{entity:e.id,point:'start'}},{point:e.end,ref:{entity:e.id,point:'end'}});}
-   else if(e.type==='circle')candidates.push({point:e.center,ref:{entity:e.id,point:'center'}});
+   if(e.type==='line'){
+    candidates.push(
+      {point:e.start,relation:{type:'coincident',ref:{entity:e.id,point:'start'}},referenceId:e.id,icon:'●'},
+      {point:e.end,relation:{type:'coincident',ref:{entity:e.id,point:'end'}},referenceId:e.id,icon:'●'},
+      {point:lineMid(e),relation:{type:'midpoint',line:e.id},referenceId:e.id,icon:'◇'}
+    );
+   }else if(e.type==='circle')candidates.push({point:e.center,relation:{type:'coincident',ref:{entity:e.id,point:'center'}},referenceId:e.id,icon:'●'});
    else if(e.type==='arc'){
-    candidates.push({point:e.center,ref:{entity:e.id,point:'center'}});
-    for(const key of ['start','end']){const a=e[key+'Angle'];candidates.push({point:[e.center[0]+Math.cos(a)*e.radius,e.center[1]+Math.sin(a)*e.radius],ref:{entity:e.id,point:key}});}
+    candidates.push({point:e.center,relation:{type:'coincident',ref:{entity:e.id,point:'center'}},referenceId:e.id,icon:'●'});
+    for(const key of ['start','end']){const a=e[key+'Angle'];candidates.push({point:[e.center[0]+Math.cos(a)*e.radius,e.center[1]+Math.sin(a)*e.radius],relation:{type:'coincident',ref:{entity:e.id,point:key}},referenceId:e.id,icon:'●'});}
    }
   }
   const threshold=api.object().params.size*Math.max(view[2],view[3])*.018;
   let best=null,bestD=threshold;
   for(const candidate of candidates){const d=Math.hypot(candidate.point[0]-p[0],candidate.point[1]-p[1]);if(d<bestD){bestD=d;best=candidate;}}
-  return best?{point:[...best.point],ref:best.ref,distance:bestD}:{point:p,ref:null,distance:null};
+  return best?{point:[...best.point],relation:best.relation,referenceId:best.referenceId,icon:best.icon,distance:bestD}:{point:p,relation:null,referenceId:null,icon:null,distance:null};
+ }
+ function parallelInference(start,end,doc){
+  const dx=end[0]-start[0],dy=end[1]-start[1],len=Math.hypot(dx,dy);if(len<1e-6)return null;
+  const angle=Math.atan2(dy,dx),near=api.object().params.size*Math.max(view[2],view[3])*.12;
+  let best=null;
+  for(const e of doc?.entities||[]){
+   if(e.type!=='line')continue;
+   const rawDiff=Math.abs(normAngle(angle-lineAngle(e))),diff=Math.min(rawDiff,Math.abs(Math.PI-rawDiff));
+   const proximity=Math.min(pointSegmentDistance(end,e),Math.hypot(end[0]-lineMid(e)[0],end[1]-lineMid(e)[1]));
+   if(diff>.065||proximity>near)continue;
+   const score=diff+proximity/Math.max(near,1e-6)*.02;
+   if(!best||score<best.score)best={entity:e,score,diff};
+  }
+  if(!best)return null;
+  let a=lineAngle(best.entity);if(Math.abs(normAngle(angle-a))>Math.PI/2)a+=Math.PI;
+  return {end:[start[0]+Math.cos(a)*len,start[1]+Math.sin(a)*len],parallelRef:best.entity.id,referenceId:best.entity.id,inference:'parallel',icon:'∥'};
+ }
+ function inferLine(start,raw,doc,{suppress=false}={}){
+  if(suppress)return {end:raw,startRelation:null,endRelation:null,autoConstraint:null,parallelRef:null,referenceId:null,icon:null};
+  const snapped=snapNative(raw,doc);let end=snapped.point;
+  if(snapped.relation)return {end,startRelation:null,endRelation:snapped.relation,autoConstraint:null,parallelRef:null,referenceId:snapped.referenceId,icon:snapped.icon,inference:snapped.relation.type};
+  const axial=snapLine(start,end);
+  if(axial.inference)return {end:axial.end,startRelation:null,endRelation:null,autoConstraint:axial.inference,parallelRef:null,referenceId:null,icon:axial.icon,inference:axial.inference};
+  const parallel=parallelInference(start,end,doc);
+  if(parallel)return {...parallel,startRelation:null,endRelation:null,autoConstraint:null};
+  return {end,startRelation:null,endRelation:null,autoConstraint:null,parallelRef:null,referenceId:null,icon:null,inference:null};
  }
  function addText(text,p,attrs={}){
   const t=el('text',{x:p[0],y:-p[1],class:'sketch-svg-text',...attrs});t.textContent=text;svg.appendChild(t);return t;
@@ -54,22 +89,58 @@ export function createEditor(svg,api){
     const a=localPoint(e.start,n),b=localPoint(e.end,n),mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2,dx=b[0]-a[0],dy=b[1]-a[1],len=Math.hypot(dx,dy)||1;
     p=[mx-dy/len*view[3]*.025,my+dx/len*view[3]*.025];
    }else{
-    const c=localPoint(e.center,n);p=[c[0]+e.radius/o.params.size+view[2]*.018,c[1]+view[3]*.012];
+    const cc=localPoint(e.center,n);p=[cc[0]+e.radius/o.params.size+view[2]*.018,cc[1]+view[3]*.012];
    }
    const text=(d.driving===false?'[':'')+Number(d.value).toFixed(2)+' mm'+(d.driving===false?']':'');
    addText(text,p,{class:'sketch-dimension'+(d.driving===false?' driven':''),style:`font-size:${view[2]*.020}px`,'data-dimension-entity':e.id,'data-entity':e.id});
   }
  }
  function renderConstraints(n){
+  if($('showSketchConstraints')&&!$('showSketchConstraints').checked)return;
   for(const c of n.constraints||[]){
    let entities=[];
    if(c.entity)entities=[n.entities.find(e=>e.id===c.entity)].filter(Boolean);
    else if(c.type==='coincident')entities=[n.entities.find(e=>e.id===c.a.entity),n.entities.find(e=>e.id===c.b.entity)].filter(Boolean);
+   else if(c.type==='midpoint')entities=[n.entities.find(e=>e.id===c.point.entity),n.entities.find(e=>e.id===c.line)].filter(Boolean);
    else entities=[n.entities.find(e=>e.id===c.first),n.entities.find(e=>e.id===c.second)].filter(Boolean);
    if(!entities.length)continue;
    const centers=entities.map(entityMid),p=[centers.reduce((s,q)=>s+q[0],0)/centers.length,centers.reduce((s,q)=>s+q[1],0)/centers.length],q=localPoint(p,n);
    addText(constraintLabel(c.type),[q[0]+view[2]*.008,q[1]+view[3]*.008],{class:'sketch-constraint-badge',style:`font-size:${view[2]*.016}px`});
   }
+ }
+ function renderMidpointMarker(e,n){
+  const m=localPoint(lineMid(e),n),s=view[2]*.0065,pts=[[m[0],m[1]+s],[m[0]+s,m[1]],[m[0],m[1]-s],[m[0]-s,m[1]]];
+  svg.appendChild(el('path',{d:path(pts)+'Z',class:'sketch-midpoint-marker','vector-effect':'non-scaling-stroke','pointer-events':'none'}));
+ }
+ function appendEntityShape(e,n,o,state,chosen){
+  const classes=['sketch-entity-visible',state==='defined'?'entity-defined':state==='conflict'?'entity-conflict':'entity-under'];
+  if(chosen)classes.push('entity-selected');if(e.construction)classes.push('entity-construction');if(inference?.referenceId===e.id)classes.push('sketch-reference-awake');
+  const common={class:classes.join(' '),'vector-effect':'non-scaling-stroke'};
+  if(e.type==='line'){
+   const d=path([localPoint(e.start,n),localPoint(e.end,n)]);
+   svg.appendChild(el('path',{d,class:'sketch-entity-hit','vector-effect':'non-scaling-stroke','data-entity':e.id}));
+   svg.appendChild(el('path',{...common,d}));
+   if(chosen||hoveredEntity===e.id||inference?.referenceId===e.id)renderMidpointMarker(e,n);
+  }else if(e.type==='circle'){
+   const cc=localPoint(e.center,n),r=e.radius/o.params.size;
+   svg.appendChild(el('circle',{cx:cc[0],cy:-cc[1],r,class:'sketch-entity-hit','vector-effect':'non-scaling-stroke','data-entity':e.id}));
+   svg.appendChild(el('circle',{...common,cx:cc[0],cy:-cc[1],r}));
+  }else{
+   let sweep=((e.endAngle-e.startAngle)%(2*Math.PI)+2*Math.PI)%(2*Math.PI);sweep=e.ccw?(sweep||2*Math.PI):(sweep?sweep-2*Math.PI:-2*Math.PI);
+   const pts=Array.from({length:65},(_,i)=>localPoint([e.center[0]+Math.cos(e.startAngle+sweep*i/64)*e.radius,e.center[1]+Math.sin(e.startAngle+sweep*i/64)*e.radius],n)),d=path(pts);
+   svg.appendChild(el('path',{d,class:'sketch-entity-hit','vector-effect':'non-scaling-stroke','data-entity':e.id}));
+   svg.appendChild(el('path',{...common,d}));
+  }
+ }
+ function renderBox(){
+  if(drag?.kind!=='box-select')return;
+  const a=drag.start,b=drag.end||a,minX=Math.min(a[0],b[0]),maxX=Math.max(a[0],b[0]),minY=Math.min(a[1],b[1]),maxY=Math.max(a[1],b[1]),crossing=b[0]<a[0];
+  svg.appendChild(el('rect',{x:minX,y:-maxY,width:maxX-minX,height:maxY-minY,class:'sketch-box-select'+(crossing?' crossing':''),'vector-effect':'non-scaling-stroke'}));
+ }
+ function renderInference(n){
+  if(!inference?.icon||!inference.point)return;
+  const p=localPoint(inference.point,n);
+  addText(inference.icon,[p[0]+view[2]*.018,p[1]+view[3]*.018],{class:'sketch-inference-icon',style:`font-size:${view[2]*.016}px`});
  }
  function updateInspector(n){
   const info=sketch.selectionInfo(),status=sketch.describe();
@@ -79,7 +150,7 @@ export function createEditor(svg,api){
   const title=$('sketchSelectionTitle'),meta=$('sketchSelectionMeta'),dim=$('sketchDimension'),driving=$('sketchDriving'),apply=$('applySketchDimension');
   if(title)title.textContent=info.count===0?'Nada selecionado':info.count===1?entityName(info.primary):`${info.count} entidades`;
   if(meta){
-   if(info.count===0)meta.textContent='Clique em uma entidade para editar geometria, cotas e restrições.';
+   if(info.count===0)meta.textContent='Selecione a geometria diretamente no canvas. As linhas possuem uma área de captura ampliada.';
    else if(info.count===1){
     const e=info.primary;
     meta.textContent=e.type==='line'?`Comprimento atual: ${info.value.toFixed(2)} mm`:e.type==='circle'?`Raio atual: ${info.value.toFixed(2)} mm`:`Raio do arco: ${info.value.toFixed(2)} mm`;
@@ -96,9 +167,9 @@ export function createEditor(svg,api){
   if(svg.hasAttribute('hidden')){svg.replaceChildren();return;}
   const o=api.object();svg.replaceChildren();svg.setAttribute('viewBox',view.join(' '));if(!o)return;
   renderAxes();
-  const n=sketch.native(),nativeCount=n?.entities?.length||0;
+  const n=sketch.native(),nativeCount=n?.entities?.length||0,stateMap=sketch.states();
   if(o.result?.bladeProfile?.length&&!nativeCount)svg.appendChild(el('path',{class:'blade-preview',d:o.result.bladeProfile.map(p=>path(p.map(([x,y])=>[x/o.result.params.size*(o.result.params.mirror?-1:1),y/o.result.params.size]))+'Z').join(' '),fill:'#d99c32','fill-opacity':.42,'fill-rule':'evenodd','pointer-events':'none'}));
-  if(o.loops.length)svg.appendChild(el('path',{d:o.loops.map(p=>path(p)+'Z').join(' '),class:nativeCount?'sketch-derived-profile':'legacy-profile',fill:'#476a90','fill-rule':'evenodd','fill-opacity':nativeCount?.065:.42,'pointer-events':'none'}));
+  if(o.loops.length)svg.appendChild(el('path',{d:o.loops.map(p=>path(p)+'Z').join(' '),class:nativeCount?'sketch-derived-profile':'legacy-profile',fill:'#476a90','fill-rule':'evenodd','fill-opacity':nativeCount?.045:.42,'pointer-events':'none'}));
   if(!nativeCount)o.loops.forEach((p,i)=>svg.appendChild(el('path',{d:path(p)+'Z',fill:'none',stroke:i===selected?'#e5852d':i===0?'#286bbb':'#597a97','stroke-width':i===selected?2:1.1,'vector-effect':'non-scaling-stroke','pointer-events':'stroke','data-loop':i})));
   if(selected>=0&&o.loops[selected]&&tool==='select'&&!nativeCount)o.loops[selected].forEach(([x,y],i)=>svg.appendChild(el('circle',{cx:x,cy:-y,r:view[2]*.004,fill:i===node?'#e88024':'white',stroke:'#bd6c21','stroke-width':1,'vector-effect':'non-scaling-stroke','data-node':i})));
   if(region)svg.appendChild(el('path',{d:path(region)+'Z',fill:'#7cbfff22',stroke:'#45b6a3','stroke-dasharray':'5 4','stroke-width':1.5,'vector-effect':'non-scaling-stroke','pointer-events':'none'}));
@@ -106,14 +177,11 @@ export function createEditor(svg,api){
 
   if(nativeCount){
    for(const e of n.entities){
-    const chosen=sketch.selected().includes(e.id),attrs={fill:'none',stroke:chosen?'#d89a46':e.construction?'#7d8b94':'#45b6a3','stroke-width':chosen?2.4:1.75,'stroke-dasharray':e.construction?'6 4':undefined,'vector-effect':'non-scaling-stroke','pointer-events':'stroke','data-entity':e.id};
-    if(e.type==='line')svg.appendChild(el('path',{...attrs,d:path([localPoint(e.start,n),localPoint(e.end,n)])}));
-    else if(e.type==='circle'){const c=localPoint(e.center,n);svg.appendChild(el('circle',{...attrs,cx:c[0],cy:-c[1],r:e.radius/o.params.size}));}
-    else{let sweep=((e.endAngle-e.startAngle)%(2*Math.PI)+2*Math.PI)%(2*Math.PI);sweep=e.ccw?(sweep||2*Math.PI):(sweep?sweep-2*Math.PI:-2*Math.PI);const pts=Array.from({length:65},(_,i)=>localPoint([e.center[0]+Math.cos(e.startAngle+sweep*i/64)*e.radius,e.center[1]+Math.sin(e.startAngle+sweep*i/64)*e.radius],n));svg.appendChild(el('path',{...attrs,d:path(pts)}));}
+    const chosen=sketch.selected().includes(e.id);appendEntityShape(e,n,o,stateMap.get(e.id)||'under',chosen);
     if(chosen&&tool==='select'){
      const handles=e.type==='line'?[['start',e.start],['end',e.end]]:[['center',e.center],['radius',[e.center[0]+e.radius,e.center[1]]]];
      if(e.type==='arc')for(const key of ['start','end']){const a=e[key+'Angle'];handles.push([key,[e.center[0]+Math.cos(a)*e.radius,e.center[1]+Math.sin(a)*e.radius]]);}
-     for(const [key,p] of handles){const c=localPoint(p,n);svg.appendChild(el('circle',{cx:c[0],cy:-c[1],r:view[2]*.006,fill:sketch.points().some(p=>p.entity===e.id&&p.point===key)?'#f4b860':'#eef4f3',stroke:'#258d7d','stroke-width':1,'vector-effect':'non-scaling-stroke','data-entity':e.id,'data-handle':key}));}
+     for(const [key,p] of handles){const cc=localPoint(p,n);svg.appendChild(el('circle',{cx:cc[0],cy:-cc[1],r:view[2]*.006,fill:sketch.points().some(p=>p.entity===e.id&&p.point===key)?'#f4b860':'#eef4f3',stroke:'#258d7d','stroke-width':1,'vector-effect':'non-scaling-stroke','data-entity':e.id,'data-handle':key}));}
     }
    }
    renderConstraints(n);renderDimensions(n,o);
@@ -123,42 +191,81 @@ export function createEditor(svg,api){
    const a=localPoint(drag.start,n),b=localPoint(drag.end,n);
    if(tool==='circle')svg.appendChild(el('circle',{cx:a[0],cy:-a[1],r:Math.hypot(b[0]-a[0],b[1]-a[1]),class:'sketch-preview-shape','vector-effect':'non-scaling-stroke'}));
    else svg.appendChild(el('path',{d:tool==='rectangle'?path([a,[b[0],a[1]],b,[a[0],b[1]]])+'Z':path([a,b]),class:'sketch-preview-shape','vector-effect':'non-scaling-stroke','pointer-events':'none'}));
-   const value=tool==='circle'?Math.hypot(drag.end[0]-drag.start[0],drag.end[1]-drag.start[1]):Math.hypot(drag.end[0]-drag.start[0],drag.end[1]-drag.start[1]);
+   const value=Math.hypot(drag.end[0]-drag.start[0],drag.end[1]-drag.start[1]);
    addText((tool==='circle'?'R ':'')+value.toFixed(2)+' mm',[(a[0]+b[0])/2+view[2]*.012,(a[1]+b[1])/2+view[3]*.018],{class:'sketch-live-dimension',style:`font-size:${view[2]*.018}px`});
-   if(drag.inference){
-    const guide=drag.inference==='horizontal'?[[view[0],a[1]],[view[0]+view[2],a[1]]]:[[a[0],-view[1]],[a[0],-(view[1]+view[3])]];
-    if(drag.inference==='horizontal')svg.appendChild(el('line',{x1:guide[0][0],y1:-guide[0][1],x2:guide[1][0],y2:-guide[1][1],class:'sketch-inference-line','vector-effect':'non-scaling-stroke'}));
-    else svg.appendChild(el('line',{x1:a[0],y1:view[1],x2:a[0],y2:view[1]+view[3],class:'sketch-inference-line','vector-effect':'non-scaling-stroke'}));
-   }
+   if(drag.inference==='horizontal')svg.appendChild(el('line',{x1:view[0],y1:-a[1],x2:view[0]+view[2],y2:-a[1],class:'sketch-inference-line','vector-effect':'non-scaling-stroke'}));
+   if(drag.inference==='vertical')svg.appendChild(el('line',{x1:a[0],y1:view[1],x2:a[0],y2:view[1]+view[3],class:'sketch-inference-line','vector-effect':'non-scaling-stroke'}));
   }
-  if(drag?.kind==='primitive'&&(drag.startRef||drag.endRef)){
-   const target=drag.endRef?drag.end:drag.start,q=localPoint(target,n);
-   svg.appendChild(el('circle',{cx:q[0],cy:-q[1],r:view[2]*.009,class:'sketch-snap-marker','vector-effect':'non-scaling-stroke'}));
+  if(drag?.kind==='primitive'&&(drag.startRelation||drag.endRelation)){
+   const target=drag.endRelation?drag.end:drag.start,cc=localPoint(target,n);
+   svg.appendChild(el('circle',{cx:cc[0],cy:-cc[1],r:view[2]*.009,class:'sketch-snap-marker','vector-effect':'non-scaling-stroke'}));
   }
-  updateInspector(n);
-  const selection=$('selection');if(selection)selection.textContent=region?'Região selecionada para edição de contorno.':sketch.selected().length?`${sketch.selected().length} entidade(s) selecionada(s) · Shift adiciona à seleção`:selected>=0?`Contorno ${selected+1} · ${o.loops[selected]?.length||0} pontos`:'Selecione uma entidade ou escolha uma ferramenta.';
+  renderBox();renderInference(n);updateInspector(n);
+  const selection=$('selection');
+  if(selection)selection.textContent=drag?.kind==='box-select'?(drag.end?.[0]<drag.start[0]?'Seleção cruzada: toca a janela para selecionar.':'Seleção por janela: a entidade precisa ficar dentro.'):region?'Região selecionada para edição de contorno.':sketch.selected().length?`${sketch.selected().length} entidade(s) selecionada(s) · Shift adiciona à seleção`:selected>=0?`Contorno ${selected+1} · ${o.loops[selected]?.length||0} pontos`:tool==='trim'?'Trim: clique no trecho que deseja remover.':tool==='extend'?'Extend: clique perto da extremidade que deseja prolongar.':tool==='dimension'?'Cota: clique em uma linha, círculo ou arco.':'Clique para selecionar · arraste no vazio para seleção por janela.';
  }
- function reset(){view=[-.65,-.65,1.3,1.3];selected=-1;node=-1;region=null;drag=null;arcClicks=[];sketch.reset();render();}
+ function reset(){view=[-.65,-.65,1.3,1.3];selected=-1;node=-1;region=null;drag=null;arcClicks=[];hoveredEntity=null;inference=null;sketch.reset();closeInlineDimension();render();}
  async function operate(op){const o=api.object();if(!o||!contourMode())return;const original=o.loops;try{api.status('Aplicando edição vetorial…');const loops=await api.request({action:'edit',loops:original,op:{...op,size:o.params.size}});if(api.object()?.id!==o.id||o.loops!==original){api.status('Edição cancelada porque o objeto mudou.');return;}api.history();delete o.sketch;o.loops=loops;selected=-1;node=-1;api.changed();render();}catch(e){api.status(e.message);}}
 
+ function closeInlineDimension(){const box=$('sketchInlineDimension');if(box)box.hidden=true;}
+ function openInlineDimension(entityId,clientX,clientY){
+  sketch.select(entityId);render();const info=sketch.selectionInfo();if(info.count!==1)return;
+  const box=$('sketchInlineDimension'),input=$('sketchInlineDimensionValue'),label=$('sketchInlineDimensionLabel'),vp=$('viewport').getBoundingClientRect();
+  label.textContent=info.primary.type==='line'?'Comprimento':info.primary.type==='circle'?'Raio':'Raio do arco';
+  input.value=(info.dimension?.value??info.value).toFixed(2);
+  box.style.left=Math.max(8,Math.min(vp.width-210,clientX-vp.left+10))+'px';box.style.top=Math.max(62,Math.min(vp.height-60,clientY-vp.top-18))+'px';box.hidden=false;
+  requestAnimationFrame(()=>{input.focus();input.select();});
+ }
+ function applyInlineDimension(){
+  const value=+$('sketchInlineDimensionValue').value;if(!Number.isFinite(value)||value<=0){api.status('Informe uma cota válida.');return;}
+  sketch.dimension(value,$('sketchDriving')?.checked!==false);closeInlineDimension();render();
+ }
+ if($('sketchInlineDimensionApply'))$('sketchInlineDimensionApply').onclick=applyInlineDimension;
+ if($('sketchInlineDimensionValue'))$('sketchInlineDimensionValue').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();applyInlineDimension();}else if(e.key==='Escape'){e.preventDefault();closeInlineDimension();}};
+ if($('showSketchConstraints'))$('showSketchConstraints').onchange=render;
+
  svg.onpointerdown=e=>{
-  const o=api.object();if(!o)return;svg.setPointerCapture(e.pointerId);const q=point(e),n=e.target.dataset.node,l=e.target.dataset.loop;
+  const o=api.object();if(!o)return;svg.setPointerCapture(e.pointerId);const q=point(e),n=e.target.dataset.node,l=e.target.dataset.loop,entity=e.target.dataset.entity;
   if(e.button===1||e.button===2){drag={kind:'pan',x:e.clientX,y:e.clientY,view:[...view]};return;}
-  if(e.target.dataset.dimensionEntity){sketch.select(e.target.dataset.dimensionEntity,null,e.shiftKey);render();return;}
-  if(['sketch-line','rectangle','circle'].includes(tool)){const doc=sketch.native(),raw=nativePoint(q),snap=snapNative(raw,doc),start=tool==='circle'?snap.point:snap.point;drag={kind:'primitive',start,end:[...start],startRef:snap.ref,endRef:null,inference:null};return;}
+  if(e.target.dataset.dimensionEntity){openInlineDimension(e.target.dataset.dimensionEntity,e.clientX,e.clientY);return;}
+  if(entity&&tool==='trim'){sketch.trim(entity,nativePoint(q));hoveredEntity=null;inference=null;render();return;}
+  if(entity&&tool==='extend'){sketch.extend(entity,nativePoint(q));hoveredEntity=null;inference=null;render();return;}
+  if(entity&&tool==='dimension'){openInlineDimension(entity,e.clientX,e.clientY);return;}
+  if(['sketch-line','rectangle','circle'].includes(tool)){
+   const doc=sketch.native(),raw=nativePoint(q),snap=e.shiftKey?{point:raw,relation:null,referenceId:null,icon:null}:snapNative(raw,doc),start=snap.point;
+   drag={kind:'primitive',start,end:[...start],startRelation:snap.relation,endRelation:null,parallelRef:null,referenceId:snap.referenceId,inference:snap.relation?.type||null,icon:snap.icon,suppress:e.shiftKey};inference=snap.relation?{...snap,point:start,type:snap.relation.type}:null;return;
+  }
   if(tool==='arc'){arcClicks.push(nativePoint(q));if(arcClicks.length===3){sketch.create('arc',...arcClicks);arcClicks=[];}else api.status('Arco de 3 pontos · clique '+(arcClicks.length+1)+' de 3.');render();return;}
-  if(e.target.dataset.entity&&tool==='select'){const entity=e.target.dataset.entity,handle=e.target.dataset.handle;sketch.select(entity,handle==='radius'?null:handle,e.shiftKey);if(handle&&!e.shiftKey)drag={kind:'entity-point',entity,handle,start:q};render();return;}
+  if(entity&&tool==='select'){
+   const handle=e.target.dataset.handle;sketch.select(entity,handle==='radius'?null:handle,e.shiftKey);if(handle&&!e.shiftKey)drag={kind:'entity-point',entity,handle,start:q};render();return;
+  }
   if(['draw','erase','line'].includes(tool)&&!contourMode())return;
   if(['draw','erase','line'].includes(tool)){drag={kind:'stroke',points:[q]};return;}
   if(tool==='region'){region=[q,q,q,q];drag={kind:'region',start:q};render();return;}
   if(tool==='move'&&l!==undefined){if(!contourMode())return;api.history();delete o.sketch;selected=+l;drag={kind:'move',start:q,original:o.loops[selected].map(p=>p.slice())};return;}
   if(n!==undefined){if(!contourMode())return;api.history();delete o.sketch;node=+n;drag={kind:'node'};}
   else if(l!==undefined){selected=+l;node=-1;render();}
-  else{selected=-1;node=-1;sketch.clearSelection();drag={kind:'pan',x:e.clientX,y:e.clientY,view:[...view]};render();}
+  else if(tool==='select'){selected=-1;node=-1;if(!e.shiftKey)sketch.clearSelection();drag={kind:'box-select',start:q,end:q,extend:e.shiftKey};render();}
+  else{drag={kind:'pan',x:e.clientX,y:e.clientY,view:[...view]};}
  };
  svg.onpointermove=e=>{
-  const o=api.object();if(!drag||!o)return;const q=point(e);
-  if(drag.kind==='primitive'){const doc=sketch.native(),raw=nativePoint(q);let end=raw;drag.endRef=null;if(tool!=='circle'){const target=snapNative(raw,doc);end=target.point;drag.endRef=target.ref;}if(tool==='sketch-line'){const inferred=snapLine(drag.start,end);end=inferred.end;drag.inference=inferred.inference;}drag.end=end;render();return;}
+  const o=api.object();if(!o)return;
+  hoveredEntity=e.target?.dataset?.entity||null;
+  if(!drag){render();return;}
+  const q=point(e);
+  if(drag.kind==='primitive'){
+   const doc=sketch.native(),raw=nativePoint(q);
+   if(tool==='sketch-line'){
+    const inf=inferLine(drag.start,raw,doc,{suppress:e.shiftKey||drag.suppress});drag.end=inf.end;drag.endRelation=inf.endRelation;drag.parallelRef=inf.parallelRef;drag.referenceId=inf.referenceId;drag.inference=inf.inference;drag.icon=inf.icon;
+    inference=inf.inference?{...inf,point:inf.end}:null;
+   }else if(tool==='circle'){
+    drag.end=raw;drag.endRelation=null;inference=null;
+   }else{
+    const snap=e.shiftKey?{point:raw,relation:null,referenceId:null,icon:null}:snapNative(raw,doc);drag.end=snap.point;drag.endRelation=snap.relation;drag.referenceId=snap.referenceId;drag.inference=snap.relation?.type||null;drag.icon=snap.icon;inference=snap.relation?{...snap,point:snap.point,type:snap.relation.type}:null;
+   }
+   render();return;
+  }
+  if(drag.kind==='box-select'){drag.end=q;render();return;}
   if(drag.kind==='entity-point'){drag.end=nativePoint(q);return;}
   if(drag.kind==='node'){o.loops[selected][node]=q;render();}
   else if(drag.kind==='move'){o.loops[selected]=drag.original.map(v=>[v[0]+q[0]-drag.start[0],v[1]+q[1]-drag.start[1]]);render();}
@@ -166,31 +273,34 @@ export function createEditor(svg,api){
   else if(drag.kind==='stroke'){if(tool==='line')drag.points=[drag.points[0],q];else if(Math.hypot(q[0]-drag.points.at(-1)[0],q[1]-drag.points.at(-1)[1])>.001&&drag.points.length<1500)drag.points.push(q);render();}
   else{const r=svg.getBoundingClientRect(),scale=Math.max(view[2]/r.width,view[3]/r.height);view=[drag.view[0]-(e.clientX-drag.x)*scale,drag.view[1]-(e.clientY-drag.y)*scale,...drag.view.slice(2)];render();}
  };
- svg.onpointerup=()=>{
+ svg.onpointerup=e=>{
   if(!drag)return;const d=drag;drag=null;
-  if(d.kind==='primitive')sketch.create(tool==='sketch-line'?'line':tool,d.start,d.end,null,{autoConstraint:d.inference,startRef:d.startRef,endRef:d.endRef,centerRef:d.startRef});
+  if(d.kind==='primitive')sketch.create(tool==='sketch-line'?'line':tool,d.start,d.end,null,{autoConstraint:d.inference==='horizontal'||d.inference==='vertical'?d.inference:null,startRelation:d.startRelation,endRelation:d.endRelation,centerRelation:d.startRelation,parallelRef:d.parallelRef});
+  if(d.kind==='box-select'){
+   const a=nativePoint(d.start),b=nativePoint(d.end||d.start),bounds={minX:Math.min(a[0],b[0]),minY:Math.min(a[1],b[1]),maxX:Math.max(a[0],b[0]),maxY:Math.max(a[1],b[1])};
+   sketch.selectBox(bounds,{crossing:(d.end?.[0]??d.start[0])<d.start[0],extend:d.extend});
+  }
   if(d.kind==='entity-point'&&d.end)sketch.movePoint(d.entity,d.handle,d.end);
   if(['node','move'].includes(d.kind))api.changed();
   if(d.kind==='stroke'&&d.points.length)operate({type:'stroke',points:d.points,width:+$('brushWidth')?.value||.8,subtract:tool==='erase'});
-  render();
+  inference=null;render();
  };
- svg.onpointercancel=()=>{if(drag&&['node','move'].includes(drag.kind))api.changed();drag=null;render();};
+ svg.onpointercancel=()=>{if(drag&&['node','move'].includes(drag.kind))api.changed();drag=null;inference=null;render();};
+ svg.onpointerleave=()=>{if(!drag){hoveredEntity=null;inference=null;render();}};
  svg.oncontextmenu=e=>e.preventDefault();
  svg.onwheel=e=>{e.preventDefault();const f=e.deltaY>0?1.12:1/1.12;if(view[2]*f<.015||view[2]*f>12)return;const [x,negY]=point(e),y=-negY;view=[x+(view[0]-x)*f,y+(view[1]-y)*f,view[2]*f,view[3]*f];render();};
  svg.ondblclick=e=>{
-  if(e.target.dataset.dimensionEntity){
-   sketch.select(e.target.dataset.dimensionEntity);render();const input=$('sketchDimension');if(input){input.focus();input.select();}return;
-  }
+  if(e.target.dataset.dimensionEntity){openInlineDimension(e.target.dataset.dimensionEntity,e.clientX,e.clientY);return;}
   if(tool!=='select'||e.target.dataset.loop===undefined||!contourMode())return;
   const o=api.object();selected=+e.target.dataset.loop;const p=o.loops[selected],q=point(e);let at=0,best=Infinity;
-  for(let i=0;i<p.length;i++){const a=p[i],b=p[(i+1)%p.length],dx=b[0]-a[0],dy=b[1]-a[1],t=Math.max(0,Math.min(1,((q[0]-a[0])*dx+(q[1]-a[1])*dy)/(dx*dx+dy*dy||1))),d=Math.hypot(q[0]-a[0]-t*dx,q[1]-a[1]-t*dy);if(d<best){best=d;at=i+1;}}
+  for(let i=0;i<p.length;i++){const a=p[i],b=p[(i+1)%p.length],dx=b[0]-a[0],dy=b[1]-a[1],t=Math.max(0,Math.min(1,((q[0]-a[0])*dx+(q[1]-a[1])*dy)/(dx*dx+dy*dy||1))),dd=Math.hypot(q[0]-a[0]-t*dx,q[1]-a[1]-t*dy);if(dd<best){best=dd;at=i+1;}}
   api.history();delete o.sketch;p.splice(at,0,q);node=at;api.changed();render();
  };
  function removeNode(){if(sketch.selected().length){sketch.remove();render();return;}const o=api.object();if(!contourMode())return;if(selected>=0&&node>=0&&o?.loops[selected].length>3){api.history();delete o.sketch;o.loops[selected].splice(node,1);node=-1;api.changed();render();}}
+ function setTool(t){tool=t;arcClicks=[];drag=null;inference=null;closeInlineDimension();render();}
  return {
   sketch,render,reset,fit:()=>{view=[-.65,-.65,1.3,1.3];render()},
-  setTool:t=>{tool=t;arcClicks=[];drag=null;render()},
-  getTool:()=>tool,
+  setTool,getTool:()=>tool,openInlineDimension,
   removeNode,clearRegion:()=>{region=null;render()},
   offset:distance=>{if(selected<0){api.status('Selecione um contorno primeiro.');return;}operate({type:'offset',selected,distance});},
   thickness:distance=>operate({type:'thickness',distance,region}),
