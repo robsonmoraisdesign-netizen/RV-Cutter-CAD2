@@ -9,6 +9,7 @@ const midpoint=e=>[(e.start[0]+e.end[0])/2,(e.start[1]+e.end[1])/2];
 const radial=e=>['circle','arc'].includes(e.type);
 
 function setPoint(entity,which,p){
+  if(entity.type==='point'&&which==='point'){entity.position=[p[0],p[1]];return;}
   if(entity.type==='line'&&(which==='start'||which==='end')){entity[which]=[p[0],p[1]];return;}
   if(radial(entity)&&which==='center'){entity.center=[p[0],p[1]];return;}
   if(entity.type==='arc'&&(which==='start'||which==='end')){
