@@ -40,7 +40,7 @@ async function flush(){
  clearTimeout(saveTimer);if(!state.objects.length)return true;
  const signature=projectSignature();if(signature===lastSavedSignature){saveState('saved');return true;}
  saveState('saving');const data=project();
- try{if(window.desktop?.catalogSave)await window.desktop.catalogSave(JSON.stringify(data));else await dbPut(data);lastSavedSignature=signature;saveState('saved');return true;}
+ try{if(window.desktop?.catalogSave)await window.desktop.catalogSave(JSON.stringify(data));else await dbPut(data);try{await window.desktop?.clearRecovery?.();}catch{}lastSavedSignature=signature;saveState('saved');return true;}
  catch(e){saveState('error');status('Falha ao salvar o projeto: '+e.message);return false;}
 }
 async function writeRecovery(){
@@ -231,7 +231,7 @@ $('retrace').onclick=()=>state.source?loadImage(state.source,state.name):status(
 async function sample(name,fromHome=false){if(fromHome&&!await newProject())return;const epoch=sessionEpoch;const r=await fetch(name==='Porquinho'?'examples/pig.jpg':name==='Flores'?'examples/flowers.png':'examples/cow.jpg');const data=await readData(await r.blob());if(epoch===sessionEpoch&&state.screen==='studio')await loadImage(data,name,false);}
 $('pig').onclick=()=>sample('Porquinho');$('cow').onclick=()=>sample('Vaquinha');$('homePig').onclick=()=>sample('Porquinho',true);$('homeCow').onclick=()=>sample('Vaquinha',true);$('homeFlowers').onclick=()=>sample('Flores',true);
 async function download(name,data,kind){if(window.desktop){try{return await window.desktop.save(name,typeof data==='string'?data:new Uint8Array(data),kind);}catch(e){status('Falha ao salvar: '+e.message);return null;}}const url=URL.createObjectURL(new Blob([data])),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),3000);return name;}
-$('save').onclick=async()=>{if(!state.objects.length){status('Importe uma arte primeiro.');return;}await flush();const result=await download(state.name+'.rvcad',JSON.stringify(project()),'project');if(result)status('Projeto salvo.');};
+$('save').onclick=async()=>{if(!state.objects.length){status('Crie ou abra um projeto primeiro.');return;}if(!await flush())return;const result=await download(state.name+'.rvcad',JSON.stringify(project()),'project');if(result)status('Projeto salvo na biblioteca e em arquivo.');};
 $('open').onclick=()=>$('projectFile').click();$('projectFile').onchange=async()=>{try{const f=$('projectFile').files[0];if(!f)return;if(f.size>80*1024*1024)throw Error('Projeto excede 80 MB.');const d=JSON.parse(await f.text());if(state.screen==='studio'&&!await closeCurrentProject())return;applyProject(d);state.history=[];state.future=[];enterStudio();lastSavedSignature=null;saveState('dirty');generate();}catch(e){status(e.message)}finally{$('projectFile').value='';}};
 $('exportSvg').onclick=()=>{const o=active();if(!o)return;const d=o.loops.map(l=>'M'+l.map(([x,y])=>`${(x+.6)*o.params.size},${(.6-y)*o.params.size}`).join('L')+'Z').join(' ');download(o.name+'.svg',`<svg xmlns="http://www.w3.org/2000/svg" width="${o.params.size*1.2}mm" height="${o.params.size*1.2}mm" viewBox="0 0 ${o.params.size*1.2} ${o.params.size*1.2}"><path fill="black" fill-rule="evenodd" d="${d}"/></svg>`,'svg');};
 function exportSummary(){const objects=state.objects.filter(o=>!$('exportVisible').checked||o.visible);$('exportSummary').textContent=`${objects.length} objetos selecionados. Modos com vários arquivos entregam um ZIP com os STLs.`;}
