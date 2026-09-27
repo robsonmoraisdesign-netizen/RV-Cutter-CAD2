@@ -4,6 +4,7 @@ import {solveSketch} from './src/sketch/solver.mjs';
 import {entityStates,sketchStatus} from './src/sketch/diagnostics.mjs';
 import {trimEntity,extendLine} from './src/sketch/operations.mjs';
 import {resolveProfiles} from './src/sketch/profile.mjs';
+import {scaleSketch} from './src/sketch/document.mjs';
 
 const d=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
 
@@ -60,6 +61,14 @@ const d=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
  assert.deepEqual(s.entities.find(e=>e.id==='curve').points,[[0,0],[20,30],[40,0]]);
  assert.equal(profiles.length,1);
  assert.ok(profiles[0].length>20);
+}
+
+// Bezier control points scale with the parametric object size.
+{
+ const s=createSketch();addEntity(s,bezier([[0,0],[10,20],[30,0]],{id:'scaled'}));s.profileSize=30;s.profileCenter=[0,0];s.legacyLoops=[];
+ scaleSketch(s,2);
+ assert.deepEqual(s.entities[0].points,[[0,0],[20,40],[60,0]]);
+ assert.equal(s.profileSize,60);
 }
 
 console.log('Sketch Phase 2 — midpoint, states, trim, extend and Bezier: PASS');
