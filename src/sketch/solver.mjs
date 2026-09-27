@@ -17,6 +17,10 @@ function setPoint(entity,which,p){
     entity[which==='start'?'startAngle':'endAngle']=Math.atan2(dy,dx);
     return;
   }
+  if(entity.type==='bezier'){
+    let i=which==='start'?0:which==='end'?entity.points.length-1:typeof which==='string'&&which.startsWith('control:')?Number(which.slice(8)):-1;
+    if(Number.isInteger(i)&&entity.points[i]){entity.points[i]=[p[0],p[1]];return;}
+  }
   throw Error(`Não é possível escrever em ${entity.type}.${which}`);
 }
 function setLineAngle(e,angle,length=lineLength(e),center=midpoint(e)){
