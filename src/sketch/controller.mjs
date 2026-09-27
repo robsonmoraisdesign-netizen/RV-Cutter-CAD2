@@ -1,4 +1,4 @@
-import {cloneSketch,line,circle,arc,bezier,rectangle,addEntity,addConstraint,addDimension,getEntity,removeEntity} from './model.mjs';
+import {cloneSketch,sketchPoint,line,circle,arc,bezier,rectangle,addEntity,addConstraint,addDimension,getEntity,removeEntity} from './model.mjs';
 import {sketchFromObject,resolveDocument} from './document.mjs';
 import {sketchStatus,entityStates} from './diagnostics.mjs';
 import {trimEntity,extendLine,entityBounds} from './operations.mjs';
@@ -24,6 +24,7 @@ export function createSketchController(api){
    if(options.startRef)addConstraint(s,'coincident',{a:{entity:selected[0],point:'start'},b:options.startRef});
    if(options.endRef)addConstraint(s,'coincident',{a:{entity:selected[1],point:'end'},b:options.endRef});
   }else{let e;
+   if(type==='point')e=sketchPoint(a);
    if(type==='line')e=line(a,b);
    if(type==='circle')e=circle(a,Math.hypot(b[0]-a[0],b[1]-a[1]));
    if(type==='bezier')e=bezier(a);
@@ -46,6 +47,10 @@ export function createSketchController(api){
     };
     applyInference('start',options.startRelation|| (options.startRef?{type:'coincident',ref:options.startRef}:null));
     applyInference('end',options.endRelation|| (options.endRef?{type:'coincident',ref:options.endRef}:null));
+   }else if(e.type==='point'){
+    const rel=options.pointRelation||null;
+    if(rel?.type==='coincident')addConstraint(s,'coincident',{a:{entity:e.id,point:'point'},b:rel.ref});
+    if(rel?.type==='midpoint')addConstraint(s,'midpoint',{point:{entity:e.id,point:'point'},line:rel.line});
    }else if(e.type==='circle'){
     const rel=options.centerRelation||(options.centerRef?{type:'coincident',ref:options.centerRef}:null);
     if(rel?.type==='coincident')addConstraint(s,'coincident',{a:{entity:e.id,point:'center'},b:rel.ref});
@@ -94,7 +99,8 @@ export function createSketchController(api){
  function movePoint(entity,which,p){return transact(s=>{
   const e=getEntity(s,entity);
   if(s.constraints.some(c=>c.type==='fixed'&&c.entity===entity))throw Error('Entidade fixada: remova Fixar antes de mover.');
-  if(e.type==='line')e[which]=[...p];
+  if(e.type==='point')e.position=[...p];
+  else if(e.type==='line')e[which]=[...p];
   else if(e.type==='bezier'){
    const i=which==='start'?0:which==='end'?e.points.length-1:typeof which==='string'&&which.startsWith('control:')?Number(which.slice(8)):-1;
    if(!Number.isInteger(i)||!e.points[i])throw Error('Ponto de controle Bézier inválido.');e.points[i]=[...p];
