@@ -104,6 +104,11 @@ export function validateSketch(s) {
     } else if(c.type==='coincident') {
       for(const ref of [c.a,c.b])entityEndpoint(getEntity(s,ref?.entity),ref?.point);
       if(c.a.entity===c.b.entity&&c.a.point===c.b.point)throw Error('Selecione dois pontos diferentes.');
+    } else if(c.type==='midpoint') {
+      const p=getEntity(s,c.point?.entity),ln=getEntity(s,c.line);
+      entityEndpoint(p,c.point?.point);
+      if(ln.type!=='line')throw Error('Ponto médio requer uma linha de referência.');
+      if(c.point.entity===c.line)throw Error('Ponto médio requer entidades diferentes.');
     } else if(PAIR_LINE.has(c.type)) validatePairRef(s,c,'line');
     else if(PAIR_RADIAL.has(c.type)) validatePairRef(s,c,'radial');
     else if(c.type==='equal'){
