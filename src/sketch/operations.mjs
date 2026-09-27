@@ -95,9 +95,9 @@ function nearestSegmentIndex(bounds,t){
  }
  return best;
 }
-function mutateArc(target,center,radius,startAngle,endAngle,ccw=true){
- for(const k of Object.keys(target))delete target[k];
- Object.assign(target,{id:target.id,type:'arc',center:[...center],radius,startAngle,endAngle,ccw,construction:false});
+function mutateArc(target,center,radius,startAngle,endAngle,ccw=true,construction=false){
+ const id=target.id;for(const k of Object.keys(target))delete target[k];
+ Object.assign(target,{id,type:'arc',center:[...center],radius,startAngle,endAngle,ccw,construction:!!construction});
 }
 
 export function trimEntity(sketch,entityId,clickPoint){
@@ -128,7 +128,7 @@ export function trimEntity(sketch,entityId,clickPoint){
   let a=angles.at(-1)-TAU,b=angles[0],found=false;
   for(let i=0;i<angles.length;i++){const x=angles[i],y=i===angles.length-1?angles[0]+TAU:angles[i+1],cc=click<x?click+TAU:click;if(cc>=x-EPS&&cc<=y+EPS){a=x;b=y;found=true;break;}}
   if(!found){a=angles.at(-1);b=angles[0]+TAU;}
-  mutateArc(target,target.center,target.radius,normAngle(b),normAngle(a),true);
+  mutateArc(target,target.center,target.radius,normAngle(b),normAngle(a),true,target.construction);
   return {removed:false,split:false,relationsRemoved};
  }
 
@@ -164,11 +164,18 @@ export function extendLine(sketch,entityId,clickPoint){
  return {relationsRemoved,endpoint:extendEnd?'end':'start',point:[...hit.point]};
 }
 
+function bezierPoint(points,t){
+ let work=points.map(p=>[...p]);for(let level=work.length-1;level>0;level--)for(let i=0;i<level;i++)work[i]=[work[i][0]*(1-t)+work[i+1][0]*t,work[i][1]*(1-t)+work[i+1][1]*t];return work[0];
+}
 export function entityBounds(entity){
  if(entity.type==='line')return {minX:Math.min(entity.start[0],entity.end[0]),minY:Math.min(entity.start[1],entity.end[1]),maxX:Math.max(entity.start[0],entity.end[0]),maxY:Math.max(entity.start[1],entity.end[1])};
  if(entity.type==='circle')return {minX:entity.center[0]-entity.radius,minY:entity.center[1]-entity.radius,maxX:entity.center[0]+entity.radius,maxY:entity.center[1]+entity.radius};
  if(entity.type==='arc'){
   const pts=[arcPoint(entity,0),arcPoint(entity,1)];for(let i=1;i<32;i++)pts.push(arcPoint(entity,i/32));
+  return {minX:Math.min(...pts.map(p=>p[0])),minY:Math.min(...pts.map(p=>p[1])),maxX:Math.max(...pts.map(p=>p[0])),maxY:Math.max(...pts.map(p=>p[1]))};
+ }
+ if(entity.type==='bezier'){
+  const pts=Array.from({length:49},(_,i)=>bezierPoint(entity.points,i/48));
   return {minX:Math.min(...pts.map(p=>p[0])),minY:Math.min(...pts.map(p=>p[1])),maxX:Math.max(...pts.map(p=>p[0])),maxY:Math.max(...pts.map(p=>p[1]))};
  }
  return null;
