@@ -24,7 +24,7 @@ async function cdp(url){
  try{
   const target=await waitFor(async()=>{const list=await (await fetch('http://127.0.0.1:9223/json/list')).json();return list.find(x=>x.type==='page');},25000);
   const dev=await cdp(target.webSocketDebuggerUrl),send=dev.send;
-  await send('Page.enable');await send('Runtime.enable');await send('Log.enable');
+  await send('Page.enable');await send('Runtime.enable');await send('Log.enable');await send('Emulation.setDeviceMetricsOverride',{width:1500,height:900,deviceScaleFactor:1,mobile:false});
   await send('Page.navigate',{url:'http://127.0.0.1:8092/'});await waitFor(async()=>{const r=await send('Runtime.evaluate',{expression:'document.readyState==="complete" && !!window.RVTest',returnByValue:true});return r.result.value;},20000);
   const evalv=async expression=>(await send('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true})).result.value;
   await evalv("document.querySelector('#newProject').click(); true");
