@@ -1,0 +1,11 @@
+const assert=require('node:assert/strict'),fs=require('fs');
+const html=fs.readFileSync('app/index.html','utf8'),ui=fs.readFileSync('src/ui.mjs','utf8'),editor=fs.readFileSync('src/editor.mjs','utf8'),css=fs.readFileSync('app/style.css','utf8');
+for(const token of ['sketch-commandbar','>Criar ','>Modificar ','>Restringir ','id="sketchDimensionCommand"','id="sketchInspector"','id="sketchStatusChip"','id="leaveProjectDialog"','id="leaveSave"','id="leaveDiscard"','id="leaveCancel"'])assert(html.includes(token),'Missing UI contract: '+token);
+assert(!html.includes('class="toolbuttons"'),'Old permanent Sketch toolbutton bar must not return.');
+assert(!html.includes('class="sketch-controls"'),'Old collapsible restriction block must not return.');
+for(const token of ['resolveProjectTransition','closeCurrentProject','destroyCurrentProject','writeRecovery','projectSignature'])assert(ui.includes(token),'Missing lifecycle contract: '+token);
+assert(ui.includes("window.desktop?.autosave"),'Editing recovery must use recovery storage, not silent catalog save.');
+assert(editor.includes('renderDimensions'),'Canvas dimensions must remain visible in Sketch.');
+assert(editor.includes('sketch-inference-line'),'Sketch inference feedback must remain visible.');
+assert(css.includes('Sketch 2D workspace — CAD-first interaction'),'CAD workspace styling missing.');
+console.log('Sketch UI and project lifecycle contract: PASS');
