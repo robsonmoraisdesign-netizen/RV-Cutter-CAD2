@@ -76,3 +76,16 @@ jobs:
           for(const p of ['app/ui.js','app/worker.js','app/manifold.wasm']){
             if(!fs.existsSync(p)||fs.statSync(p).size===0)throw new Error('Invalid generated artifact: '+p);
           }
+
+      - name: Package Windows x64 application
+        if: runner.os == 'Windows'
+        run: node scripts/package-windows.cjs
+
+      - name: Upload Windows x64 application
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: RV_Cutter_CAD_Windows_x64
+          path: dist/RV_Cutter_CAD_*_Windows_x64
+          if-no-files-found: error
+          retention-days: 30

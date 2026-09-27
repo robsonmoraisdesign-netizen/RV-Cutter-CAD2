@@ -1,3 +1,4 @@
+const signedArea=p=>p.reduce((s,a,i)=>{const b=p[(i+1)%p.length];return s+a[0]*b[1]-a[1]*b[0]},0)/2;
 import {entityEndpoint,validateSketch} from './model.mjs';
 
 const near=(a,b,t)=>Math.hypot(a[0]-b[0],a[1]-b[1])<=t;
@@ -6,8 +7,8 @@ const clone=p=>[p[0],p[1]];
 function arcPoints(e,segments){
   let a0=e.startAngle,a1=e.endAngle;
   let sweep=a1-a0;
-  if(e.ccw!==false){while(sweep<=0)sweep+=Math.PI*2;}
-  else{while(sweep>=0)sweep-=Math.PI*2;}
+  sweep=((sweep%(Math.PI*2))+(Math.PI*2))%(Math.PI*2);
+  if(e.ccw!==false){if(sweep===0)sweep=Math.PI*2;}else sweep=sweep===0?-Math.PI*2:sweep-Math.PI*2;
   const n=Math.max(3,Math.ceil(Math.abs(sweep)/(Math.PI*2)*segments));
   return Array.from({length:n+1},(_,i)=>{
     const a=a0+sweep*i/n;
@@ -24,6 +25,7 @@ function segmentFromEntity(e,curveSegments){
 
 export function resolveProfiles(sketch,{curveSegments=96,tolerance=1e-4}={}){
   validateSketch(sketch);
+  if(!Number.isInteger(curveSegments)||curveSegments<8||curveSegments>2048||!Number.isFinite(tolerance)||tolerance<=0)throw Error('Resolução de perfil inválida.');
   const profiles=[];
   for(const e of sketch.entities){
     if(e.construction)continue;
@@ -58,7 +60,7 @@ export function resolveProfiles(sketch,{curveSegments=96,tolerance=1e-4}={}){
       if(chain.length>=3)profiles.push(chain);
     }
   }
-  return profiles;
+  return profiles.sort((a,b)=>Math.abs(signedArea(b))-Math.abs(signedArea(a)));
 }
 
 export function normalizeProfiles(profiles){

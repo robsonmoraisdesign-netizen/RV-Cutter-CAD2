@@ -1,93 +1,106 @@
-export const SKETCH_SCHEMA_VERSION=1;
-
-let seq=0;
-const id=(prefix='sk')=>`${prefix}-${(++seq).toString(36)}`;
-
-const point=p=>{
-  if(!Array.isArray(p)||p.length!==2||!p.every(Number.isFinite))throw Error('Ponto inválido.');
-  return [Number(p[0]),Number(p[1])];
+export const SKETCH_SCHEMA_VERSION = 1;
+const id = (prefix='sk') => `${prefix}-${globalThis.crypto.randomUUID()}`;
+const TYPES = new Set(['line','circle','arc']);
+const finite = n => Number.isFinite(n) && Math.abs(n) <= 1e6;
+const point = p => {
+  if (!Array.isArray(p) || p.length !== 2 || !p.every(finite)) throw Error('Ponto inválido.');
+  return [...p];
 };
-
-export function createSketch({units='mm'}={}){
-  return {schemaVersion:SKETCH_SCHEMA_VERSION,units,entities:[],constraints:[],dimensions:[]};
+export function createSketch({units='mm'}={}) { return {schemaVersion:1,units,entities:[],constraints:[],dimensions:[]}; }
+export function line(start,end,options={}) { return {id:options.id||id('line'),type:'line',start:point(start),end:point(end),construction:!!options.construction}; }
+export function circle(center,radius,options={}) {
+  if (!finite(radius) || radius <= 0) throw Error('Raio inválido.');
+  return {id:options.id||id('circle'),type:'circle',center:point(center),radius,construction:!!options.construction};
 }
-
-export function line(start,end,options={}){
-  return {id:options.id||id('line'),type:'line',start:point(start),end:point(end),construction:!!options.construction};
+export function arc(center,radius,startAngle,endAngle,options={}) {
+  const c=circle(center,radius,options);
+  if (![startAngle,endAngle].every(finite)) throw Error('Ângulo inválido.');
+  return {...c,id:options.id||id('arc'),type:'arc',startAngle,endAngle,ccw:options.ccw!==false};
 }
-
-export function circle(center,radius,options={}){
-  if(!Number.isFinite(radius)||radius<=0)throw Error('Raio inválido.');
-  return {id:options.id||id('circle'),type:'circle',center:point(center),radius:Number(radius),construction:!!options.construction};
-}
-
-export function arc(center,radius,startAngle,endAngle,options={}){
-  if(!Number.isFinite(radius)||radius<=0)throw Error('Raio inválido.');
-  for(const v of [startAngle,endAngle])if(!Number.isFinite(v))throw Error('Ângulo inválido.');
-  return {id:options.id||id('arc'),type:'arc',center:point(center),radius:Number(radius),startAngle:Number(startAngle),endAngle:Number(endAngle),ccw:options.ccw!==false,construction:!!options.construction};
-}
-
-export function addEntity(sketch,entity){
-  if(sketch.entities.some(e=>e.id===entity.id))throw Error('ID de entidade duplicado.');
-  sketch.entities.push(structuredClone(entity));
-  return entity.id;
-}
-
-export function addConstraint(sketch,type,data={}){
-  const c={id:data.id||id('c'),type,...structuredClone(data)};
-  delete c.entityData;
-  sketch.constraints.push(c);
-  return c.id;
-}
-
-export function addDimension(sketch,type,data={}){
-  if(!Number.isFinite(data.value)||data.value<=0)throw Error('Valor de cota inválido.');
-  const d={id:data.id||id('d'),type,...structuredClone(data),value:Number(data.value),driving:data.driving!==false};
-  sketch.dimensions.push(d);
-  return d.id;
-}
-
-export function getEntity(sketch,entityId){
+export function getEntity(sketch,entityId) {
   const e=sketch.entities.find(x=>x.id===entityId);
-  if(!e)throw Error(`Entidade não encontrada: ${entityId}`);
+  if (!e) throw Error(`Entidade não encontrada: ${entityId}`);
   return e;
 }
-
-export function cloneSketch(sketch){return structuredClone(sketch);}
-
-export function validateSketch(sketch){
-  if(!sketch||sketch.schemaVersion!==SKETCH_SCHEMA_VERSION)throw Error('Versão de Sketch inválida.');
-  if(sketch.units!=='mm')throw Error('A Fase 1 usa milímetros como unidade nativa.');
+export function cloneSketch(sketch) { return structuredClone(sketch); }
+function append(sketch,collection,value) {
+  const copy=cloneSketch(sketch); copy[collection].push(structuredClone(value)); validateSketch(copy);
+  sketch[collection].push(structuredClone(value)); return value.id;
+}
+export function addEntity(sketch,entity) { return append(sketch,'entities',entity); }
+export function addConstraint(sketch,type,data={}) {
+  const c={...structuredClone(data),id:data.id||id('constraint'),type};
+  if (type==='fixed') c.geometry=structuredClone(getEntity(sketch,c.entity));
+  return append(sketch,'constraints',c);
+}
+export function addDimension(sketch,type,data={}) {
+  return append(sketch,'dimensions',{...structuredClone(data),id:data.id||id('dimension'),type,driving:data.driving!==false});
+}
+export function rectangle(sketch,a,b,options={}) {
+  point(a); point(b);
+  if (Math.abs(a[0]-b[0])<1e-6 || Math.abs(a[1]-b[1])<1e-6) throw Error('Retângulo sem área.');
+  const s=cloneSketch(sketch),ps=[a,[b[0],a[1]],b,[a[0],b[1]]];
+  const lines=ps.map((p,i)=>line(p,ps[(i+1)%4],options));
+  lines.forEach(e=>addEntity(s,e));
+  lines.forEach((e,i)=>{
+    addConstraint(s,i%2?'vertical':'horizontal',{entity:e.id});
+    addConstraint(s,'coincident',{a:{entity:e.id,point:'end'},b:{entity:lines[(i+1)%4].id,point:'start'}});
+  });
+  Object.assign(sketch,s);return lines.map(e=>e.id);
+}
+export function removeEntity(sketch,entityId) {
+  getEntity(sketch,entityId);
+  sketch.entities=sketch.entities.filter(e=>e.id!==entityId);
+  sketch.constraints=sketch.constraints.filter(c=>![c.entity,c.a?.entity,c.b?.entity].includes(entityId));
+  sketch.dimensions=sketch.dimensions.filter(d=>d.entity!==entityId);
+}
+export function entityEndpoint(entity,which) {
+  if (entity.type==='line' && ['start','end'].includes(which)) return [...entity[which]];
+  if (['circle','arc'].includes(entity.type) && which==='center') return [...entity.center];
+  if (entity.type==='arc' && ['start','end'].includes(which)) {
+    const a=entity[which==='start'?'startAngle':'endAngle'];
+    return [entity.center[0]+Math.cos(a)*entity.radius,entity.center[1]+Math.sin(a)*entity.radius];
+  }
+  throw Error(`Referência de ponto inválida: ${entity.type}.${which}`);
+}
+export function validateSketch(s) {
+  if (!s || s.schemaVersion!==1 || s.units!=='mm') throw Error('Versão ou unidade do Sketch inválida.');
+  for (const key of ['entities','constraints','dimensions']) {
+    if (!Array.isArray(s[key]) || s[key].length>8000) throw Error('Lista de Sketch inválida ou muito grande.');
+  }
+  if(s.entities.length>2000)throw Error('Limite de 2000 entidades por Sketch. Divida em objetos.');
+  if(s.profileCenter!==undefined)point(s.profileCenter);
+  if(s.profileSize!==undefined&&(!finite(s.profileSize)||s.profileSize<=0))throw Error('Tamanho do Sketch inválido.');
+  if(s.legacyLoops!==undefined){
+    if(!Array.isArray(s.legacyLoops)||s.legacyLoops.length>10000)throw Error('Contornos legados inválidos.');
+    let count=0;for(const loop of s.legacyLoops){if(!Array.isArray(loop)||loop.length<3)throw Error('Contorno legado inválido.');count+=loop.length;if(count>500000)throw Error('Contornos legados muito grandes.');loop.forEach(point);}
+  }
   const ids=new Set();
-  for(const e of sketch.entities){
-    if(!e?.id||ids.has(e.id))throw Error('Entidade com ID inválido ou duplicado.');
-    ids.add(e.id);
-    if(e.type==='line'){point(e.start);point(e.end);}
-    else if(e.type==='circle'){point(e.center);if(!(e.radius>0&&Number.isFinite(e.radius)))throw Error('Círculo inválido.');}
-    else if(e.type==='arc'){point(e.center);if(!(e.radius>0&&Number.isFinite(e.radius))||![e.startAngle,e.endAngle].every(Number.isFinite))throw Error('Arco inválido.');}
-    else throw Error(`Entidade não suportada na Fase 1: ${e.type}`);
+  for (const v of [...s.entities,...s.constraints,...s.dimensions]) {
+    if (typeof v?.id!=='string' || !v.id.length || v.id.length>120 || ids.has(v.id)) throw Error('ID inválido ou duplicado no Sketch.');
+    ids.add(v.id);
   }
-  for(const c of sketch.constraints){
-    if(!c?.id||ids.has(c.id))throw Error('Restrição com ID inválido ou duplicado.');
-    ids.add(c.id);
+  function checkEntity(e) {
+    if (!TYPES.has(e.type)) throw Error('Tipo de entidade não suportado.');
+    if (e.type==='line') { point(e.start);point(e.end); }
+    else {point(e.center);if(!finite(e.radius)||e.radius<=0)throw Error('Raio inválido.');}
+    if(e.type==='arc' && ![e.startAngle,e.endAngle].every(finite))throw Error('Ângulo inválido.');
   }
-  for(const d of sketch.dimensions){
-    if(!d?.id||ids.has(d.id))throw Error('Cota com ID inválido ou duplicado.');
-    ids.add(d.id);
-    if(!(d.value>0&&Number.isFinite(d.value)))throw Error('Cota inválida.');
+  s.entities.forEach(checkEntity);
+  for (const c of s.constraints) {
+    if (['horizontal','vertical','fixed'].includes(c.type)) {
+      const e=getEntity(s,c.entity);
+      if(c.type!=='fixed'&&e.type!=='line')throw Error('Horizontal/Vertical requer linha.');
+      if(c.type==='fixed'&&c.geometry){checkEntity(c.geometry);if(c.geometry.id!==e.id||c.geometry.type!==e.type)throw Error('Referência fixa inválida.');}
+    } else if(c.type==='coincident') {
+      for(const ref of [c.a,c.b])entityEndpoint(getEntity(s,ref?.entity),ref?.point);
+      if(c.a.entity===c.b.entity&&c.a.point===c.b.point)throw Error('Selecione dois pontos diferentes.');
+    } else throw Error('Restrição não suportada: '+c.type);
+  }
+  for (const d of s.dimensions) {
+    const e=getEntity(s,d.entity);
+    if (!finite(d.value)||d.value<=0) throw Error('Valor de cota inválido.');
+    if ({lineLength:'line',circleRadius:'circle',arcRadius:'arc'}[d.type]!==e.type) throw Error('Cota incompatível com a entidade.');
   }
   return true;
-}
-
-export function entityEndpoint(entity,which){
-  if(entity.type==='line'){
-    if(which==='start')return [...entity.start];
-    if(which==='end')return [...entity.end];
-  }
-  if(entity.type==='arc'){
-    const a=which==='start'?entity.startAngle:entity.endAngle;
-    if(which==='start'||which==='end')return [entity.center[0]+Math.cos(a)*entity.radius,entity.center[1]+Math.sin(a)*entity.radius];
-  }
-  if(entity.type==='circle'&&which==='center')return [...entity.center];
-  throw Error(`Referência de ponto inválida: ${entity.type}.${which}`);
 }

@@ -5,7 +5,7 @@ const dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
 
 function setPoint(entity,which,p){
   if(entity.type==='line'&&(which==='start'||which==='end')){entity[which]=[p[0],p[1]];return;}
-  if(entity.type==='circle'&&which==='center'){entity.center=[p[0],p[1]];return;}
+  if(['circle','arc'].includes(entity.type)&&which==='center'){entity.center=[p[0],p[1]];return;}
   if(entity.type==='arc'&&(which==='start'||which==='end')){
     const dx=p[0]-entity.center[0],dy=p[1]-entity.center[1];
     const r=Math.hypot(dx,dy);
@@ -84,22 +84,26 @@ function residual(sketch){
   return r;
 }
 
-export function solveSketch(input,{maxIterations=40,tolerance=1e-5}={}){
+export function solveSketch(input,{maxIterations=240,tolerance=1e-6,changedIds=null}={}){
   validateSketch(input);
+  if (!Number.isInteger(maxIterations)||maxIterations<1||maxIterations>1000||!Number.isFinite(tolerance)||tolerance<=0)throw Error('Opções do solver inválidas.');
   const sketch=cloneSketch(input);
+  const affected=new Set(changedIds||sketch.entities.map(e=>e.id));
+  let grew=true;while(grew){grew=false;for(const c of sketch.constraints)if(c.type==='coincident'&&(affected.has(c.a.entity)||affected.has(c.b.entity))){for(const ref of [c.a,c.b])if(!affected.has(ref.entity)){affected.add(ref.entity);grew=true;}}}
+  const touches=c=>affected.has(c.entity)||affected.has(c.a?.entity)||affected.has(c.b?.entity);
   const fixed=new Map();
-  for(const c of sketch.constraints)if(c.type==='fixed')fixed.set(c.entity,snapshotEntity(getEntity(sketch,c.entity)));
+  for(const c of sketch.constraints)if(c.type==='fixed')fixed.set(c.entity,c.geometry||snapshotEntity(getEntity(sketch,c.entity)));
 
   let iterations=0,last=Infinity;
   for(;iterations<maxIterations;iterations++){
-    for(const d of sketch.dimensions)applyDimension(sketch,d);
-    for(const c of sketch.constraints)if(c.type!=='fixed')applyConstraint(sketch,c);
+    for(const d of sketch.dimensions)if(touches(d))applyDimension(sketch,d);
+    for(const c of sketch.constraints)if(c.type!=='fixed'&&touches(c))applyConstraint(sketch,c);
     applyFixed(sketch,fixed);
     const r=residual(sketch);
-    if(r<=tolerance)return {sketch,iterations:iterations+1,residual:r,converged:true};
+    if(r<=tolerance)return {sketch,iterations:iterations+1,residual:r,converged:true,affectedIds:[...affected]};
     if(Math.abs(last-r)<tolerance*1e-3&&iterations>3){last=r;break;}
     last=r;
   }
   const r=residual(sketch);
-  return {sketch,iterations,residual:r,converged:r<=tolerance};
+  return {sketch,iterations,residual:r,converged:r<=tolerance,affectedIds:[...affected]};
 }
