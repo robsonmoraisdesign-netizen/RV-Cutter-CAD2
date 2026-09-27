@@ -23,6 +23,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - uses: actions/setup-node@v4
         with:
@@ -96,6 +98,8 @@ jobs:
 
       - name: Package Windows x64 application
         if: runner.os == 'Windows'
+        env:
+          RV_SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: node scripts/package-windows.cjs
 
       - name: Upload Windows x64 application
