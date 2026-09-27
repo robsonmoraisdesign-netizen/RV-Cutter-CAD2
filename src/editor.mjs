@@ -12,8 +12,8 @@ export function createEditor(svg,api){
  const nativePoint=q=>{const o=api.object(),n=sketch.native();return [q[0]*o.params.size+n.profileCenter[0],q[1]*o.params.size+n.profileCenter[1]];};
  const localPoint=(p,n)=>{const size=api.object().params.size;return [(p[0]-n.profileCenter[0])/size,(p[1]-n.profileCenter[1])/size];};
  const bezierPoint=(points,t)=>{let work=points.map(p=>[...p]);for(let level=work.length-1;level>0;level--)for(let i=0;i<level;i++)work[i]=[work[i][0]*(1-t)+work[i+1][0]*t,work[i][1]*(1-t)+work[i+1][1]*t];return work[0];};
- const entityMid=e=>e.type==='line'?[(e.start[0]+e.end[0])/2,(e.start[1]+e.end[1])/2]:e.type==='bezier'?bezierPoint(e.points,.5):[...e.center];
- const entityName=e=>({line:'Linha',circle:'Círculo',arc:'Arco',bezier:'Bézier'}[e?.type]||'Entidade');
+ const entityMid=e=>e.type==='point'?[...e.position]:e.type==='line'?[(e.start[0]+e.end[0])/2,(e.start[1]+e.end[1])/2]:e.type==='bezier'?bezierPoint(e.points,.5):[...e.center];
+ const entityName=e=>({point:'Ponto',line:'Linha',circle:'Círculo',arc:'Arco',bezier:'Bézier'}[e?.type]||'Entidade');
  const constraintLabel=t=>({horizontal:'H',vertical:'V',coincident:'●',midpoint:'◇',fixed:'F',parallel:'∥',perpendicular:'⊥',equal:'=',concentric:'◎',collinear:'—',tangent:'T'}[t]||'?');
  const ruleName=t=>({horizontal:'Horizontal',vertical:'Vertical',coincident:'Coincidente',midpoint:'Ponto médio',fixed:'Fixar',parallel:'Paralela',perpendicular:'Perpendicular',equal:'Igual',concentric:'Concêntrica',collinear:'Colinear',tangent:'Tangente',lineLength:'Comprimento',circleRadius:'Raio',arcRadius:'Raio do arco'}[t]||t);
  const normAngle=a=>Math.atan2(Math.sin(a),Math.cos(a));
@@ -31,7 +31,8 @@ export function createEditor(svg,api){
  function snapNative(p,n){
   const candidates=[];
   for(const e of n?.entities||[]){
-   if(e.type==='line'){
+   if(e.type==='point')candidates.push({point:e.position,relation:{type:'coincident',ref:{entity:e.id,point:'point'}},referenceId:e.id,icon:'●'});
+   else if(e.type==='line'){
     candidates.push(
       {point:e.start,relation:{type:'coincident',ref:{entity:e.id,point:'start'}},referenceId:e.id,icon:'●'},
       {point:e.end,relation:{type:'coincident',ref:{entity:e.id,point:'end'}},referenceId:e.id,icon:'●'},
@@ -148,7 +149,11 @@ export function createEditor(svg,api){
   const classes=['sketch-entity-visible',state==='defined'?'entity-defined':state==='conflict'?'entity-conflict':'entity-under'];
   if(chosen)classes.push('entity-selected');if(e.construction)classes.push('entity-construction');if(inference?.referenceId===e.id)classes.push('sketch-reference-awake');
   const common={class:classes.join(' '),'vector-effect':'non-scaling-stroke'};
-  if(e.type==='line'){
+  if(e.type==='point'){
+   const p=localPoint(e.position,n),r=view[2]*.006;
+   svg.appendChild(el('circle',{cx:p[0],cy:-p[1],r:r*2.2,class:'sketch-point-hit','data-entity':e.id}));
+   svg.appendChild(el('circle',{...common,cx:p[0],cy:-p[1],r}));
+  }else if(e.type==='line'){
    const d=path([localPoint(e.start,n),localPoint(e.end,n)]);
    svg.appendChild(el('path',{d,class:'sketch-entity-hit','vector-effect':'non-scaling-stroke','data-entity':e.id}));
    svg.appendChild(el('path',{...common,d}));
@@ -205,7 +210,7 @@ export function createEditor(svg,api){
    if(info.count===0)meta.textContent='Selecione a geometria diretamente no canvas. As linhas possuem uma área de captura ampliada.';
    else if(info.count===1){
     const e=info.primary;
-    meta.textContent=e.type==='line'?`Comprimento atual: ${info.value.toFixed(2)} mm`:e.type==='circle'?`Raio atual: ${info.value.toFixed(2)} mm`:e.type==='arc'?`Raio do arco: ${info.value.toFixed(2)} mm`:`Bézier de grau ${Math.max(1,e.points.length-1)} · ${e.points.length} pontos de controle`;
+    meta.textContent=e.type==='point'?`Ponto: X ${e.position[0].toFixed(2)} · Y ${e.position[1].toFixed(2)} mm`:e.type==='line'?`Comprimento atual: ${info.value.toFixed(2)} mm`:e.type==='circle'?`Raio atual: ${info.value.toFixed(2)} mm`:e.type==='arc'?`Raio do arco: ${info.value.toFixed(2)} mm`:`Bézier de grau ${Math.max(1,e.points.length-1)} · ${e.points.length} pontos de controle`;
    }else meta.textContent='Seleção múltipla pronta para restrições entre entidades.';
   }
   if(dim){const canDimension=info.count===1&&Number.isFinite(info.value);dim.disabled=!canDimension;if(canDimension&&!dim.matches(':focus'))dim.value=(info.dimension?.value??info.value).toFixed(2);}
@@ -231,7 +236,7 @@ export function createEditor(svg,api){
    for(const e of n.entities){
     const chosen=sketch.selected().includes(e.id);appendEntityShape(e,n,o,stateMap.get(e.id)||'under',chosen);
     if(chosen&&tool==='select'){
-     const handles=e.type==='line'?[['start',e.start],['end',e.end]]:e.type==='bezier'?e.points.map((p,i)=>[`control:${i}`,p]):[['center',e.center],['radius',[e.center[0]+e.radius,e.center[1]]]];
+     const handles=e.type==='point'?[['point',e.position]]:e.type==='line'?[['start',e.start],['end',e.end]]:e.type==='bezier'?e.points.map((p,i)=>[`control:${i}`,p]):[['center',e.center],['radius',[e.center[0]+e.radius,e.center[1]]]];
      if(e.type==='arc')for(const key of ['start','end']){const a=e[key+'Angle'];handles.push([key,[e.center[0]+Math.cos(a)*e.radius,e.center[1]+Math.sin(a)*e.radius]]);}
      for(const [key,p] of handles){const cc=localPoint(p,n);svg.appendChild(el('circle',{cx:cc[0],cy:-cc[1],r:view[2]*.006,fill:sketch.points().some(p=>p.entity===e.id&&p.point===key)?'#f4b860':'#eef4f3',stroke:'#258d7d','stroke-width':1,'vector-effect':'non-scaling-stroke','data-entity':e.id,'data-handle':key}));}
     }
@@ -254,7 +259,7 @@ export function createEditor(svg,api){
   }
   renderBezierDraft(n);renderBox();renderInference(n);updateInspector(n);
   const selection=$('selection');
-  if(selection)selection.textContent=drag?.kind==='box-select'?(drag.end?.[0]<drag.start[0]?'Seleção cruzada: toca a janela para selecionar.':'Seleção por janela: a entidade precisa ficar dentro.'):region?'Região selecionada para edição de contorno.':sketch.selected().length?`${sketch.selected().length} entidade(s) selecionada(s) · Shift adiciona à seleção`:selected>=0?`Contorno ${selected+1} · ${o.loops[selected]?.length||0} pontos`:tool==='trim'?'Trim: clique no trecho que deseja remover.':tool==='extend'?'Extend: clique perto da extremidade que deseja prolongar.':tool==='dimension'?'Cota: clique em uma linha, círculo ou arco.':tool==='bezier'?(bezierClicks.length?'Bézier: continue clicando · duplo clique ou Enter conclui.':'Bézier: clique para iniciar a curva.'):'Clique para selecionar · arraste no vazio para seleção por janela.';
+  if(selection)selection.textContent=drag?.kind==='box-select'?(drag.end?.[0]<drag.start[0]?'Seleção cruzada: toca a janela para selecionar.':'Seleção por janela: a entidade precisa ficar dentro.'):region?'Região selecionada para edição de contorno.':sketch.selected().length?`${sketch.selected().length} entidade(s) selecionada(s) · Shift adiciona à seleção`:selected>=0?`Contorno ${selected+1} · ${o.loops[selected]?.length||0} pontos`:tool==='trim'?'Trim: clique no trecho que deseja remover.':tool==='extend'?'Extend: clique perto da extremidade que deseja prolongar.':tool==='dimension'?'Cota: clique em uma linha, círculo ou arco.':tool==='bezier'?(bezierClicks.length?'Bézier: continue clicando · duplo clique ou Enter conclui.':'Bézier: clique para iniciar a curva.'):tool==='point'?'Ponto: clique para posicionar · Shift suprime inferências.':'Clique para selecionar · arraste no vazio para seleção por janela.';
  }
  function reset(){view=[-.65,-.65,1.3,1.3];selected=-1;node=-1;region=null;drag=null;arcClicks=[];bezierClicks=[];bezierHover=null;hoveredEntity=null;inference=null;sketch.reset();closeInlineDimension();render();}
  async function operate(op){const o=api.object();if(!o||!contourMode())return;const original=o.loops;try{api.status('Aplicando edição vetorial…');const loops=await api.request({action:'edit',loops:original,op:{...op,size:o.params.size}});if(api.object()?.id!==o.id||o.loops!==original){api.status('Edição cancelada porque o objeto mudou.');return;}api.history();delete o.sketch;o.loops=loops;selected=-1;node=-1;api.changed();render();}catch(e){api.status(e.message);}}
@@ -285,6 +290,10 @@ export function createEditor(svg,api){
   }
   if(entity&&tool==='extend'){sketch.extend(entity,nativePoint(q));hoveredEntity=null;inference=null;render();return;}
   if(entity&&tool==='dimension'){openInlineDimension(entity,e.clientX,e.clientY);return;}
+  if(tool==='point'){
+   const raw=nativePoint(q),snap=e.shiftKey?{point:raw,relation:null}:snapNative(raw,sketch.native());
+   sketch.create('point',snap.point,null,null,{pointRelation:snap.relation});inference=null;render();return;
+  }
   if(['sketch-line','rectangle','circle'].includes(tool)){
    if(drag?.kind==='primitive'){commitPrimitive(q,{suppress:e.shiftKey});return;}
    beginPrimitive(q,{suppress:e.shiftKey});render();return;
