@@ -175,3 +175,10 @@ body.drawer-collapsed .project-drawer-v4{visibility:hidden;pointer-events:none}
 #editor .sketch-bezier-polygon.draft{stroke:#7a858b;opacity:.7}
 #editor .sketch-bezier-control{fill:#f8fbfb;stroke:#4a5960;stroke-width:1.2}
 #editor .bezier-preview{stroke:#d38731!important;stroke-width:1.7}
+
+#editor .sketch-point-hit{fill:transparent;stroke:transparent;pointer-events:all;cursor:pointer}
+#editor .sketch-point-visible{pointer-events:none;stroke-width:1.4;fill:#287dc4}
+#editor .sketch-point-visible.entity-defined{fill:#252c31}
+#editor .sketch-point-visible.entity-conflict{fill:#cf4646}
+#editor .sketch-point-visible.entity-selected{fill:#df8c2f}
+#editor .sketch-point-hit:hover + .sketch-point-visible{fill:#ee9a37!important;stroke:#ee9a37!important}
