@@ -1,6 +1,8 @@
 export const SKETCH_SCHEMA_VERSION = 1;
 const id = (prefix='sk') => `${prefix}-${globalThis.crypto.randomUUID()}`;
 const TYPES = new Set(['line','circle','arc']);
+const PAIR_LINE = new Set(['parallel','perpendicular','collinear']);
+const PAIR_RADIAL = new Set(['concentric']);
 const finite = n => Number.isFinite(n) && Math.abs(n) <= 1e6;
 const point = p => {
   if (!Array.isArray(p) || p.length !== 2 || !p.every(finite)) throw Error('Ponto inválido.');
@@ -51,7 +53,7 @@ export function rectangle(sketch,a,b,options={}) {
 export function removeEntity(sketch,entityId) {
   getEntity(sketch,entityId);
   sketch.entities=sketch.entities.filter(e=>e.id!==entityId);
-  sketch.constraints=sketch.constraints.filter(c=>![c.entity,c.a?.entity,c.b?.entity].includes(entityId));
+  sketch.constraints=sketch.constraints.filter(c=>![c.entity,c.a?.entity,c.b?.entity,c.first,c.second].includes(entityId));
   sketch.dimensions=sketch.dimensions.filter(d=>d.entity!==entityId);
 }
 export function entityEndpoint(entity,which) {
@@ -62,6 +64,13 @@ export function entityEndpoint(entity,which) {
     return [entity.center[0]+Math.cos(a)*entity.radius,entity.center[1]+Math.sin(a)*entity.radius];
   }
   throw Error(`Referência de ponto inválida: ${entity.type}.${which}`);
+}
+function validatePairRef(s,c,kind){
+  if(typeof c.first!=='string'||typeof c.second!=='string'||c.first===c.second)throw Error('Selecione duas entidades diferentes.');
+  const a=getEntity(s,c.first),b=getEntity(s,c.second);
+  if(kind==='line'&&(a.type!=='line'||b.type!=='line'))throw Error('Esta restrição requer duas linhas.');
+  if(kind==='radial'&&(!['circle','arc'].includes(a.type)||!['circle','arc'].includes(b.type)))throw Error('Esta restrição requer dois círculos/arcos.');
+  return [a,b];
 }
 export function validateSketch(s) {
   if (!s || s.schemaVersion!==1 || s.units!=='mm') throw Error('Versão ou unidade do Sketch inválida.');
@@ -82,7 +91,7 @@ export function validateSketch(s) {
   }
   function checkEntity(e) {
     if (!TYPES.has(e.type)) throw Error('Tipo de entidade não suportado.');
-    if (e.type==='line') { point(e.start);point(e.end); }
+    if (e.type==='line') { point(e.start);point(e.end);if(Math.hypot(e.end[0]-e.start[0],e.end[1]-e.start[1])<1e-8)throw Error('Linha sem comprimento.');}
     else {point(e.center);if(!finite(e.radius)||e.radius<=0)throw Error('Raio inválido.');}
     if(e.type==='arc' && ![e.startAngle,e.endAngle].every(finite))throw Error('Ângulo inválido.');
   }
@@ -95,6 +104,17 @@ export function validateSketch(s) {
     } else if(c.type==='coincident') {
       for(const ref of [c.a,c.b])entityEndpoint(getEntity(s,ref?.entity),ref?.point);
       if(c.a.entity===c.b.entity&&c.a.point===c.b.point)throw Error('Selecione dois pontos diferentes.');
+    } else if(PAIR_LINE.has(c.type)) validatePairRef(s,c,'line');
+    else if(PAIR_RADIAL.has(c.type)) validatePairRef(s,c,'radial');
+    else if(c.type==='equal'){
+      const [a,b]=validatePairRef(s,c);
+      const linePair=a.type==='line'&&b.type==='line';
+      const radialPair=['circle','arc'].includes(a.type)&&['circle','arc'].includes(b.type);
+      if(!linePair&&!radialPair)throw Error('Igual requer duas linhas ou dois círculos/arcos.');
+    } else if(c.type==='tangent'){
+      const [a,b]=validatePairRef(s,c);
+      const ok=(a.type==='line'&&['circle','arc'].includes(b.type))||(b.type==='line'&&['circle','arc'].includes(a.type));
+      if(!ok)throw Error('Tangente, nesta fase, requer uma linha e um círculo/arco.');
     } else throw Error('Restrição não suportada: '+c.type);
   }
   for (const d of s.dimensions) {
