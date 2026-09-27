@@ -1,5 +1,6 @@
 const fs=require('fs'),path=require('path'),http=require('http'),{spawn}=require('child_process'),assert=require('node:assert/strict');
-const chromium=require('@sparticuz/chromium');
+const chromiumModule=require('@sparticuz/chromium');
+const chromium=chromiumModule.default||chromiumModule;
 
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function waitFor(fn,timeout=20000){const end=Date.now()+timeout;let last;while(Date.now()<end){try{const v=await fn();if(v)return v;}catch(e){last=e;}await sleep(100);}throw last||new Error('Timeout');}
