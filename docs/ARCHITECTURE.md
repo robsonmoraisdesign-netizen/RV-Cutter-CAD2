@@ -78,3 +78,34 @@ As entidades continuam semânticas durante edição e serialização. Cotas e s�
 ## Ciclo de vida de projeto
 
 Ao sair de um projeto para a Biblioteca, criar outro ou abrir um arquivo, a aplicação deve perguntar **Salvar / Não salvar / Cancelar**. “Não salvar” descarta as alterações correntes e a recuperação; “Cancelar” mantém a sessão; “Salvar” persiste o catálogo antes de fechar. Quando a saída continua, o projeto anterior é encerrado por completo: worker, jobs pendentes, geração, cena/GPU, histórico e referências de estado são liberados antes da abertura do próximo projeto.
+
+## Sketch Phase 2 — 14.26
+
+A experiência de edição deixa de ser um menu genérico de ferramentas e passa a seguir o modelo de um **Sketch ativo**: ferramentas de criação/modificação disponíveis diretamente, seleção CAD, inferências e cotas no canvas. A referência de interação é Onshape/Fusion, sem copiar sua identidade visual.
+
+```text
+Sketch toolbar
+[Select] [Line] [Rectangle] [Circle] [Arc] [Bezier]
+         [Trim] [Extend] [Construction] [Constraints] [Dimension]
+                            ↓
+                     SketchDocument
+              Line / Circle / Arc / Bezier
+                            ↓
+             constraints + dimensions + solver
+                            ↓
+                  resolved manufacturing profile
+                            ↓
+                    geometry pipeline 14.22
+```
+
+Regras desta fase:
+- criação de linha, retângulo e círculo usa sequência de cliques e preview dinâmico;
+- linha continua em cadeia com coincidência persistente entre segmentos;
+- área invisível de captura é maior que o traço visual;
+- janela esquerda→direita seleciona entidades totalmente contidas; direita→esquerda funciona como crossing selection;
+- inferências H/V, coincidência, ponto médio e paralela viram relações persistentes quando aplicadas; Shift suprime inferências automáticas;
+- Trim e Extend operam no modelo semântico, não em uma cópia destrutiva de pontos;
+- Bézier multiponto permanece editável e é amostrada apenas na etapa de geração do perfil;
+- estado visual de entidade é derivado do solver/diagnóstico: subdefinida, definida ou conflito;
+- comandos ainda não implementados não devem aparecer como se estivessem prontos.
+
