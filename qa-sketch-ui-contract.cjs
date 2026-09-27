@@ -12,6 +12,7 @@ for(const token of [
   'data-tool="circle"',
   'data-tool="arc"',
   'data-tool="bezier"',
+  'data-tool="point"',
   'data-tool="trim"',
   'data-tool="extend"',
   'data-constraint="midpoint"',
@@ -34,7 +35,7 @@ assert(!html.includes('>Modificar <span class="chevron">'),'Phase 2 must not reg
 
 for(const token of [
   'resolveProjectTransition','closeCurrentProject','destroyCurrentProject','writeRecovery','projectSignature',
-  "map={d:'dimension',m:'trim',l:'sketch-line',r:'rectangle',c:'circle',a:'arc',b:'bezier'}",
+  "map={d:'dimension',m:'trim',l:'sketch-line',r:'rectangle',c:'circle',a:'arc',b:'bezier',p:'point'}",
   'toggleSketchShortcutPalette','activateSketchTool'
 ])assert(ui.includes(token),'Missing UI/lifecycle wiring: '+token);
 
