@@ -53,6 +53,10 @@ function applyConstraint(sketch,c){
     const a=getEntity(sketch,c.a.entity),b=getEntity(sketch,c.b.entity),pa=entityEndpoint(a,c.a.point),pb=entityEndpoint(b,c.b.point);
     const mid=[(pa[0]+pb[0])/2,(pa[1]+pb[1])/2];setPoint(a,c.a.point,mid);setPoint(b,c.b.point,mid);return;
   }
+  if(c.type==='midpoint'){
+    const e=getEntity(sketch,c.point.entity),ln=getEntity(sketch,c.line);
+    setPoint(e,c.point.point,midpoint(ln));return;
+  }
   if(c.type==='parallel'||c.type==='perpendicular'){
     const [a,b]=pair(sketch,c),base=lineAngle(a)+(c.type==='perpendicular'?Math.PI/2:0);
     setLineAngle(b,closestEquivalentAngle(base,lineAngle(b)));return;
@@ -101,6 +105,7 @@ function constraintResidual(sketch,c){
   if(c.type==='horizontal'){const e=getEntity(sketch,c.entity);return Math.abs(e.start[1]-e.end[1]);}
   if(c.type==='vertical'){const e=getEntity(sketch,c.entity);return Math.abs(e.start[0]-e.end[0]);}
   if(c.type==='coincident'){const a=getEntity(sketch,c.a.entity),b=getEntity(sketch,c.b.entity);return dist(entityEndpoint(a,c.a.point),entityEndpoint(b,c.b.point));}
+  if(c.type==='midpoint'){const e=getEntity(sketch,c.point.entity),ln=getEntity(sketch,c.line);return dist(entityEndpoint(e,c.point.point),midpoint(ln));}
   if(c.type==='parallel'){const [a,b]=pair(sketch,c);return Math.abs(normalizedCross(lineVector(a),lineVector(b)));}
   if(c.type==='perpendicular'){const [a,b]=pair(sketch,c);return Math.abs(normalizedDot(lineVector(a),lineVector(b)));}
   if(c.type==='equal'){const [a,b]=pair(sketch,c);return Math.abs(a.type==='line'?lineLength(a)-lineLength(b):a.radius-b.radius);}
@@ -122,6 +127,7 @@ function residual(sketch){
 }
 function constraintEntityIds(c){
   if(c.type==='coincident')return [c.a.entity,c.b.entity];
+  if(c.type==='midpoint')return [c.point.entity,c.line];
   if(c.first||c.second)return [c.first,c.second].filter(Boolean);
   return c.entity?[c.entity]:[];
 }
