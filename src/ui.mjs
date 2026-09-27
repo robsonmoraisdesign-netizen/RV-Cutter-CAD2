@@ -93,14 +93,14 @@ async function closeCurrentProject(){
  return resolveProjectTransition({
   active:state.screen==='studio'&&!!state.id,
   prompt:askLeaveProject,
-  save:async()=>{await updateHomePreview();return flush();},
+  save:async()=>{updateHomePreview();return flush();},
   discard:clearRecovery,
   close:async()=>{destroyCurrentProject();}
  });
 }
 function thumbnail(loop){const c=document.createElement('canvas');c.width=300;c.height=160;const ctx=c.getContext('2d');ctx.fillStyle='#eaf0f8';ctx.fillRect(0,0,300,160);if(loop?.length){ctx.beginPath();loop.forEach(([x,y],i)=>ctx[i?'lineTo':'moveTo'](150+x*130,80-y*130));ctx.closePath();ctx.fillStyle='#a6c5e9';ctx.fill();ctx.strokeStyle='#446a97';ctx.lineWidth=2;ctx.stroke();}return c.toDataURL('image/png')}
-function bytesDataUrl(bytes){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(r.error);r.readAsDataURL(new Blob([bytes],{type:'image/png'}));});}
-async function updateHomePreview(){if(!viewer||state.screen!=='studio'||!state.objects.some(o=>o.result))return;try{state.homePreview=await bytesDataUrl(viewer.capture(420,false));}catch(e){console.warn('Prévia indisponível:',e);}}
+function bytesDataUrl(bytes){let binary='';const step=0x8000;for(let i=0;i<bytes.length;i+=step)binary+=String.fromCharCode(...bytes.subarray(i,i+step));return 'data:image/png;base64,'+btoa(binary);}
+function updateHomePreview(){if(!viewer||state.screen!=='studio'||!state.objects.some(o=>o.result))return;try{state.homePreview=bytesDataUrl(viewer.capture(420,false));}catch(e){console.warn('Prévia indisponível:',e);}}
 async function showHome(page=0){
  page=Number.isInteger(page)?page:0;if(transitioning)return false;
  if(state.screen==='studio'){const ok=await closeCurrentProject();if(!ok)return false;}
