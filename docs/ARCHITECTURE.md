@@ -89,7 +89,7 @@ Sketch toolbar
          [Trim] [Extend] [Construction] [Constraints] [Dimension]
                             ↓
                      SketchDocument
-              Line / Circle / Arc / Bezier
+           Point / Line / Circle / Arc / Bezier
                             ↓
              constraints + dimensions + solver
                             ↓
