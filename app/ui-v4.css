@@ -170,3 +170,8 @@ body.drawer-collapsed .project-drawer-v4{visibility:hidden;pointer-events:none}
 #editor .sketch-constraint-badge{fill:#2c756b!important}
 
 @media(max-width:1120px){.sketch-tool-button{min-width:42px;padding:4px 5px}.sketch-tool-button>span:last-child{display:none}.onshape-ribbon .sketch-status-chip{min-width:94px}.sketch-show-constraints span{display:none}}
+
+#editor .sketch-bezier-polygon{fill:none;stroke:#465158;stroke-width:1;stroke-dasharray:3 3;opacity:.85}
+#editor .sketch-bezier-polygon.draft{stroke:#7a858b;opacity:.7}
+#editor .sketch-bezier-control{fill:#f8fbfb;stroke:#4a5960;stroke-width:1.2}
+#editor .bezier-preview{stroke:#d38731!important;stroke-width:1.7}
