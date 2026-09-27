@@ -253,7 +253,7 @@ window.addEventListener('keydown',e=>{
    activateSketchTool('select');editor.sketch.clearSelection();editor.render();return;
   }
   if(e.key==='Enter'&&editor.getTool()==='bezier'){e.preventDefault();editor.finishBezier();return;}
-  const map={d:'dimension',m:'trim',l:'sketch-line',r:'rectangle',c:'circle',a:'arc',b:'bezier'};
+  const map={d:'dimension',m:'trim',l:'sketch-line',r:'rectangle',c:'circle',a:'arc',b:'bezier',p:'point'};
   if(map[k]&&!e.ctrlKey&&!e.metaKey&&!e.altKey){e.preventDefault();activateSketchTool(map[k]);return;}
   if(e.key==='Delete'){editor.removeNode();return;}
  }
