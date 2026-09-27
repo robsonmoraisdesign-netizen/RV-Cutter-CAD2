@@ -1,11 +1,11 @@
 {
   "name": "rv-cutter-cad-source",
-  "version": "14.22.0",
+  "version": "14.24.0",
   "description": "RV Cutter CAD — revisão de apresentação e desempenho",
   "main": "app/main.cjs",
   "scripts": {
-    "build": "esbuild src/ui.mjs --bundle --minify --outfile=app/ui.js --format=iife --platform=browser --external:node:* && esbuild src/worker.mjs --bundle --minify --outfile=app/worker.js --format=esm --platform=browser --external:node:*",
-    "test": "node qa13-geometry.mjs && node qa14-bevel.mjs && node qa14-corners.mjs && node qa148-expansion-linked.mjs && node qa148-runtime-worker.mjs && node qa14-export-center.mjs && node qa13-catalog.cjs && node qa1422-inverted-relief-volume.mjs",
+    "build": "node scripts/build.mjs",
+    "test": "node qa13-geometry.mjs && node qa14-bevel.mjs && node qa14-corners.mjs && node qa148-expansion-linked.mjs && node qa148-runtime-worker.mjs && node qa14-export-center.mjs && node qa13-catalog.cjs && node qa1422-inverted-relief-volume.mjs && node qa-sketch-phase1.mjs && node qa-sketch-integration.mjs && node qa1417-catalog.cjs && node qa-source-version.cjs && node qa-project-transition.mjs && node qa-sketch-constraints.mjs && node qa-sketch-ui-contract.cjs && node qa-sketch-snapping.mjs",
     "start": "electron app"
   },
   "keywords": [],

@@ -18,3 +18,12 @@ Este arquivo é permanente. Um problema corrigido não deve ser apagado; deve ga
 | R-012 | Função visual presente, mas sem modelo arquitetônico real | Botão/UI não conta como função concluída sem estado, persistência, comportamento e teste. |
 | R-013 | ZIP de staging enviado com sufixo `(1)` não acionou o importador que esperava nome exato | Arquivo de staging deve ser normalizado antes da importação; automações não podem depender de um nome de upload frágil. |
 | R-014 | Verificação SHA da baseline falhou apenas no Windows por conversão LF→CRLF no checkout | `.gitattributes` deve fixar `eol=lf` para texto e marcar binários explicitamente antes de comparar hashes. |
+| R-015 | Núcleo de Sketch sem ligação com interface e persistência | O editor SVG existente usa o controlador de domínio; entidades, restrições e cotas sobrevivem à serialização. QA: `qa-sketch-integration.mjs`, `qa-sketch-browser.cjs`. |
+| R-016 | IDs sequenciais colidindo após reabrir um Sketch | IDs persistentes únicos, validação de referências e rejeição de duplicatas antes de resolver. |
+| R-017 | Fixar recapturando coordenadas alteradas | A restrição guarda sua geometria de referência; conflitos rejeitam a transação sem alterar o objeto. |
+| R-018 | Novo projeto obrigando importação antes de desenhar | Novo projeto abre objeto vazio no Sketch; apenas perfis fechados entram na fabricação. |
+| R-019 | Contagem antiga de 60 projetos no QA após migração paginada | QA atualizado para os 140 projetos reais do cenário, preservando paginação e carregamento preguiçoso. |
+| R-020 | Sketch paramétrico funcional, mas interface continuava como barra antiga cheia de botões | O Sketch usa ribbon contextual `Criar / Modificar / Restringir / Cota`, inspector próprio, cotas/restrições no canvas e QA de contrato visual. |
+| R-021 | Autosave silencioso no catálogo tornava a opção “Não salvar” sem efeito real | Edição grava apenas recuperação de falha; o catálogo é atualizado por salvamento explícito ou por “Salvar” na transição. |
+| R-022 | Troca para Biblioteca/novo projeto podia manter jobs/worker/cena do anterior até a substituição | Toda transição passa por `Salvar / Não salvar / Cancelar`; ao continuar, `resetSession()` encerra worker, pendências, geração e cena antes do próximo projeto. |
+| R-023 | Inferência visual de snap não criava relação paramétrica persistente | Snap em extremidades/centros cria restrição Coincidente sem converter entidades em pontos soltos. QA: `qa-sketch-snapping.mjs`. |
