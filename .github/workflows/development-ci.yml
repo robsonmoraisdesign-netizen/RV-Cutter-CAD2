@@ -87,12 +87,16 @@ jobs:
         if: runner.os == 'Linux'
         run: node qa-browser-cdp.cjs
 
-      - name: Upload Sketch UI audit
+      - name: Upload Workspace UI audit
         if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4
         with:
-          name: sketch-ui-audit
-          path: audit-sketch-14.24.png
+          name: workspace-ui-audit-14.25
+          path: |
+            audit-home-14.25.png
+            audit-3d-14.25.png
+            audit-sketch-14.25.png
+            audit-presentation-14.25.png
           if-no-files-found: error
           retention-days: 14
 
