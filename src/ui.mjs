@@ -9,6 +9,7 @@ import {zipSync} from 'fflate';
 import {defaults,migrateParams,simplify,normalize,area,stl,validateProject,splitObjects,combineParts} from './geometry.mjs';
 import {createViewer,initialColors,componentNames,layout} from './viewer.mjs';
 import {createEditor} from './editor.mjs';
+import {resolveProjectTransition} from './project-transition.mjs';
 const $=id=>document.getElementById(id),uid=()=>crypto.randomUUID();
 $('appVersion').textContent=APP_VERSION;
 function saveState(value){const el=$('saveState');el.dataset.state=value;el.textContent={dirty:'Alterações pendentes',saving:'Salvando…',saved:'Salvo',error:'Erro ao salvar',idle:'Biblioteca'}[value];}
@@ -33,8 +34,25 @@ function historyButtons(){$('undo').disabled=!state.history.length;$('redo').dis
 function applyProject(d){validateProject(d);resetSession();isolatedId=null;hoveredObjectId=null;expandedObjects.clear();state.id=typeof d.id==='string'&&/^[\w-]{10,80}$/.test(d.id)?d.id:uid();state.name=String(d.name||'Projeto');state.source=typeof d.source==='string'&&d.source.startsWith('data:image/')?d.source:null;state.homePreview=typeof d.previewImage==='string'&&d.previewImage.startsWith('data:image/')?d.previewImage:null;state.objects=d.objects?d.objects.map(o=>({...o,id:o.id||uid(),params:migrateParams(o.params),visible:o.visible!==false,result:null,cacheKey:null})): [{id:uid(),name:state.name,loops:d.loops,params:migrateParams(d.params),visible:true,result:null}];state.activeId=state.objects.some(o=>o.id===d.activeId)?d.activeId:state.objects[0]?.id;state.view={...state.view,...d.view,presentation:{...structuredClone(presentationDefaults),...d.view?.presentation,colors:{...presentationDefaults.colors,...d.view?.presentation?.colors}},colors:{...initialColors,...d.view?.colors}};if(d.view?.presentation&&!Object.prototype.hasOwnProperty.call(d.view.presentation,'modelShadowMode'))state.view.presentation.modelShadowMode=d.view.presentation.modelShadows===false?'none':'soft';sync();editor?.reset();}
 function restore(saved){const d=typeof saved==='string'?JSON.parse(saved):{...saved,objects:saved.objects.map(o=>({...o,loops:JSON.parse(o.loops)}))};applyProject(d);generate();historyButtons()}
 $('undo').onclick=()=>{if(!state.history.length)return;state.future.push(snapshot());restore(state.history.pop());};$('redo').onclick=()=>{if(!state.future.length)return;state.history.push(snapshot());restore(state.future.pop());};
-let saveTimer,lastSavedSignature=null,transitioning=false;async function flush(){clearTimeout(saveTimer);if(!state.objects.length)return true;const signature=JSON.stringify([state.id,state.name,state.homePreview,state.view,state.objects.map(o=>[o.id,o.name,o.params,o.visible,o.contourVersion||0,o.geometryRecord?.cacheKey,o.sketch])]);if(signature===lastSavedSignature){saveState('saved');return true;}saveState('saving');const data=project();try{if(window.desktop?.catalogSave)await window.desktop.catalogSave(JSON.stringify(data));else{await dbPut(data);}lastSavedSignature=signature;saveState('saved');return true;}catch(e){saveState('error');status('Falha ao salvar histórico: '+e.message);return false;}}
-function autosave(){if(state.screen!=='studio'||transitioning)return;saveState('dirty');clearTimeout(saveTimer);saveTimer=setTimeout(flush,1800)}window.RVDesktopFlush=flush;
+let saveTimer,lastSavedSignature=null,transitioning=false;
+function projectSignature(){return JSON.stringify([state.id,state.name,state.homePreview,state.view,state.objects.map(o=>[o.id,o.name,o.params,o.visible,o.contourVersion||0,o.geometryRecord?.cacheKey,o.sketch])]);}
+async function flush(){
+ clearTimeout(saveTimer);if(!state.objects.length)return true;
+ const signature=projectSignature();if(signature===lastSavedSignature){saveState('saved');return true;}
+ saveState('saving');const data=project();
+ try{if(window.desktop?.catalogSave)await window.desktop.catalogSave(JSON.stringify(data));else await dbPut(data);lastSavedSignature=signature;saveState('saved');return true;}
+ catch(e){saveState('error');status('Falha ao salvar o projeto: '+e.message);return false;}
+}
+async function writeRecovery(){
+ if(state.screen!=='studio'||!state.objects.length)return;
+ try{if(window.desktop?.autosave)await window.desktop.autosave(JSON.stringify(project(false)));}catch(e){console.warn('Recuperação automática indisponível:',e);}
+}
+function autosave(){
+ if(state.screen!=='studio'||transitioning)return;
+ saveState('dirty');clearTimeout(saveTimer);saveTimer=setTimeout(writeRecovery,1200);
+}
+function markCurrentSaved(){lastSavedSignature=projectSignature();saveState('saved');}
+window.RVDesktopFlush=flush;
 let dbPromise;function db(){return dbPromise??=new Promise((resolve,reject)=>{const r=indexedDB.open('rv-cutter-catalog',1);r.onupgradeneeded=()=>r.result.createObjectStore('projects',{keyPath:'id'});r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);})}
 async function dbPut(p){const d=await db();return new Promise((resolve,reject)=>{const t=d.transaction('projects','readwrite');t.objectStore('projects').put(p);t.oncomplete=resolve;t.onerror=()=>reject(t.error);})}
 async function catalog(){if(window.desktop?.catalogList)return window.desktop.catalogList();const d=await db();return new Promise((resolve,reject)=>{const rows=[],q=d.transaction('projects').objectStore('projects').openCursor();q.onsuccess=()=>{const c=q.result;if(!c){resolve(rows.sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)));return;}const p=c.value;rows.push({id:p.id,name:p.name,updatedAt:p.savedAt,count:p.objects.length,preview:p.objects[0]?.loops?.[0]?.filter((_,i)=>i%8===0),previewImage:p.previewImage||null});c.continue();};q.onerror=()=>reject(q.error);});}
@@ -53,13 +71,73 @@ function applyPreset(id){const row=presetRows.find(p=>p.id===id);if(!row||!activ
 $('savePreset').onclick=async()=>{if(!active())return status('Selecione um objeto primeiro.');const name=await askName('Salvar configurações como preset');if(name)try{await savePreset(name);status('Preset salvo.');}catch(e){status(e.message)}};
 $('applyPreset').onclick=()=>applyPreset($('savedPreset').value);
 $('deletePreset').onclick=async()=>{const id=$('savedPreset').value;if(!id||!confirm('Excluir este preset?'))return;try{await persistPresets(presetRows.filter(p=>p.id!==id));}catch(e){status(e.message)}};
+function askLeaveProject(){
+ return new Promise(resolve=>{
+  const d=$('leaveProjectDialog');$('leaveProjectName').textContent=state.name||'este projeto';
+  const done=value=>{d.onclose=null;resolve(value);};
+  d.onclose=()=>done(d.returnValue||'cancel');
+  d.oncancel=e=>{e.preventDefault();d.close('cancel');};
+  $('leaveSave').onclick=()=>d.close('save');
+  $('leaveDiscard').onclick=()=>d.close('discard');
+  $('leaveCancel').onclick=()=>d.close('cancel');
+  d.showModal();
+ });
+}
+async function clearRecovery(){try{await window.desktop?.clearRecovery?.();}catch(e){console.warn('Não foi possível limpar a recuperação:',e);}}
+function destroyCurrentProject(){
+ resetSession();
+ Object.assign(state,{id:null,name:'',source:null,objects:[],activeId:null,history:[],future:[],homePreview:null});
+ isolatedId=null;hoveredObjectId=null;expandedObjects.clear();editor?.reset();$('layers').replaceChildren();$('busy').hidden=true;closeDimensionEditor();lastSavedSignature=null;
+}
+async function closeCurrentProject(){
+ return resolveProjectTransition({
+  active:state.screen==='studio'&&!!state.id,
+  prompt:askLeaveProject,
+  save:async()=>{await updateHomePreview();return flush();},
+  discard:clearRecovery,
+  close:async()=>{destroyCurrentProject();}
+ });
+}
 function thumbnail(loop){const c=document.createElement('canvas');c.width=300;c.height=160;const ctx=c.getContext('2d');ctx.fillStyle='#eaf0f8';ctx.fillRect(0,0,300,160);if(loop?.length){ctx.beginPath();loop.forEach(([x,y],i)=>ctx[i?'lineTo':'moveTo'](150+x*130,80-y*130));ctx.closePath();ctx.fillStyle='#a6c5e9';ctx.fill();ctx.strokeStyle='#446a97';ctx.lineWidth=2;ctx.stroke();}return c.toDataURL('image/png')}
 function bytesDataUrl(bytes){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(r.error);r.readAsDataURL(new Blob([bytes],{type:'image/png'}));});}
 async function updateHomePreview(){if(!viewer||state.screen!=='studio'||!state.objects.some(o=>o.result))return;try{state.homePreview=await bytesDataUrl(viewer.capture(420,false));}catch(e){console.warn('Prévia indisponível:',e);}}
-async function showHome(page=0){page=Number.isInteger(page)?page:0;if(transitioning)return;transitioning=true;try{if(state.screen==='studio')await updateHomePreview();if(!await flush())return;resetSession();Object.assign(state,{id:null,name:'',source:null,objects:[],activeId:null,history:[],future:[],homePreview:null});isolatedId=null;hoveredObjectId=null;expandedObjects.clear();state.screen='home';editor?.reset();$('layers').replaceChildren();$('busy').hidden=true;closeDimensionEditor();saveState('idle');status('Biblioteca · nenhum projeto ativo');$('studio').hidden=true;$('home').hidden=false;$('export').disabled=true;const parent=$('recentProjects');parent.replaceChildren();try{const items=await catalog();if(!items.length){const e=document.createElement('div');e.className='empty-recents';e.textContent='Seus projetos aparecerão aqui depois da primeira edição.';parent.appendChild(e);}for(const item of items.slice(page*60,(page+1)*60)){const wrapper=document.createElement('div');wrapper.className='project-card';const card=document.createElement('button');card.className='recent-card';const img=new Image();img.loading='lazy';img.decoding='async';img.src=item.previewImage||thumbnail(item.preview);img.alt=item.previewImage?'Prévia 3D do projeto':'Prévia do projeto';const title=document.createElement('strong');title.textContent=item.name;const sub=document.createElement('small');sub.textContent=`${item.count} objeto(s) · ${new Date(item.updatedAt).toLocaleString('pt-BR')}`;card.append(img,title,sub);card.onclick=async()=>{try{if(transitioning)return;transitioning=true;const data=await getStored(item.id);if(!await flush())return;applyProject(data);state.history=[];state.future=[];enterStudio();transitioning=false;generate();}catch(e){status(e.message)}finally{transitioning=false;}};const actions=document.createElement('div');actions.className='project-actions';for(const [label,fn] of [['Renomear',()=>renameCatalogProject(item)],['Excluir',()=>deleteProject(item)]]){const b=document.createElement('button');b.textContent=label;b.onclick=fn;actions.appendChild(b);}wrapper.append(card,actions);parent.appendChild(wrapper);}if(items.length>60){const nav=document.createElement('div');nav.className='project-actions';for(const [label,n]of [['Anterior',page-1],['Próxima',page+1]]){const b=document.createElement('button');b.textContent=label;b.disabled=n<0||n*60>=items.length;b.onclick=()=>showHome(n);nav.appendChild(b);}parent.appendChild(nav);}}catch(e){status('Não foi possível abrir o histórico: '+e.message)}}finally{transitioning=false;}}
+async function showHome(page=0){
+ page=Number.isInteger(page)?page:0;if(transitioning)return false;
+ if(state.screen==='studio'){const ok=await closeCurrentProject();if(!ok)return false;}
+ transitioning=true;
+ try{
+  state.screen='home';saveState('idle');status('Biblioteca · nenhum projeto ativo');$('studio').hidden=true;$('home').hidden=false;$('export').disabled=true;
+  const parent=$('recentProjects');parent.replaceChildren();
+  try{
+   const items=await catalog();
+   if(!items.length){const e=document.createElement('div');e.className='empty-recents';e.textContent='Seus projetos aparecerão aqui depois de salvar.';parent.appendChild(e);}
+   for(const item of items.slice(page*60,(page+1)*60)){
+    const wrapper=document.createElement('div');wrapper.className='project-card';
+    const card=document.createElement('button');card.className='recent-card';
+    const img=new Image();img.loading='lazy';img.decoding='async';img.src=item.previewImage||thumbnail(item.preview);img.alt=item.previewImage?'Prévia 3D do projeto':'Prévia do projeto';
+    const title=document.createElement('strong');title.textContent=item.name;
+    const sub=document.createElement('small');sub.textContent=`${item.count} objeto(s) · ${new Date(item.updatedAt).toLocaleString('pt-BR')}`;
+    card.append(img,title,sub);
+    card.onclick=async()=>{if(transitioning)return;transitioning=true;try{const data=await getStored(item.id);applyProject(data);state.history=[];state.future=[];enterStudio();markCurrentSaved();generate();}catch(e){status(e.message)}finally{transitioning=false;}};
+    const actions=document.createElement('div');actions.className='project-actions';
+    for(const [label,fn] of [['Renomear',()=>renameCatalogProject(item)],['Excluir',()=>deleteProject(item)]]){const b=document.createElement('button');b.textContent=label;b.onclick=fn;actions.appendChild(b);}
+    wrapper.append(card,actions);parent.appendChild(wrapper);
+   }
+   if(items.length>60){const nav=document.createElement('div');nav.className='project-actions';for(const [label,n]of [['Anterior',page-1],['Próxima',page+1]]){const b=document.createElement('button');b.textContent=label;b.disabled=n<0||n*60>=items.length;b.onclick=()=>showHome(n);nav.appendChild(b);}parent.appendChild(nav);}
+  }catch(e){status('Não foi possível abrir o histórico: '+e.message);}
+ }finally{transitioning=false;}
+ return true;
+}
 function enterStudio(){$('recentProjects').replaceChildren();state.screen='studio';$('home').hidden=true;$('studio').hidden=false;sync();viewer.resize();}
-async function newProject(){if(transitioning)return false;if(!await flush())return false;resetSession();isolatedId=null;hoveredObjectId=null;expandedObjects.clear();Object.assign(state,{id:uid(),name:'Novo cortador',source:null,objects:[],activeId:null,history:[],future:[],homePreview:null});const o=makeObject([],'Objeto 1');o.sketch=createSketch();state.objects=[o];state.activeId=o.id;enterStudio();editor.reset();setStage('2d');refreshView();historyButtons();autosave();status('Desenhe um perfil fechado no Sketch ou importe sua arte.');return true;}
-$('homeBtn').onclick=showHome;$('newProject').onclick=newProject;$('openHome').onclick=()=>$('projectFile').click();
+async function newProject(){
+ if(transitioning)return false;
+ if(state.screen==='studio'&&!await closeCurrentProject())return false;
+ resetSession();isolatedId=null;hoveredObjectId=null;expandedObjects.clear();
+ Object.assign(state,{id:uid(),name:'Novo cortador',source:null,objects:[],activeId:null,history:[],future:[],homePreview:null});
+ const o=makeObject([],'Objeto 1');o.sketch=createSketch();state.objects=[o];state.activeId=o.id;lastSavedSignature=null;
+ enterStudio();editor.reset();setStage('2d');refreshView();historyButtons();autosave();status('Desenhe um perfil fechado no Sketch ou importe sua arte.');return true;
+}
+$('homeBtn').onclick=()=>showHome();$('newProject').onclick=newProject;$('openHome').onclick=()=>$('projectFile').click();
 function sync(){syncPresentation();const o=active();$('name').value=state.name;$('modelTitle').textContent=o?.name||'Novo projeto';$('activeObject').textContent=o?.name||'nenhum objeto';$('modelSubtitle').textContent=o?`${state.objects.length} objeto(s) · milímetros`:'Importe uma arte para começar';for(const [k,v]of Object.entries(o?.params||defaults)){const e=$(k),range=$(k+'Range');if(e){if(e.type==='checkbox')e.checked=v;else e.value=v;}if(range)range.value=v;}
  for(const [k,v]of Object.entries(state.view)){const e=$(k);if(e){if(e.type==='checkbox')e.checked=v;else if(k!=='colors')e.value=v;}}
  for(const role of Object.keys(initialColors)){$('color-'+role).value=state.view.colors[role];document.querySelectorAll(`[data-color="${role}"]`).forEach(e=>e.style.background=state.view.colors[role]);}
@@ -122,16 +200,20 @@ function primaryDimension(o,axis){const m=measurements(o)?.primary;return m?.[ax
 async function applyDimensionEdit(){const ed=$('dimensionEditor'),o=state.objects.find(x=>x.id===ed.dataset.objectId),axis=ed.dataset.axis,target=+$('dimensionValue').value;if(!o||!Number.isFinite(target)||target<=0){status('Informe uma medida válida em milímetros.');return;}const current=primaryDimension(o,axis);if(!Number.isFinite(current))return;if(axis==='z'&&o.result.parts[0]?.name==='Carimbo'){status('A altura total do carimbo é resultante. Ajuste base e relevo nos parâmetros.');closeDimensionEditor();return;}history();generation++;clearTimeout(timer);$('busy').hidden=false;$('busy').textContent='Ajustando cota com precisão…';try{if(axis==='z'){o.params.height=Math.max(4,Math.min(50,target));await ensure(o);}else{let size0=o.params.size,dim0=current,size1=Math.max(10,Math.min(300,size0*target/dim0));o.params.size=size1;await ensure(o);let dim1=primaryDimension(o,axis);for(let i=0;i<2&&Math.abs(dim1-target)>.01;i++){const slope=Math.abs(size1-size0)>1e-6?(dim1-dim0)/(size1-size0):dim1/Math.max(size1,1);if(!Number.isFinite(slope)||Math.abs(slope)<1e-5)break;const size2=Math.max(10,Math.min(300,size1+(target-dim1)/slope));size0=size1;dim0=dim1;size1=size2;o.params.size=size1;await ensure(o);dim1=primaryDimension(o,axis);}}sync();refreshView();autosave();const final=primaryDimension(o,axis);status(`Cota ajustada: ${fmt(final)} mm${Math.abs(final-target)<=.02?'':' (limite geométrico aproximado)'}.`);}catch(e){status('Não foi possível ajustar a cota: '+e.message);}finally{$('busy').hidden=true;closeDimensionEditor();}}
 $('dimensionValue').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();applyDimensionEdit();}else if(e.key==='Escape'){e.preventDefault();closeDimensionEditor();}};$('dimensionApply').onclick=applyDimensionEdit;$('dimensionCancel').onclick=closeDimensionEditor;
 function handleViewerInteraction(evt){if(evt.type==='hover'){setLayerHover(evt.id);return;}if(evt.type==='select'){if(evt.id)selectObject(evt.id);else setLayerHover(null);return;}if(evt.type==='focus'){if(evt.id)selectObject(evt.id);return;}if(evt.type==='dimension'){openDimensionEditor(evt);}}
-function setStage(stage){if(state.stage==='presentation'){pres().camera=viewer.getCamera();autosave();}state.stage=stage;document.body.classList.toggle('presenting',stage==='presentation');$('presentationPanel').hidden=stage!=='presentation';$('tabPresentation').classList.toggle('active',stage==='presentation');syncPresentation();const edit=stage==='2d';$('editor').toggleAttribute('hidden',!edit);$('three').hidden=edit;$('editTools').hidden=!edit;$('thickness2d').hidden=!edit;$('goThickness').hidden=edit;$('tab2d').classList.toggle('active',edit);$('tab3d').classList.toggle('active',stage==='3d');document.querySelector('.viewport-title').hidden=edit;document.querySelector('.right').classList.toggle('editing-2d',edit);$('rightTitle').textContent=edit?'Editar desenho':stage==='presentation'?'Apresentação':'Configurar peça';refreshView();if(edit)editor.render();else viewer.resize();}
-$('tabPresentation').onclick=()=>setStage('presentation');$('tab2d').onclick=() =>setStage('2d');$('tab3d').onclick=()=>setStage('3d');$('goThickness').onclick=()=>{setStage('2d');$('thickness2d').scrollIntoView({block:'start'});};$('fit').onclick=()=>{if(state.stage==='2d')editor.fit();else {viewer.fit();refreshView();}};function fitView(top){viewer.fit(top);if(state.stage==='presentation'){pres().projection=top?'orthographic':'perspective';pres().camera=viewer.getCamera();syncPresentation();autosave();}}$('top').onclick=()=>fitView(true);$('iso').onclick=()=>fitView(false);
+function setStage(stage){if(state.stage==='presentation'){pres().camera=viewer.getCamera();autosave();}state.stage=stage;document.body.classList.toggle('presenting',stage==='presentation');document.body.classList.toggle('sketching',stage==='2d');$('presentationPanel').hidden=stage!=='presentation';$('tabPresentation').classList.toggle('active',stage==='presentation');syncPresentation();const edit=stage==='2d';$('editor').toggleAttribute('hidden',!edit);$('three').hidden=edit;$('editTools').hidden=!edit;$('sketchInspector').hidden=!edit;if(!edit)$('thickness2d').hidden=true;else $('thickness2d').hidden=true;$('goThickness').hidden=edit;$('tab2d').classList.toggle('active',edit);$('tab3d').classList.toggle('active',stage==='3d');document.querySelector('.viewport-title').hidden=edit;document.querySelector('.right').classList.toggle('editing-2d',edit);$('rightTitle').textContent=edit?'Sketch 2D':stage==='presentation'?'Apresentação':'Configurar peça';refreshView();if(edit)editor.render();else viewer.resize();}
+$('tabPresentation').onclick=()=>setStage('presentation');$('tab2d').onclick=()=>setStage('2d');$('tab3d').onclick=()=>setStage('3d');$('goThickness').onclick=()=>{setStage('2d');$('thickness2d').hidden=false;$('thickness2d').scrollIntoView({block:'start'});};$('toggleThicknessPanel').onclick=()=>{$('thickness2d').hidden=!$('thickness2d').hidden;if(!$('thickness2d').hidden)$('thickness2d').scrollIntoView({block:'nearest'});};$('fit').onclick=()=>{if(state.stage==='2d')editor.fit();else {viewer.fit();refreshView();}};function fitView(top){viewer.fit(top);if(state.stage==='presentation'){pres().projection=top?'orthographic':'perspective';pres().camera=viewer.getCamera();syncPresentation();autosave();}}$('top').onclick=()=>fitView(true);$('iso').onclick=()=>fitView(false);
 try{viewer=createViewer($('three'),camera=>{pres().camera=camera;autosave();},handleViewerInteraction);}catch(e){status('Não foi possível iniciar o 3D: '+e.message);}
 editor=createEditor($('editor'),{object:active,history,status,request,changed:(info={geometryChanged:true})=>{const o=active();if(o&&info.geometryChanged){o.contourVersion=(o.contourVersion||0)+1;if(!o.loops.length){o.result=null;o.cacheKey=null;refreshView();}else generate([o.id]);}sync();autosave();renderLayers();}});
-document.querySelectorAll('[data-constraint]').forEach(b=>b.onclick=()=>{editor.sketch.constrain(b.dataset.constraint);editor.render();});
-$('applySketchDimension').onclick=()=>{editor.sketch.dimension(+$('sketchDimension').value);editor.render();};
+function closeSketchMenus(){document.querySelectorAll('.sketch-menu[open]').forEach(d=>d.removeAttribute('open'));}
+document.querySelectorAll('[data-constraint]').forEach(b=>b.onclick=()=>{editor.sketch.constrain(b.dataset.constraint);closeSketchMenus();editor.render();});
+$('applySketchDimension').onclick=()=>{editor.sketch.dimension(+$('sketchDimension').value,$('sketchDriving').checked);editor.render();};
+$('sketchDimension').addEventListener('keydown',e=>{if(e.key==='Enter'){$('applySketchDimension').click();e.preventDefault();}});
+$('sketchDimensionCommand').onclick=()=>{const info=editor.sketch.selectionInfo();if(info.count!==1){status('Selecione uma linha, círculo ou arco para criar uma cota.');return;}$('sketchDimension').focus();$('sketchDimension').select();};
 $('removeSketchRule').onclick=()=>{if($('sketchRules').value)editor.sketch.removeRule($('sketchRules').value);editor.render();};
 $('deleteSketchEntity').onclick=()=>{editor.sketch.remove();editor.render();};
+$('toggleConstruction').onclick=()=>{editor.sketch.toggleConstruction();closeSketchMenus();editor.render();};
 $('bakeSketch').onclick=()=>{editor.sketch.convert();editor.render();};
-document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-tool]').forEach(e=>e.classList.remove('active'));b.classList.add('active');editor.setTool(b.dataset.tool)});$('deleteLoop').onclick=()=>editor.removeContour();$('clearRegion').onclick=()=>editor.clearRegion();$('applyOffset').onclick=()=>editor.offset(+$('offsetAmount').value);$('applyThickness').onclick=()=>{const delta=+$('lineDelta').value;if(!Number.isFinite(delta)||delta< -1||delta>2){status('Use uma variação entre -1 e 2 mm.');return;}if($('thicknessTarget').value==='art'){editor.thickness(delta);return;}const o=active();if(!o)return;const {region}=editor.getSelection();history();if(region){o.params.wallEdits=[...(o.params.wallEdits||[]),{region:region.map(p=>p.slice()),delta}];}else {o.params.wall=Math.max(.3,Math.min(5,o.params.wall+delta));o.params.tip=Math.min(o.params.tip,o.params.wall);}sync();generate([o.id]);autosave();};
+document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-tool]').forEach(e=>e.classList.remove('active'));b.classList.add('active');editor.setTool(b.dataset.tool);closeSketchMenus();});$('deleteLoop').onclick=()=>editor.removeContour();$('clearRegion').onclick=()=>editor.clearRegion();$('applyOffset').onclick=()=>editor.offset(+$('offsetAmount').value);$('applyThickness').onclick=()=>{const delta=+$('lineDelta').value;if(!Number.isFinite(delta)||delta< -1||delta>2){status('Use uma variação entre -1 e 2 mm.');return;}if($('thicknessTarget').value==='art'){editor.thickness(delta);return;}const o=active();if(!o)return;const {region}=editor.getSelection();history();if(region){o.params.wallEdits=[...(o.params.wallEdits||[]),{region:region.map(p=>p.slice()),delta}];}else {o.params.wall=Math.max(.3,Math.min(5,o.params.wall+delta));o.params.tip=Math.min(o.params.tip,o.params.wall);}sync();generate([o.id]);autosave();};
 $('resetWallEdits').onclick=()=>{const o=active();if(!o)return;history();o.params.wallEdits=[];generate([o.id]);autosave();status('Ajustes locais da lâmina removidos.');};
 window.addEventListener('keydown',e=>{if(['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName))return;if(e.ctrlKey&&e.key.toLowerCase()==='z'){e.preventDefault();$('undo').click()}if(e.ctrlKey&&e.key.toLowerCase()==='y'){e.preventDefault();$('redo').click()}if(e.ctrlKey&&e.key.toLowerCase()==='s'){e.preventDefault();$('save').click()}if(e.key==='Escape'&&isolatedId){isolatedId=null;sync();syncViewerVisibility();status('Isolamento encerrado.');}if(e.key.toLowerCase()==='f'&&active()&&state.stage!=='2d'){e.preventDefault();viewer?.focus(state.activeId);}if(e.key==='Delete'&&state.stage==='2d')editor.removeNode();});
 function readData(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(file)})}
@@ -150,7 +232,7 @@ async function sample(name,fromHome=false){if(fromHome&&!await newProject())retu
 $('pig').onclick=()=>sample('Porquinho');$('cow').onclick=()=>sample('Vaquinha');$('homePig').onclick=()=>sample('Porquinho',true);$('homeCow').onclick=()=>sample('Vaquinha',true);$('homeFlowers').onclick=()=>sample('Flores',true);
 async function download(name,data,kind){if(window.desktop){try{return await window.desktop.save(name,typeof data==='string'?data:new Uint8Array(data),kind);}catch(e){status('Falha ao salvar: '+e.message);return null;}}const url=URL.createObjectURL(new Blob([data])),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),3000);return name;}
 $('save').onclick=async()=>{if(!state.objects.length){status('Importe uma arte primeiro.');return;}await flush();const result=await download(state.name+'.rvcad',JSON.stringify(project()),'project');if(result)status('Projeto salvo.');};
-$('open').onclick=()=>$('projectFile').click();$('projectFile').onchange=async()=>{try{const f=$('projectFile').files[0];if(!f)return;if(f.size>80*1024*1024)throw Error('Projeto excede 80 MB.');const d=JSON.parse(await f.text());if(!await flush())return;applyProject(d);state.history=[];state.future=[];enterStudio();generate();}catch(e){status(e.message)}$('projectFile').value='';};
+$('open').onclick=()=>$('projectFile').click();$('projectFile').onchange=async()=>{try{const f=$('projectFile').files[0];if(!f)return;if(f.size>80*1024*1024)throw Error('Projeto excede 80 MB.');const d=JSON.parse(await f.text());if(state.screen==='studio'&&!await closeCurrentProject())return;applyProject(d);state.history=[];state.future=[];enterStudio();lastSavedSignature=null;saveState('dirty');generate();}catch(e){status(e.message)}finally{$('projectFile').value='';}};
 $('exportSvg').onclick=()=>{const o=active();if(!o)return;const d=o.loops.map(l=>'M'+l.map(([x,y])=>`${(x+.6)*o.params.size},${(.6-y)*o.params.size}`).join('L')+'Z').join(' ');download(o.name+'.svg',`<svg xmlns="http://www.w3.org/2000/svg" width="${o.params.size*1.2}mm" height="${o.params.size*1.2}mm" viewBox="0 0 ${o.params.size*1.2} ${o.params.size*1.2}"><path fill="black" fill-rule="evenodd" d="${d}"/></svg>`,'svg');};
 function exportSummary(){const objects=state.objects.filter(o=>!$('exportVisible').checked||o.visible);$('exportSummary').textContent=`${objects.length} objetos selecionados. Modos com vários arquivos entregam um ZIP com os STLs.`;}
 $('export').onclick=()=>{exportSummary();$('exportDialog').showModal();};$('exportVisible').onchange=exportSummary;$('closeExport').onclick=()=>$('exportDialog').close();
@@ -213,5 +295,5 @@ let appearanceFrame=0;function refreshAppearance(){if(appearanceFrame)return;app
   };
 
 async function start(){sync();await loadPresets();await showHome();}
-window.RVTest={setStage,enforceBudget,refreshView,showHome,setParam,savePreset,applyPreset,presetRows,renameStored,deleteStored,diagnostics:()=>({worker:!!worker,pending:pending.size,queued:pendingBuildIds.size,running,sessionEpoch,screen:state.screen}),cacheStats,meshBytes,resetSession,state,active,generate,loadImage,loadSvg,project,traceSource,applyProject,commitImport,exportData,measurements,primaryDimension,selectObject,toggleIsolation,flush,catalog,newProject,editor,viewer,request,wait:async()=>{for(let i=0;i<1200;i++){await new Promise(r=>setTimeout(r,50));if(state.objects.length&&!running&&state.objects.filter(o=>o.visible).every(o=>!o.loops.length||o.result&&(o.result.released||o.cacheKey===keyFor(o))))return state.objects.map(o=>o.result);const bad=state.objects.find(o=>o.visible&&o.error);if(!running&&bad)throw Error(bad.error);}throw Error('Tempo de geração excedido');}};
+window.RVTest={setStage,enforceBudget,refreshView,showHome,closeCurrentProject,askLeaveProject,destroyCurrentProject,projectSignature,markCurrentSaved,setParam,savePreset,applyPreset,presetRows,renameStored,deleteStored,diagnostics:()=>({worker:!!worker,pending:pending.size,queued:pendingBuildIds.size,running,sessionEpoch,screen:state.screen}),cacheStats,meshBytes,resetSession,state,active,generate,loadImage,loadSvg,project,traceSource,applyProject,commitImport,exportData,measurements,primaryDimension,selectObject,toggleIsolation,flush,catalog,newProject,editor,viewer,request,wait:async()=>{for(let i=0;i<1200;i++){await new Promise(r=>setTimeout(r,50));if(state.objects.length&&!running&&state.objects.filter(o=>o.visible).every(o=>!o.loops.length||o.result&&(o.result.released||o.cacheKey===keyFor(o))))return state.objects.map(o=>o.result);const bad=state.objects.find(o=>o.visible&&o.error);if(!running&&bad)throw Error(bad.error);}throw Error('Tempo de geração excedido');}};
 start();
