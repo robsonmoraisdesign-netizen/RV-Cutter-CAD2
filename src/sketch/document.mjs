@@ -9,7 +9,7 @@ export function sketchFromObject(o){
 }
 export function scaleSketch(s,k){
  if(!(k>0&&Number.isFinite(k)))throw Error('Escala do Sketch inválida.');
- function scale(e){if(e.start)e.start=e.start.map(v=>v*k);if(e.end)e.end=e.end.map(v=>v*k);if(e.center)e.center=e.center.map(v=>v*k);if(e.radius)e.radius*=k;}
+ function scale(e){if(e.start)e.start=e.start.map(v=>v*k);if(e.end)e.end=e.end.map(v=>v*k);if(e.center)e.center=e.center.map(v=>v*k);if(e.points)e.points=e.points.map(p=>p.map(v=>v*k));if(e.radius)e.radius*=k;}
  s.entities.forEach(scale);s.constraints.forEach(c=>{if(c.geometry)scale(c.geometry)});s.dimensions.forEach(d=>d.value*=k);
  s.legacyLoops=(s.legacyLoops||[]).map(p=>p.map(v=>v.map(x=>x*k)));s.profileCenter=(s.profileCenter||[0,0]).map(v=>v*k);s.profileSize=(s.profileSize||1)*k;return s;
 }
