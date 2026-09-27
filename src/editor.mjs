@@ -73,6 +73,35 @@ export function createEditor(svg,api){
   if(parallel)return {...parallel,startRelation:null,endRelation:null,autoConstraint:null};
   return {end,startRelation:null,endRelation:null,autoConstraint:null,parallelRef:null,referenceId:null,icon:null,inference:null};
  }
+ function updatePrimitiveDraft(q,{suppress=false}={}){
+  if(drag?.kind!=='primitive')return;
+  const doc=sketch.native(),raw=nativePoint(q);
+  if(tool==='sketch-line'){
+   const inf=inferLine(drag.start,raw,doc,{suppress});drag.end=inf.end;drag.endRelation=inf.endRelation;drag.parallelRef=inf.parallelRef;drag.referenceId=inf.referenceId;drag.inference=inf.inference;drag.icon=inf.icon;
+   inference=inf.inference?{...inf,point:inf.end}:null;
+  }else if(tool==='circle'){
+   drag.end=raw;drag.endRelation=null;inference=null;
+  }else{
+   const snap=suppress?{point:raw,relation:null,referenceId:null,icon:null}:snapNative(raw,doc);drag.end=snap.point;drag.endRelation=snap.relation;drag.referenceId=snap.referenceId;drag.inference=snap.relation?.type||null;drag.icon=snap.icon;inference=snap.relation?{...snap,point:snap.point,type:snap.relation.type}:null;
+  }
+ }
+ function beginPrimitive(q,{suppress=false}={}){
+  const doc=sketch.native(),raw=nativePoint(q),snap=suppress?{point:raw,relation:null,referenceId:null,icon:null}:snapNative(raw,doc),start=snap.point;
+  drag={kind:'primitive',start,end:[...start],startRelation:snap.relation,endRelation:null,parallelRef:null,referenceId:snap.referenceId,inference:snap.relation?.type||null,icon:snap.icon,suppress};
+  inference=snap.relation?{...snap,point:start,type:snap.relation.type}:null;
+ }
+ function commitPrimitive(q,{suppress=false}={}){
+  if(drag?.kind!=='primitive')return false;
+  updatePrimitiveDraft(q,{suppress});const d=drag;
+  const ok=sketch.create(tool==='sketch-line'?'line':tool,d.start,d.end,null,{autoConstraint:d.inference==='horizontal'||d.inference==='vertical'?d.inference:null,startRelation:d.startRelation,endRelation:d.endRelation,centerRelation:d.startRelation,parallelRef:d.parallelRef});
+  if(!ok){drag=null;inference=null;render();return false;}
+  if(tool==='sketch-line'){
+   const createdId=sketch.selected()[0],doc=sketch.native(),created=doc.entities.find(e=>e.id===createdId),start=created?.end?[...created.end]:[...d.end];
+   drag={kind:'primitive',start,end:[...start],startRelation:createdId?{type:'coincident',ref:{entity:createdId,point:'end'}}:null,endRelation:null,parallelRef:null,referenceId:createdId,inference:'coincident',icon:'●',suppress:false};
+   inference=null;api.status('Linha criada · clique para continuar a cadeia ou Esc para sair.');
+  }else{drag=null;inference=null;}
+  render();return true;
+ }
  function addText(text,p,attrs={}){
   const t=el('text',{x:p[0],y:-p[1],class:'sketch-svg-text',...attrs});t.textContent=text;svg.appendChild(t);return t;
  }
@@ -232,8 +261,8 @@ export function createEditor(svg,api){
   if(entity&&tool==='extend'){sketch.extend(entity,nativePoint(q));hoveredEntity=null;inference=null;render();return;}
   if(entity&&tool==='dimension'){openInlineDimension(entity,e.clientX,e.clientY);return;}
   if(['sketch-line','rectangle','circle'].includes(tool)){
-   const doc=sketch.native(),raw=nativePoint(q),snap=e.shiftKey?{point:raw,relation:null,referenceId:null,icon:null}:snapNative(raw,doc),start=snap.point;
-   drag={kind:'primitive',start,end:[...start],startRelation:snap.relation,endRelation:null,parallelRef:null,referenceId:snap.referenceId,inference:snap.relation?.type||null,icon:snap.icon,suppress:e.shiftKey};inference=snap.relation?{...snap,point:start,type:snap.relation.type}:null;return;
+   if(drag?.kind==='primitive'){commitPrimitive(q,{suppress:e.shiftKey});return;}
+   beginPrimitive(q,{suppress:e.shiftKey});render();return;
   }
   if(tool==='arc'){arcClicks.push(nativePoint(q));if(arcClicks.length===3){sketch.create('arc',...arcClicks);arcClicks=[];}else api.status('Arco de 3 pontos · clique '+(arcClicks.length+1)+' de 3.');render();return;}
   if(entity&&tool==='select'){
@@ -253,18 +282,7 @@ export function createEditor(svg,api){
   hoveredEntity=e.target?.dataset?.entity||null;
   if(!drag){render();return;}
   const q=point(e);
-  if(drag.kind==='primitive'){
-   const doc=sketch.native(),raw=nativePoint(q);
-   if(tool==='sketch-line'){
-    const inf=inferLine(drag.start,raw,doc,{suppress:e.shiftKey||drag.suppress});drag.end=inf.end;drag.endRelation=inf.endRelation;drag.parallelRef=inf.parallelRef;drag.referenceId=inf.referenceId;drag.inference=inf.inference;drag.icon=inf.icon;
-    inference=inf.inference?{...inf,point:inf.end}:null;
-   }else if(tool==='circle'){
-    drag.end=raw;drag.endRelation=null;inference=null;
-   }else{
-    const snap=e.shiftKey?{point:raw,relation:null,referenceId:null,icon:null}:snapNative(raw,doc);drag.end=snap.point;drag.endRelation=snap.relation;drag.referenceId=snap.referenceId;drag.inference=snap.relation?.type||null;drag.icon=snap.icon;inference=snap.relation?{...snap,point:snap.point,type:snap.relation.type}:null;
-   }
-   render();return;
-  }
+  if(drag.kind==='primitive'){updatePrimitiveDraft(q,{suppress:e.shiftKey||drag.suppress});render();return;}
   if(drag.kind==='box-select'){drag.end=q;render();return;}
   if(drag.kind==='entity-point'){drag.end=nativePoint(q);return;}
   if(drag.kind==='node'){o.loops[selected][node]=q;render();}
@@ -274,8 +292,9 @@ export function createEditor(svg,api){
   else{const r=svg.getBoundingClientRect(),scale=Math.max(view[2]/r.width,view[3]/r.height);view=[drag.view[0]-(e.clientX-drag.x)*scale,drag.view[1]-(e.clientY-drag.y)*scale,...drag.view.slice(2)];render();}
  };
  svg.onpointerup=e=>{
-  if(!drag)return;const d=drag;drag=null;
-  if(d.kind==='primitive')sketch.create(tool==='sketch-line'?'line':tool,d.start,d.end,null,{autoConstraint:d.inference==='horizontal'||d.inference==='vertical'?d.inference:null,startRelation:d.startRelation,endRelation:d.endRelation,centerRelation:d.startRelation,parallelRef:d.parallelRef});
+  if(!drag)return;
+  if(drag.kind==='primitive'){render();return;}
+  const d=drag;drag=null;
   if(d.kind==='box-select'){
    const a=nativePoint(d.start),b=nativePoint(d.end||d.start),bounds={minX:Math.min(a[0],b[0]),minY:Math.min(a[1],b[1]),maxX:Math.max(a[0],b[0]),maxY:Math.max(a[1],b[1])};
    sketch.selectBox(bounds,{crossing:(d.end?.[0]??d.start[0])<d.start[0],extend:d.extend});
@@ -285,7 +304,7 @@ export function createEditor(svg,api){
   if(d.kind==='stroke'&&d.points.length)operate({type:'stroke',points:d.points,width:+$('brushWidth')?.value||.8,subtract:tool==='erase'});
   inference=null;render();
  };
- svg.onpointercancel=()=>{if(drag&&['node','move'].includes(drag.kind))api.changed();drag=null;inference=null;render();};
+ svg.onpointercancel=()=>{if(drag&&['node','move'].includes(drag.kind))api.changed();if(drag?.kind!=='primitive'){drag=null;inference=null;}render();};
  svg.onpointerleave=()=>{if(!drag){hoveredEntity=null;inference=null;render();}};
  svg.oncontextmenu=e=>e.preventDefault();
  svg.onwheel=e=>{e.preventDefault();const f=e.deltaY>0?1.12:1/1.12;if(view[2]*f<.015||view[2]*f>12)return;const [x,negY]=point(e),y=-negY;view=[x+(view[0]-x)*f,y+(view[1]-y)*f,view[2]*f,view[3]*f];render();};
