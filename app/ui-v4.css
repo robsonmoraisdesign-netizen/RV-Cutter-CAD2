@@ -113,3 +113,10 @@ body.drawer-collapsed .project-drawer-v4{visibility:hidden;pointer-events:none}
 /* mobile-ish fallback */
 @media(max-width:1180px){:root{--v4-drawer:215px;--v4-inspector:330px}.command-button span,.command-button kbd{display:none}.command-button{min-width:34px}.projects-v4{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:900px){.studio-v4{grid-template-columns:var(--v4-rail) 210px minmax(0,1fr);grid-template-areas:"rail drawer workspace"}.right{position:fixed!important;right:8px;top:60px;bottom:8px;width:330px!important;z-index:90;box-shadow:var(--v4-shadow)}.workspace-nav .workspace-tab{min-width:64px}.projects-v4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.brand-version{font-style:normal;font-size:6.5px;color:var(--v4-muted);font-weight:600;margin-left:4px}
+.drawer-title-edit{min-width:0;flex:1}.project-title-row{display:flex;align-items:center;gap:4px;margin-top:3px}
+.project-title-row #name{min-width:0;width:100%;height:26px;padding:0 4px;border:0;background:transparent;color:var(--v4-text);font-size:10px;font-weight:750;outline:0;border-radius:4px}
+.project-title-row #name:focus{background:var(--v4-bg);box-shadow:0 0 0 1px var(--v4-brand)}
+.project-title-row #renameProject{width:25px;height:25px;padding:0;background:transparent;border:1px solid transparent;color:var(--v4-muted)}
+.project-title-row #renameProject:hover{background:var(--v4-surface2);color:var(--v4-text)}
