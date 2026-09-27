@@ -23,6 +23,21 @@ export function createEditor(svg,api){
   if(Math.abs(dx)/m<threshold)return {end:[start[0],end[1]],inference:'vertical'};
   return {end,inference:null};
  }
+ function snapNative(p,n){
+  const candidates=[];
+  for(const e of n?.entities||[]){
+   if(e.type==='line'){candidates.push({point:e.start,ref:{entity:e.id,point:'start'}},{point:e.end,ref:{entity:e.id,point:'end'}});}
+   else if(e.type==='circle')candidates.push({point:e.center,ref:{entity:e.id,point:'center'}});
+   else if(e.type==='arc'){
+    candidates.push({point:e.center,ref:{entity:e.id,point:'center'}});
+    for(const key of ['start','end']){const a=e[key+'Angle'];candidates.push({point:[e.center[0]+Math.cos(a)*e.radius,e.center[1]+Math.sin(a)*e.radius],ref:{entity:e.id,point:key}});}
+   }
+  }
+  const threshold=api.object().params.size*Math.max(view[2],view[3])*.018;
+  let best=null,bestD=threshold;
+  for(const candidate of candidates){const d=Math.hypot(candidate.point[0]-p[0],candidate.point[1]-p[1]);if(d<bestD){bestD=d;best=candidate;}}
+  return best?{point:[...best.point],ref:best.ref,distance:bestD}:{point:p,ref:null,distance:null};
+ }
  function addText(text,p,attrs={}){
   const t=el('text',{x:p[0],y:-p[1],class:'sketch-svg-text',...attrs});t.textContent=text;svg.appendChild(t);return t;
  }
@@ -116,6 +131,10 @@ export function createEditor(svg,api){
     else svg.appendChild(el('line',{x1:a[0],y1:view[1],x2:a[0],y2:view[1]+view[3],class:'sketch-inference-line','vector-effect':'non-scaling-stroke'}));
    }
   }
+  if(drag?.kind==='primitive'&&(drag.startRef||drag.endRef)){
+   const target=drag.endRef?drag.end:drag.start,q=localPoint(target,n);
+   svg.appendChild(el('circle',{cx:q[0],cy:-q[1],r:view[2]*.009,class:'sketch-snap-marker','vector-effect':'non-scaling-stroke'}));
+  }
   updateInspector(n);
   const selection=$('selection');if(selection)selection.textContent=region?'Região selecionada para edição de contorno.':sketch.selected().length?`${sketch.selected().length} entidade(s) selecionada(s) · Shift adiciona à seleção`:selected>=0?`Contorno ${selected+1} · ${o.loops[selected]?.length||0} pontos`:'Selecione uma entidade ou escolha uma ferramenta.';
  }
@@ -126,7 +145,7 @@ export function createEditor(svg,api){
   const o=api.object();if(!o)return;svg.setPointerCapture(e.pointerId);const q=point(e),n=e.target.dataset.node,l=e.target.dataset.loop;
   if(e.button===1||e.button===2){drag={kind:'pan',x:e.clientX,y:e.clientY,view:[...view]};return;}
   if(e.target.dataset.dimensionEntity){sketch.select(e.target.dataset.dimensionEntity,null,e.shiftKey);render();return;}
-  if(['sketch-line','rectangle','circle'].includes(tool)){drag={kind:'primitive',start:nativePoint(q),end:nativePoint(q),inference:null};return;}
+  if(['sketch-line','rectangle','circle'].includes(tool)){const doc=sketch.native(),raw=nativePoint(q),snap=snapNative(raw,doc),start=tool==='circle'?snap.point:snap.point;drag={kind:'primitive',start,end:[...start],startRef:snap.ref,endRef:null,inference:null};return;}
   if(tool==='arc'){arcClicks.push(nativePoint(q));if(arcClicks.length===3){sketch.create('arc',...arcClicks);arcClicks=[];}else api.status('Arco de 3 pontos · clique '+(arcClicks.length+1)+' de 3.');render();return;}
   if(e.target.dataset.entity&&tool==='select'){const entity=e.target.dataset.entity,handle=e.target.dataset.handle;sketch.select(entity,handle==='radius'?null:handle,e.shiftKey);if(handle&&!e.shiftKey)drag={kind:'entity-point',entity,handle,start:q};render();return;}
   if(['draw','erase','line'].includes(tool)&&!contourMode())return;
@@ -139,7 +158,7 @@ export function createEditor(svg,api){
  };
  svg.onpointermove=e=>{
   const o=api.object();if(!drag||!o)return;const q=point(e);
-  if(drag.kind==='primitive'){let end=nativePoint(q);if(tool==='sketch-line'){const snap=snapLine(drag.start,end);end=snap.end;drag.inference=snap.inference;}drag.end=end;render();return;}
+  if(drag.kind==='primitive'){const doc=sketch.native(),raw=nativePoint(q);let end=raw;drag.endRef=null;if(tool!=='circle'){const target=snapNative(raw,doc);end=target.point;drag.endRef=target.ref;}if(tool==='sketch-line'){const inferred=snapLine(drag.start,end);end=inferred.end;drag.inference=inferred.inference;}drag.end=end;render();return;}
   if(drag.kind==='entity-point'){drag.end=nativePoint(q);return;}
   if(drag.kind==='node'){o.loops[selected][node]=q;render();}
   else if(drag.kind==='move'){o.loops[selected]=drag.original.map(v=>[v[0]+q[0]-drag.start[0],v[1]+q[1]-drag.start[1]]);render();}
@@ -149,7 +168,7 @@ export function createEditor(svg,api){
  };
  svg.onpointerup=()=>{
   if(!drag)return;const d=drag;drag=null;
-  if(d.kind==='primitive')sketch.create(tool==='sketch-line'?'line':tool,d.start,d.end,null,{autoConstraint:d.inference});
+  if(d.kind==='primitive')sketch.create(tool==='sketch-line'?'line':tool,d.start,d.end,null,{autoConstraint:d.inference,startRef:d.startRef,endRef:d.endRef,centerRef:d.startRef});
   if(d.kind==='entity-point'&&d.end)sketch.movePoint(d.entity,d.handle,d.end);
   if(['node','move'].includes(d.kind))api.changed();
   if(d.kind==='stroke'&&d.points.length)operate({type:'stroke',points:d.points,width:+$('brushWidth')?.value||.8,subtract:tool==='erase'});
