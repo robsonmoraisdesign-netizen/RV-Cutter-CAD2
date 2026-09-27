@@ -57,7 +57,7 @@ export function rectangle(sketch,a,b,options={}) {
 export function removeEntity(sketch,entityId) {
   getEntity(sketch,entityId);
   sketch.entities=sketch.entities.filter(e=>e.id!==entityId);
-  sketch.constraints=sketch.constraints.filter(c=>![c.entity,c.a?.entity,c.b?.entity,c.first,c.second].includes(entityId));
+  sketch.constraints=sketch.constraints.filter(c=>![c.entity,c.a?.entity,c.b?.entity,c.point?.entity,c.line,c.first,c.second].includes(entityId));
   sketch.dimensions=sketch.dimensions.filter(d=>d.entity!==entityId);
 }
 export function entityEndpoint(entity,which) {
