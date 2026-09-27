@@ -57,7 +57,7 @@ export function createEditor(svg,api){
     const c=localPoint(e.center,n);p=[c[0]+e.radius/o.params.size+view[2]*.018,c[1]+view[3]*.012];
    }
    const text=(d.driving===false?'[':'')+Number(d.value).toFixed(2)+' mm'+(d.driving===false?']':'');
-   addText(text,p,{class:'sketch-dimension'+(d.driving===false?' driven':''),'data-dimension-entity':e.id,'data-entity':e.id});
+   addText(text,p,{class:'sketch-dimension'+(d.driving===false?' driven':''),style:`font-size:${view[2]*.020}px`,'data-dimension-entity':e.id,'data-entity':e.id});
   }
  }
  function renderConstraints(n){
@@ -68,7 +68,7 @@ export function createEditor(svg,api){
    else entities=[n.entities.find(e=>e.id===c.first),n.entities.find(e=>e.id===c.second)].filter(Boolean);
    if(!entities.length)continue;
    const centers=entities.map(entityMid),p=[centers.reduce((s,q)=>s+q[0],0)/centers.length,centers.reduce((s,q)=>s+q[1],0)/centers.length],q=localPoint(p,n);
-   addText(constraintLabel(c.type),[q[0]+view[2]*.008,q[1]+view[3]*.008],{class:'sketch-constraint-badge'});
+   addText(constraintLabel(c.type),[q[0]+view[2]*.008,q[1]+view[3]*.008],{class:'sketch-constraint-badge',style:`font-size:${view[2]*.016}px`});
   }
  }
  function updateInspector(n){
@@ -124,7 +124,7 @@ export function createEditor(svg,api){
    if(tool==='circle')svg.appendChild(el('circle',{cx:a[0],cy:-a[1],r:Math.hypot(b[0]-a[0],b[1]-a[1]),class:'sketch-preview-shape','vector-effect':'non-scaling-stroke'}));
    else svg.appendChild(el('path',{d:tool==='rectangle'?path([a,[b[0],a[1]],b,[a[0],b[1]]])+'Z':path([a,b]),class:'sketch-preview-shape','vector-effect':'non-scaling-stroke','pointer-events':'none'}));
    const value=tool==='circle'?Math.hypot(drag.end[0]-drag.start[0],drag.end[1]-drag.start[1]):Math.hypot(drag.end[0]-drag.start[0],drag.end[1]-drag.start[1]);
-   addText((tool==='circle'?'R ':'')+value.toFixed(2)+' mm',[(a[0]+b[0])/2+view[2]*.012,(a[1]+b[1])/2+view[3]*.018],{class:'sketch-live-dimension'});
+   addText((tool==='circle'?'R ':'')+value.toFixed(2)+' mm',[(a[0]+b[0])/2+view[2]*.012,(a[1]+b[1])/2+view[3]*.018],{class:'sketch-live-dimension',style:`font-size:${view[2]*.018}px`});
    if(drag.inference){
     const guide=drag.inference==='horizontal'?[[view[0],a[1]],[view[0]+view[2],a[1]]]:[[a[0],-view[1]],[a[0],-(view[1]+view[3])]];
     if(drag.inference==='horizontal')svg.appendChild(el('line',{x1:guide[0][0],y1:-guide[0][1],x2:guide[1][0],y2:-guide[1][1],class:'sketch-inference-line','vector-effect':'non-scaling-stroke'}));
