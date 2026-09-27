@@ -1,9 +1,59 @@
-<!doctype html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'self' blob: data:; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self' blob:; worker-src 'self' blob:"><title>RV Cutter CAD 14.19 · Medição 3D</title><link rel="stylesheet" href="style.css"></head><body>
-<header class="app-header"><button class="brand" id="homeBtn" title="Ir para início"><b>RV</b><span>CUTTER <strong>CAD</strong><small id="appVersion"></small></span></button><div class="project-name-wrap"><span class="project-kicker">PROJETO</span><input id="name" aria-label="Nome do projeto" value="Novo projeto"><button id="renameProject" class="icon-button" title="Renomear projeto" aria-label="Renomear projeto">✎</button></div><span class="save-state" id="saveState" role="status">Biblioteca</span><div class="top-actions"><button id="open">Abrir</button><button id="save">Salvar</button><button class="primary" id="export" disabled>Exportar</button></div></header>
-<section id="home"><div class="home-heading"><div><span class="eyebrow">SEU ATELIÊ DIGITAL</span><h1>O próximo projeto começa aqui.</h1><p>Crie, ajuste e reencontre seus cortadores.</p></div><span class="local-badge">Projetos salvos neste computador</span></div><div class="home-actions"><button class="new-project" id="newProject"><span class="new-icon">+</span><span><strong>Novo projeto cortador</strong><small>Uma arte ou uma coleção inteira</small></span></button><div class="home-examples"><span>EXPERIMENTE COM UMA ARTE</span><button id="homePig">Porquinho</button><button id="homeFlowers">Flores · 4 objetos</button><button id="homeCow">Vaquinha</button></div></div><div class="recent-title"><h2>Projetos recentes</h2><button id="openHome">Abrir arquivo .rvcad</button></div><div id="recentProjects"></div><p id="homeStatus" role="status"></p></section>
-<main id="studio" hidden>
-<aside class="left">
-  <div class="sidebar-heading"><div><span class="section-eyebrow">PROJETO</span><h2>Objetos</h2></div><span id="objectCount" class="count-badge">0 objetos</span></div>
+<!doctype html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'self' blob: data:; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self' blob:; worker-src 'self' blob:"><title>RV Cutter CAD 14.25 · Workspace System</title><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="ui-v4.css"></head><body>
+<header class="app-header v4-top">
+  <button class="brand v4-brand" id="homeBtn" title="Biblioteca de projetos">
+    <span class="brand-mark">RV</span>
+    <span class="brand-copy"><strong>RV Cutter CAD <em id="appVersion" class="brand-version"></em></strong><small id="projectLabel">Biblioteca de projetos</small></span>
+  </button>
+  <nav class="workspace-nav" aria-label="Workspaces">
+    <button id="tabHome" class="workspace-tab active">Início</button>
+    <button id="tab3d" class="workspace-tab">3D</button>
+    <button id="tab2d" class="workspace-tab">Sketch 2D</button>
+    <button id="tabPresentation" class="workspace-tab">Apresentação</button>
+  </nav>
+  <div class="top-actions v4-actions">
+    <button id="cmdBtn" class="command-button" title="Abrir paleta de comandos">⌕ <span>Comandos</span><kbd>Ctrl K</kbd></button>
+    <span class="save-state" id="saveState" role="status">Biblioteca</span>
+    <button id="themeToggle" class="icon-button" title="Alternar tema">☼</button>
+    <button id="open" class="header-action">Abrir</button>
+    <button id="save" class="header-action">Salvar</button>
+    <button class="primary" id="export" disabled>Exportar</button>
+  </div>
+</header>
+<section id="home" class="home-v4">
+  <div class="home-v4-inner">
+    <div class="library-hero">
+      <div><span class="eyebrow">WORKSPACE</span><h1>Biblioteca de projetos</h1><p>Projetos organizados por categoria. Cortador e carimbo são modos do mesmo projeto.</p></div>
+      <div class="library-hero-actions"><button id="openHome" class="secondary">Importar .rvcad</button><button class="primary big-action" id="newProject">+ Novo projeto</button></div>
+    </div>
+    <section class="library-section">
+      <div class="library-section-head"><div><h2>Tipo de projeto</h2><p>Comece pelo tipo de trabalho. Novas categorias entram sem alterar o fluxo atual.</p></div></div>
+      <div class="project-types">
+        <button class="project-type-card active-type" id="newCutterProject"><span class="type-icon">◯</span><strong>Cortadores &amp; carimbos</strong><span>Crie cortadores, carimbos ou ambos dentro do mesmo arquivo.</span></button>
+        <button class="project-type-card disabled-type" disabled><span class="coming-soon">EM BREVE</span><span class="type-icon">T</span><strong>Letras</strong><span>Projetos tipográficos e letras 3D.</span></button>
+        <button class="project-type-card disabled-type" disabled><span class="coming-soon">EM BREVE</span><span class="type-icon">▣</span><strong>Caixas</strong><span>Caixas paramétricas, tampas e organizadores.</span></button>
+      </div>
+    </section>
+    <section class="library-section">
+      <div class="library-section-head"><div><h2>Projetos recentes</h2><p>Abra, renomeie ou exclua projetos salvos neste computador.</p></div>
+        <div class="home-examples compact-examples"><span>EXEMPLOS</span><button id="homePig">Porquinho</button><button id="homeFlowers">Flores</button><button id="homeCow">Vaquinha</button></div>
+      </div>
+      <div id="recentProjects" class="projects-v4"></div>
+    </section>
+    <p id="homeStatus" role="status" class="library-status"></p>
+  </div>
+</section>
+<main id="studio" hidden class="studio-v4">
+<aside class="tool-rail-v4" aria-label="Ferramentas globais">
+  <button id="drawerToggle" class="rail-tool active" title="Estrutura do projeto">☷</button>
+  <button id="railFit" class="rail-tool" title="Enquadrar">⌗</button>
+  <button id="railMeasure" class="rail-tool" title="Medir">⌖</button>
+  <span class="rail-spacer"></span>
+  <button id="railVisual" class="rail-tool" title="Visualização">◉</button>
+</aside>
+<aside class="left project-drawer-v4">
+  <div class="drawer-v4-head"><div class="drawer-title-edit"><span class="section-eyebrow">ESTRUTURA DO PROJETO</span><div class="project-title-row"><input id="name" aria-label="Nome do projeto" value="Novo projeto"><button id="renameProject" class="icon-button" title="Renomear projeto" aria-label="Renomear projeto">✎</button></div></div><span id="drawerSelectionCount" class="count-badge">1 selecionado</span></div>
+  <div class="scope-v4"><span>ESCOPO DE EDIÇÃO</span><div class="scope-v4-buttons"><button data-scope-choice="active" class="active">Objeto</button><button data-scope-choice="selection" disabled title="Multisseleção 3D será ativada na fase correspondente">Seleção</button><button data-scope-choice="all">Todos</button></div></div>
+  <div class="sidebar-heading legacy-sidebar-heading"><div><span class="section-eyebrow">PROJETO</span><h2>Objetos</h2></div><span id="objectCount" class="count-badge">0 objetos</span></div>
   <button id="import" class="import"><span class="import-plus">+</span><span><strong>Adicionar desenho</strong><small>PNG, JPG, WebP ou SVG preenchido</small></span></button>
   <input type="file" id="artFile" accept="image/png,image/jpeg,image/webp,.svg" hidden>
   <details class="sample-drawer"><summary>Usar um exemplo</summary><div class="samples"><button id="pig">Porquinho</button><button id="cow">Vaquinha</button></div></details>
@@ -18,7 +68,7 @@
 </aside>
 <section class="workspace">
   <div class="toolbar">
-    <div class="tabs"><button id="tab3d" class="active">Modelo 3D</button><button id="tab2d">Editar em 2D</button><button id="tabPresentation">Apresentação</button></div>
+    <div class="workspace-context-title"><span id="workspaceKicker">MODELO</span><strong id="workspaceTitle">Modelo 3D</strong></div>
     <div class="view-actions"><button id="undo" class="icon-button" title="Desfazer (Ctrl+Z)">↶</button><button id="redo" class="icon-button" title="Refazer (Ctrl+Y)">↷</button><span class="toolbar-divider"></span><button id="fit">Enquadrar</button><button id="top">Superior</button><button id="iso">Perspectiva</button>
       <details class="visual-menu"><summary>Visual <span>⌄</span></summary><div class="visual-popover"><div class="popover-title"><strong>Visualização</strong><small>Apenas aparência do modelo</small></div>
         <label class="field">Organização<select id="arrangement"><option value="spread">Lado a lado</option><option value="nested">Centralizados / encaixados</option></select></label>
@@ -104,6 +154,18 @@
   <div id="thickness2d" hidden><div class="edit-panel-intro"><strong>Ajuste de espessura em 2D</strong><span>Edite o desenho com precisão sem sair do projeto.</span></div><div id="wallControl"></div><p class="hint">A faixa dourada mostra a parede da lâmina na última reconstrução.</p><label class="field">Destino do ajuste<select id="thicknessTarget"><option value="art">Traços do relevo / carimbo</option><option value="blade">Parede da lâmina do cortador</option></select></label><div class="range-pair"><label for="lineDelta">Engrossar / afinar</label><input id="lineDelta" type="number" min="-1" step=".05" value=".2"><input id="lineDeltaRange" type="range" min="-1" max="2" step=".05" value=".2" aria-label="Variação da espessura dos traços"></div><p class="hint">Positivo engrossa; negativo afina. Use “Selecionar região” para limitar o ajuste.</p><button id="applyThickness" class="full-button">Aplicar espessura</button><button id="resetWallEdits" class="full-button">Limpar ajustes locais da lâmina</button><div class="range-pair"><label for="offsetAmount">Offset do contorno</label><input id="offsetAmount" type="number" min="-5" step=".1" value=".5"><input id="offsetRange" type="range" min="-5" max="5" step=".1" value=".5" aria-label="Distância do offset"></div><button id="applyOffset" class="full-button">Aplicar no contorno selecionado</button></div>
 </aside>
 </main>
+<dialog id="commandPalette" class="command-palette-v4">
+  <div class="palette-search"><span>⌕</span><input id="commandSearch" placeholder="Buscar ferramenta, parâmetro ou ação…"><kbd>Esc</kbd></div>
+  <div id="commandResults" class="command-results">
+    <button data-command="home"><span>Ir para Biblioteca</span><small>Workspace</small></button>
+    <button data-command="3d"><span>Abrir 3D</span><small>Workspace</small></button>
+    <button data-command="2d"><span>Abrir Sketch 2D</span><small>Workspace</small></button>
+    <button data-command="presentation"><span>Abrir Apresentação</span><small>Workspace</small></button>
+    <button data-command="new"><span>Novo projeto</span><small>Projeto</small></button>
+    <button data-command="save"><span>Salvar projeto</span><small>Projeto</small></button>
+    <button data-command="export"><span>Exportar</span><small>Projeto</small></button>
+  </div>
+</dialog>
 <dialog id="leaveProjectDialog" class="leave-project-dialog">
   <div class="dialog-symbol">◆</div>
   <h2>Fechar o projeto atual?</h2>
