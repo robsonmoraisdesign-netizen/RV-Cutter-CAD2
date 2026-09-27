@@ -10,12 +10,13 @@ Aproximar a interação do Sketch das referências CAD solicitadas, preservando 
 - Line/Rectangle/Circle por sequência de cliques, e cadeia contínua de linhas;
 - Arco de 3 pontos;
 - Bézier multiponto sem converter prematuramente em nós soltos;
+- Ponto semântico, utilizável em coincidência e ponto médio;
 - seleção com hit target ampliado;
 - box selection e crossing selection;
 - Trim semântico, inclusive arrastando sobre múltiplos trechos;
 - Extend de linhas até o limite mais próximo;
 - Cota como ferramenta do canvas e edição inline;
-- painel S de atalhos e atalhos D/M/L/R/C/A/B;
+- painel S de atalhos e atalhos D/M/L/R/C/A/B/P;
 - inferência horizontal, vertical, coincidente, ponto médio e paralela; Shift suprime inferências;
 - restrição Ponto médio persistente;
 - visualização de entidades subdefinidas, definidas e em conflito;
