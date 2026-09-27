@@ -146,7 +146,7 @@ body.sketching #dimensions{display:none}
 #editor .sketch-origin{fill:#f8fbfb;stroke:#7f9198;stroke-width:1}
 #editor .sketch-derived-profile{fill:#84b7ae}
 #editor .sketch-preview-shape{fill:none;stroke:#d28a3e;stroke-width:1.6}
-#editor .sketch-inference-line{stroke:#60a998;stroke-width:1;stroke-dasharray:5 4;opacity:.75}
+#editor .sketch-inference-line{stroke:#60a998;stroke-width:1;stroke-dasharray:5 4;opacity:.75}#editor .sketch-snap-marker{fill:#edf1f2;stroke:#2f9b8a;stroke-width:1.5;pointer-events:none}
 #editor .sketch-svg-text{font-family:Inter,Segoe UI,sans-serif;dominant-baseline:middle;text-anchor:middle;pointer-events:none}
 #editor .sketch-dimension{fill:#33484d;font-size:1.7%;font-weight:650;paint-order:stroke;stroke:#edf1f2;stroke-width:.005;pointer-events:auto;cursor:pointer}
 #editor .sketch-dimension.driven{fill:#728187;font-weight:500}
