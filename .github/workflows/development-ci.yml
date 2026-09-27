@@ -9,6 +9,10 @@ on:
     branches:
       - develop
 
+concurrency:
+  group: development-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-test:
     name: Build and test (${{ matrix.os }})
@@ -76,6 +80,19 @@ jobs:
           for(const p of ['app/ui.js','app/worker.js','app/manifold.wasm']){
             if(!fs.existsSync(p)||fs.statSync(p).size===0)throw new Error('Invalid generated artifact: '+p);
           }
+
+      - name: Browser Sketch and lifecycle smoke
+        if: runner.os == 'Linux'
+        run: node qa-browser-cdp.cjs
+
+      - name: Upload Sketch UI audit
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sketch-ui-audit
+          path: audit-sketch-14.24.png
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Package Windows x64 application
         if: runner.os == 'Windows'
