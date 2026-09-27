@@ -64,6 +64,7 @@ async function cdp(url){
   assert.equal(await evalv("RVTest.active().sketch.entities[0].type"),'circle');
   await evalv("(()=>{const i=document.querySelector('#sketchDimension');i.value='18';document.querySelector('#applySketchDimension').click();return true})()");
   await waitFor(()=>evalv("Math.abs(RVTest.active().params.size-36)<0.001"));
+  await evalv("RVTest.wait()");
   assert(await evalv("document.querySelectorAll('.sketch-dimension').length>=1"),'Driving dimension must render on canvas');
   assert(await evalv("document.querySelector('#sketchStatusChip').dataset.state.length>0"),'Sketch status must render');
   assert(await evalv("document.querySelectorAll('.sketch-entity-hit').length>=1"),'CAD selection must use enlarged invisible hit targets');
