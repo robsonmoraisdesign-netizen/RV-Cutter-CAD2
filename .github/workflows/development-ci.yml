@@ -87,6 +87,28 @@ jobs:
         if: runner.os == 'Linux'
         run: node qa-browser-cdp.cjs
 
+      - name: Electron desktop smoke
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          rm -rf desktop-smoke
+          mkdir -p desktop-smoke
+          xvfb-run -a ./node_modules/.bin/electron app "--rv-desktop-smoke=$PWD/desktop-smoke"
+          cat desktop-smoke/desktop-smoke.json
+          test -s desktop-smoke/desktop-smoke.stl
+
+      - name: Electron desktop smoke (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $dir = Join-Path (Get-Location) 'desktop-smoke'
+          Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $dir | Out-Null
+          & ".\node_modules\electron\dist\electron.exe" app "--rv-desktop-smoke=$dir"
+          if ($LASTEXITCODE -ne 0) { throw "Electron desktop smoke failed with code $LASTEXITCODE" }
+          Get-Content (Join-Path $dir 'desktop-smoke.json')
+          if (-not (Test-Path (Join-Path $dir 'desktop-smoke.stl'))) { throw 'Desktop smoke STL was not saved' }
+
       - name: Upload Workspace UI audit
         if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4
