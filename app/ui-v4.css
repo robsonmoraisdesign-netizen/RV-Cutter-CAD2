@@ -152,7 +152,7 @@ body.drawer-collapsed .project-drawer-v4{visibility:hidden;pointer-events:none}
 .sketch-shortcut-palette[hidden]{display:none}.shortcut-title{display:flex;justify-content:space-between;align-items:center;padding:2px 3px 8px;border-bottom:1px solid var(--v4-line2);margin-bottom:7px}.shortcut-title strong{font-size:9px}.shortcut-title span{font-size:6.5px;color:var(--v4-muted);letter-spacing:.8px;text-transform:uppercase}
 .shortcut-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}.shortcut-grid button{height:55px;border:1px solid var(--v4-line2);border-radius:7px;background:var(--v4-surface);color:var(--v4-text2);font-size:7px;display:flex;flex-direction:column;gap:5px;align-items:center;justify-content:center}.shortcut-grid button:hover{background:var(--v4-surface3);border-color:var(--v4-brand);color:var(--v4-text)}.shortcut-grid button span{font-size:17px;color:var(--v4-brand2)}
 
-#editor .sketch-entity-hit{fill:none;stroke:transparent;stroke-width:12;pointer-events:stroke;cursor:pointer}
+#editor .sketch-entity-hit{fill:none;stroke:transparent;stroke-width:8;pointer-events:stroke;cursor:pointer}
 #editor .sketch-entity-visible{fill:none;stroke-width:1.6;pointer-events:none}
 #editor .sketch-entity-visible.entity-under{stroke:#287dc4}
 #editor .sketch-entity-visible.entity-defined{stroke:#252c31}
@@ -209,3 +209,23 @@ body.drawer-collapsed .project-drawer-v4{visibility:hidden;pointer-events:none}
 .right #savedPreset{background:var(--v4-bg)!important;border-color:var(--v4-line)!important}
 .right #objectMetrics{background:var(--v4-surface)!important;border-bottom:1px solid var(--v4-line2)!important}
 .right .metric-row,.right .metric-part{background:transparent!important;border-color:var(--v4-line2)!important}
+
+
+/* 14.27 · Unified Model workspace + Sketch/Feature tree */
+#three{position:absolute;inset:0;min-width:0;min-height:0}
+#three>canvas{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;display:block!important}
+#editor{z-index:8}
+body.sketching #editor{background-color:rgba(230,235,237,.965)!important}
+body.sketching #three{display:block!important}
+.feature-primary-actions{display:grid;grid-template-columns:1fr;gap:5px;margin:8px 10px 4px}
+.feature-action{min-height:32px;display:flex;align-items:center;gap:7px;padding:0 9px;border:1px solid var(--v4-line2);border-radius:7px;background:var(--v4-bg);color:var(--v4-text2);font-size:8px;text-align:left}
+.feature-action span{font-size:13px;color:var(--v4-brand2)}
+.feature-action:hover{background:var(--v4-surface3);color:var(--v4-text)}
+.feature-action.accent{border-color:color-mix(in srgb,var(--v4-brand) 45%,var(--v4-line2));background:var(--v4-brandSoft)}
+.finish-sketch{background:var(--v4-brand)!important;color:#142620!important;border-color:transparent!important;font-weight:800!important}
+.layer.sketch-node.editing-sketch{box-shadow:inset 3px 0 0 var(--v4-brand)!important}
+.feature-tree .layer-child{min-height:27px;padding:2px 3px 2px 8px}
+.feature-tree .layer-child.feature{color:var(--v4-brand2)}
+.feature-tree .layer-child.body{padding-left:20px;color:var(--v4-muted)}
+.tree-child-label{min-width:0;flex:1;border:0!important;background:transparent!important;color:inherit!important;text-align:left;padding:4px 2px!important;font-size:8px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tree-child-label:hover{color:var(--v4-text)!important}
