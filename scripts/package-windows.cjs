@@ -11,6 +11,6 @@ fs.rmSync(out,{recursive:true,force:true});fs.cpSync(runtime,out,{recursive:true
 fs.renameSync(path.join(out,'electron.exe'),path.join(out,'RV Cutter CAD.exe'));
 fs.rmSync(path.join(out,'resources/default_app.asar'),{force:true});
 fs.cpSync('app',path.join(out,'resources/app'),{recursive:true});
-fs.writeFileSync(path.join(out,'SOURCE_COMMIT.txt'),(process.env.GITHUB_SHA||'local')+'\n');
-fs.writeFileSync(path.join(out,'LEIA-ME.txt'),'RV Cutter CAD '+version+' — Windows x64\r\nExtraia TODA a pasta antes de executar RV Cutter CAD.exe. Não mova somente o executável.\r\nEsta versão integra o Sketch fase 1; veja o PR para escopo e limitações.\r\n');
+fs.writeFileSync(path.join(out,'SOURCE_COMMIT.txt'),(process.env.RV_SOURCE_COMMIT||process.env.GITHUB_SHA||'local')+'\n');
+fs.writeFileSync(path.join(out,'LEIA-ME.txt'),'RV Cutter CAD '+version+' — Windows x64\r\nExtraia TODA a pasta antes de executar RV Cutter CAD.exe. Não mova somente o executável.\r\nEsta versão inclui o workspace Sketch → Função → Corpo e correções do runtime desktop para geração 3D, Worker/WASM e exportação nativa.\r\n');
 console.log(out);
