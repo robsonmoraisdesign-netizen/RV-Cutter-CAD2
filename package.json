@@ -1,7 +1,7 @@
 {
   "name": "rv-cutter-cad-source",
-  "version": "14.27.0",
-  "description": "RV Cutter CAD — unified Model workspace + Sketch/Feature tree",
+  "version": "14.28.0",
+  "description": "RV Cutter CAD — desktop runtime fix for 3D, Worker/WASM and native export",
   "main": "app/main.cjs",
   "scripts": {
     "build": "node scripts/build.mjs",

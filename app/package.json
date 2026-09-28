@@ -1,7 +1,7 @@
 {
   "name": "rv-cutter-cad",
-  "version": "14.27.0",
-  "description": "Editor paramétrico local para cortadores e carimbos",
+  "version": "14.28.0",
+  "description": "Editor paramétrico desktop com Sketch, Features e exportação nativa",
   "main": "main.cjs",
   "author": "RV",
   "license": "UNLICENSED",
