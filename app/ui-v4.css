@@ -239,3 +239,16 @@ body.sketching #three{display:block!important}
 .workspace #viewport>#editor{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;min-width:100%!important;min-height:100%!important;box-sizing:border-box}
 .workspace #viewport>#editor:not([hidden]){display:block!important}
 .workspace #viewport>#editor[hidden]{display:none!important}
+
+/* 14.27 WebGL viewport contract after contextual Sketch closes. */
+.workspace #viewport>#three{
+  position:absolute!important;
+  inset:0!important;
+  width:100%!important;
+  height:100%!important;
+  min-width:100%!important;
+  min-height:100%!important;
+  display:block!important;
+  overflow:hidden!important;
+}
+.workspace #viewport>#three[hidden]{display:none!important}
