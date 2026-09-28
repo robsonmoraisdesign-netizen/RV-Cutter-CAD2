@@ -233,3 +233,9 @@ body.sketching #three{display:block!important}
 .feature-prompt{margin:11px 12px!important;padding:12px;border:1px dashed color-mix(in srgb,var(--v4-brand) 42%,var(--v4-line));border-radius:8px;background:var(--v4-brandSoft)}
 .feature-prompt strong{display:block;font-size:10px;color:var(--v4-text);margin:4px 0 6px}
 .feature-prompt p{margin:0;font-size:8px;line-height:1.55;color:var(--v4-muted)}
+
+/* 14.27 viewport contract: both WebGL and Sketch use the same full graphics cell. */
+.workspace #viewport{position:relative!important;width:100%!important;height:100%!important;min-width:0!important;min-height:0!important;overflow:hidden!important}
+.workspace #viewport>#editor{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;min-width:100%!important;min-height:100%!important;box-sizing:border-box}
+.workspace #viewport>#editor:not([hidden]){display:block!important}
+.workspace #viewport>#editor[hidden]{display:none!important}
