@@ -87,16 +87,6 @@ jobs:
         if: runner.os == 'Linux'
         run: node qa-browser-cdp.cjs
 
-      - name: Electron desktop smoke
-        if: runner.os == 'Linux'
-        shell: bash
-        run: |
-          rm -rf desktop-smoke
-          mkdir -p desktop-smoke
-          xvfb-run -a ./node_modules/.bin/electron --no-sandbox app "--rv-desktop-smoke=$PWD/desktop-smoke"
-          cat desktop-smoke/desktop-smoke.json
-          test -s desktop-smoke/desktop-smoke.stl
-
       - name: Electron desktop smoke (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -129,6 +119,21 @@ jobs:
         env:
           RV_SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: node scripts/package-windows.cjs
+
+      - name: Packaged Windows desktop smoke
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $dir = Join-Path (Get-Location) 'packaged-desktop-smoke'
+          Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $dir | Out-Null
+          $exe = Get-ChildItem -Path dist -Recurse -Filter 'RV Cutter CAD.exe' | Select-Object -First 1
+          if (-not $exe) { throw 'Packaged RV Cutter CAD.exe not found' }
+          $p = Start-Process -FilePath $exe.FullName -ArgumentList @("--rv-desktop-smoke=$dir") -Wait -PassThru
+          $result = Join-Path $dir 'desktop-smoke.json'
+          if (Test-Path $result) { Get-Content $result }
+          if ($p.ExitCode -ne 0) { throw "Packaged Electron smoke failed with code $($p.ExitCode)" }
+          if (-not (Test-Path (Join-Path $dir 'desktop-smoke.stl'))) { throw 'Packaged desktop smoke STL was not saved' }
 
       - name: Upload Windows x64 application
         if: runner.os == 'Windows'
