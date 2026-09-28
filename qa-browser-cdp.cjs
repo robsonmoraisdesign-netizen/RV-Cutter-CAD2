@@ -81,7 +81,8 @@ async function cdp(url){
   await evalv("RVTest.setStage('3d');true");
   await sleep(250);
   const render3d=await evalv("RVTest.viewer.diagnostics()");
-  assert(render3d.host.width>300&&render3d.host.height>200,'3D host must have visible dimensions');
+  console.log('3D render diagnostics',JSON.stringify(render3d));
+  assert(render3d.host.width>300&&render3d.host.height>200,'3D host must have visible dimensions: '+JSON.stringify(render3d));
   assert(render3d.canvas.cssWidth>300&&render3d.canvas.cssHeight>200,'WebGL canvas must fill the viewport');
   assert(render3d.groups>=1&&render3d.visibleMeshes>=1,'3D scene must contain visible generated meshes');
   assert(render3d.renderCalls>0,'Three.js renderer must execute draw calls');
@@ -91,7 +92,8 @@ async function cdp(url){
   await evalv("document.querySelector('#tabPresentation').click();true");await waitFor(()=>evalv("RVTest.state.stage==='presentation'"));
   await sleep(250);
   const renderPresentation=await evalv("RVTest.viewer.diagnostics()");
-  assert(renderPresentation.groups>=1&&renderPresentation.visibleMeshes>=1,'Presentation scene must retain generated geometry');
+  console.log('Presentation render diagnostics',JSON.stringify(renderPresentation));
+  assert(renderPresentation.groups>=1&&renderPresentation.visibleMeshes>=1,'Presentation scene must retain generated geometry: '+JSON.stringify(renderPresentation));
   assert(renderPresentation.renderCalls>0,'Presentation must execute draw calls');
   const shotPres=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync('audit-presentation-14.27.png',Buffer.from(shotPres.data,'base64'));
 
