@@ -54,8 +54,9 @@ async function cdp(url){
   assert.equal(await evalv("RVTest.active().features.length"),0,'New Sketch must not auto-create a cutter feature');
 
   await evalv("document.querySelector('[data-tool=\"circle\"]').click(); true");
-  const box=await evalv("(()=>{const r=document.querySelector('#editor').getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height}})()");
-  assert(box.w>300&&box.h>200,'Sketch canvas must be visible');
+  const box=await evalv("(()=>{const e=document.querySelector('#editor'),r=e.getBoundingClientRect(),v=document.querySelector('#viewport').getBoundingClientRect(),w=document.querySelector('.workspace').getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,viewport:{w:v.width,h:v.height},workspace:{w:w.width,h:w.height},hidden:e.hidden,display:getComputedStyle(e).display}})()");
+  console.log('Sketch viewport diagnostics',JSON.stringify(box));
+  assert(box.w>300&&box.h>200,'Sketch canvas must be visible: '+JSON.stringify(box));
   const x=box.x+box.w*.48,y=box.y+box.h*.48;
   await send('Input.dispatchMouseEvent',{type:'mouseMoved',x,y,button:'none'});
   await send('Input.dispatchMouseEvent',{type:'mousePressed',x,y,button:'left',clickCount:1});
