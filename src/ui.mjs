@@ -35,7 +35,7 @@ function historyButtons(){$('undo').disabled=!state.history.length;$('redo').dis
 function applyProject(d){validateProject(d);resetSession();isolatedId=null;hoveredObjectId=null;expandedObjects.clear();state.id=typeof d.id==='string'&&/^[\w-]{10,80}$/.test(d.id)?d.id:uid();state.name=String(d.name||'Projeto');state.source=typeof d.source==='string'&&d.source.startsWith('data:image/')?d.source:null;state.homePreview=typeof d.previewImage==='string'&&d.previewImage.startsWith('data:image/')?d.previewImage:null;const legacy=d.projectType!=='feature-workspace';state.objects=d.objects?d.objects.map(o=>migrateSketchNode({...o,id:o.id||uid(),visible:o.visible!==false,result:null,cacheKey:null},{legacyFeature:legacy||!Array.isArray(o.features)})):[migrateSketchNode({id:uid(),name:state.name,loops:d.loops,params:migrateParams(d.params),visible:true,result:null},{legacyFeature:true})];state.activeId=state.objects.some(o=>o.id===d.activeId)?d.activeId:state.objects[0]?.id;state.editingSketchId=null;state.view={...state.view,...d.view,presentation:{...structuredClone(presentationDefaults),...d.view?.presentation,colors:{...presentationDefaults.colors,...d.view?.presentation?.colors}},colors:{...initialColors,...d.view?.colors}};if(d.view?.presentation&&!Object.prototype.hasOwnProperty.call(d.view.presentation,'modelShadowMode'))state.view.presentation.modelShadowMode=d.view.presentation.modelShadows===false?'none':'soft';sync();editor?.reset();}
 function restore(saved){const d=typeof saved==='string'?JSON.parse(saved):{...saved,objects:saved.objects.map(o=>({...o,loops:JSON.parse(o.loops)}))};applyProject(d);generate();historyButtons()}
 $('undo').onclick=()=>{if(!state.history.length)return;state.future.push(snapshot());restore(state.history.pop());};$('redo').onclick=()=>{if(!state.future.length)return;state.history.push(snapshot());restore(state.future.pop());};
-let saveTimer,lastSavedSignature=null,transitioning=false;
+let saveTimer,lastSavedSignature=null,transitioning=false,navigationBusy=false;
 function projectSignature(){return JSON.stringify([state.id,state.name,state.homePreview,state.view,state.objects.map(o=>[o.id,o.name,o.features,o.visible,o.contourVersion||0,o.geometryRecord?.cacheKey,o.sketch])]);}
 async function flush(){
  clearTimeout(saveTimer);if(!state.objects.length)return true;
@@ -108,10 +108,11 @@ function thumbnail(loop){const c=document.createElement('canvas');c.width=300;c.
 function bytesDataUrl(bytes){let binary='';const step=0x8000;for(let i=0;i<bytes.length;i+=step)binary+=String.fromCharCode(...bytes.subarray(i,i+step));return 'data:image/png;base64,'+btoa(binary);}
 function updateHomePreview(){if(!viewer||state.screen!=='studio'||!state.objects.some(o=>o.result))return;try{state.homePreview=bytesDataUrl(viewer.capture(420,false));}catch(e){console.warn('Prévia indisponível:',e);}}
 async function showHome(page=0){
- page=Number.isInteger(page)?page:0;if(transitioning)return false;
- if(state.screen==='studio'){const ok=await closeCurrentProject();if(!ok)return false;}
- transitioning=true;
+ page=Number.isInteger(page)?page:0;if(transitioning||navigationBusy)return false;
+ navigationBusy=true;
  try{
+  if(state.screen==='studio'){const ok=await closeCurrentProject();if(!ok)return false;}
+  transitioning=true;
   state.screen='home';saveState('idle');status('Biblioteca · nenhum projeto ativo');$('studio').hidden=true;$('home').hidden=false;$('export').disabled=true;$('projectLabel').textContent='Biblioteca de projetos';$('tabHome').classList.add('active');$('tab3d').classList.remove('active');$('tab2d').classList.remove('active');$('tabPresentation').classList.remove('active');
   const parent=$('recentProjects');parent.replaceChildren();
   try{
@@ -124,24 +125,27 @@ async function showHome(page=0){
     const title=document.createElement('strong');title.textContent=item.name;
     const sub=document.createElement('small');sub.textContent=`${item.count} Sketch(es) · ${new Date(item.updatedAt).toLocaleString('pt-BR')}`;
     card.append(img,title,sub);
-    card.onclick=async()=>{if(transitioning)return;transitioning=true;try{const data=await getStored(item.id);applyProject(data);state.history=[];state.future=[];enterStudio();markCurrentSaved();generate();}catch(e){status(e.message)}finally{transitioning=false;}};
+    card.onclick=async()=>{if(transitioning||navigationBusy)return;transitioning=true;try{const data=await getStored(item.id);applyProject(data);state.history=[];state.future=[];enterStudio();markCurrentSaved();generate();}catch(e){status(e.message)}finally{transitioning=false;}};
     const actions=document.createElement('div');actions.className='project-actions';
     for(const [label,fn] of [['Renomear',()=>renameCatalogProject(item)],['Excluir',()=>deleteProject(item)]]){const b=document.createElement('button');b.textContent=label;b.onclick=fn;actions.appendChild(b);}
     wrapper.append(card,actions);parent.appendChild(wrapper);
    }
    if(items.length>60){const nav=document.createElement('div');nav.className='project-actions';for(const [label,n]of [['Anterior',page-1],['Próxima',page+1]]){const b=document.createElement('button');b.textContent=label;b.disabled=n<0||n*60>=items.length;b.onclick=()=>showHome(n);nav.appendChild(b);}parent.appendChild(nav);}
   }catch(e){status('Não foi possível abrir o histórico: '+e.message);}
- }finally{transitioning=false;}
- return true;
+  return true;
+ }finally{transitioning=false;navigationBusy=false;}
 }
 function enterStudio(){$('recentProjects').replaceChildren();state.screen='studio';$('home').hidden=true;$('studio').hidden=false;$('projectLabel').textContent=state.name||'Projeto';$('tabHome').classList.remove('active');sync();requestAnimationFrame(()=>requestAnimationFrame(()=>{viewer?.resize();viewer?.fit();viewer?.invalidate();}));}
 async function newProject(){
- if(transitioning)return false;
- if(state.screen==='studio'&&!await closeCurrentProject())return false;
- resetSession();isolatedId=null;hoveredObjectId=null;expandedObjects.clear();
- Object.assign(state,{id:uid(),name:'Novo projeto',source:null,objects:[],activeId:null,editingSketchId:null,history:[],future:[],homePreview:null});
- const o=makeObject([],'Sketch 1',false);o.sketch=createSketch();state.objects=[o];state.activeId=o.id;lastSavedSignature=null;
- enterStudio();editor.reset();setStage('3d');enterSketch(o.id);refreshView();historyButtons();autosave();status('Novo Sketch ativo. Crie a arte e depois use “Converter em cortador”.');return true;
+ if(transitioning||navigationBusy)return false;
+ navigationBusy=true;
+ try{
+  if(state.screen==='studio'&&!await closeCurrentProject())return false;
+  resetSession();isolatedId=null;hoveredObjectId=null;expandedObjects.clear();
+  Object.assign(state,{id:uid(),name:'Novo projeto',source:null,objects:[],activeId:null,editingSketchId:null,history:[],future:[],homePreview:null});
+  const o=makeObject([],'Sketch 1',false);o.sketch=createSketch();state.objects=[o];state.activeId=o.id;lastSavedSignature=null;
+  enterStudio();editor.reset();setStage('3d');enterSketch(o.id);refreshView();historyButtons();status('Novo Sketch ativo. Crie a arte e depois use “Converter em cortador”.');return true;
+ }finally{navigationBusy=false;if(state.screen==='studio')autosave();}
 }
 $('homeBtn').onclick=()=>showHome();$('tabHome').onclick=()=>showHome();$('newProject').onclick=newProject;$('newCutterProject').onclick=newProject;$('openHome').onclick=()=>$('projectFile').click();
 $('drawerToggle').onclick=()=>{document.body.classList.toggle('drawer-collapsed');requestAnimationFrame(()=>viewer?.resize());};
@@ -364,5 +368,5 @@ let appearanceFrame=0;function refreshAppearance(){if(appearanceFrame)return;app
   };
 
 async function start(){sync();await loadPresets();await showHome();}
-window.RVTest={setStage,enterSketch,finishSketch,createNewSketch,convertToCutter,enforceBudget,refreshView,showHome,closeCurrentProject,askLeaveProject,destroyCurrentProject,projectSignature,markCurrentSaved,setParam,savePreset,applyPreset,presetRows,renameStored,deleteStored,diagnostics:()=>({worker:!!worker,pending:pending.size,queued:pendingBuildIds.size,running,sessionEpoch,screen:state.screen,transitioning,saveState:$('saveState')?.dataset?.state||null,transition:globalThis.__RV_LAST_TRANSITION||null,render:viewer?.diagnostics?.()}),cacheStats,meshBytes,resetSession,state,active,generate,loadImage,loadSvg,project,traceSource,applyProject,commitImport,exportData,measurements,primaryDimension,selectObject,toggleIsolation,flush,catalog,newProject,editor,viewer,request,wait:async()=>{for(let i=0;i<1200;i++){await new Promise(r=>setTimeout(r,50));if(state.objects.length&&!running&&state.objects.filter(o=>o.visible).every(o=>!generatable(o)||o.result&&(o.result.released||o.cacheKey===keyFor(o))))return state.objects.map(o=>o.result);const bad=state.objects.find(o=>o.visible&&hasManufacturingFeature(o)&&o.error);if(!running&&bad)throw Error(bad.error);}throw Error('Tempo de geração excedido');}};
+window.RVTest={setStage,enterSketch,finishSketch,createNewSketch,convertToCutter,enforceBudget,refreshView,showHome,closeCurrentProject,askLeaveProject,destroyCurrentProject,projectSignature,markCurrentSaved,setParam,savePreset,applyPreset,presetRows,renameStored,deleteStored,diagnostics:()=>({worker:!!worker,pending:pending.size,queued:pendingBuildIds.size,running,sessionEpoch,screen:state.screen,transitioning,navigationBusy,saveState:$('saveState')?.dataset?.state||null,transition:globalThis.__RV_LAST_TRANSITION||null,render:viewer?.diagnostics?.()}),cacheStats,meshBytes,resetSession,state,active,generate,loadImage,loadSvg,project,traceSource,applyProject,commitImport,exportData,measurements,primaryDimension,selectObject,toggleIsolation,flush,catalog,newProject,editor,viewer,request,wait:async()=>{for(let i=0;i<1200;i++){await new Promise(r=>setTimeout(r,50));if(state.objects.length&&!running&&state.objects.filter(o=>o.visible).every(o=>!generatable(o)||o.result&&(o.result.released||o.cacheKey===keyFor(o))))return state.objects.map(o=>o.result);const bad=state.objects.find(o=>o.visible&&hasManufacturingFeature(o)&&o.error);if(!running&&bad)throw Error(bad.error);}throw Error('Tempo de geração excedido');}};
 start();
