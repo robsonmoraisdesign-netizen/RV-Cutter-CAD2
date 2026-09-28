@@ -106,7 +106,9 @@ async function cdp(url){
   assert.equal(await evalv("RVTest.state.screen"),'studio');
 
   await evalv("document.querySelector('#homeBtn').click();true");await waitFor(()=>evalv("document.querySelector('#leaveProjectDialog').open"));
-  await evalv("document.querySelector('#leaveSave').click();true");await waitFor(()=>evalv("RVTest.state.screen==='home'"),90000);
+  await evalv("document.querySelector('#leaveSave').click();true");
+  try{await waitFor(()=>evalv("RVTest.state.screen==='home'"),8000);}
+  catch(e){console.log('Save/close diagnostics',JSON.stringify(await evalv("RVTest.diagnostics()")));throw e;}
   assert.equal(await evalv("RVTest.state.objects.length"),0);
   assert.equal(await evalv("RVTest.diagnostics().worker"),false);
   assert(await evalv("RVTest.catalog().then(x=>x.length>=1)"),'Saved project must exist in the library');
