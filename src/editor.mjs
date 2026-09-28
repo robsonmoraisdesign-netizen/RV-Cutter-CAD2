@@ -20,6 +20,24 @@ export function createEditor(svg,api){
  const lineAngle=e=>Math.atan2(e.end[1]-e.start[1],e.end[0]-e.start[0]);
  const lineMid=e=>[(e.start[0]+e.end[0])/2,(e.start[1]+e.end[1])/2];
  const pointSegmentDistance=(p,e)=>{const dx=e.end[0]-e.start[0],dy=e.end[1]-e.start[1],q=dx*dx+dy*dy||1,t=Math.max(0,Math.min(1,((p[0]-e.start[0])*dx+(p[1]-e.start[1])*dy)/q)),x=e.start[0]+dx*t,y=e.start[1]+dy*t;return Math.hypot(p[0]-x,p[1]-y);};
+ const pointPolylineDistance=(p,pts)=>{let best=Infinity;for(let i=0;i<pts.length-1;i++)best=Math.min(best,pointSegmentDistance(p,{start:pts[i],end:pts[i+1]}));return best;};
+ const entityDistance=(p,e)=>{
+  if(e.type==='point')return Math.hypot(p[0]-e.position[0],p[1]-e.position[1]);
+  if(e.type==='line')return pointSegmentDistance(p,e);
+  if(e.type==='circle')return Math.abs(Math.hypot(p[0]-e.center[0],p[1]-e.center[1])-e.radius);
+  if(e.type==='bezier')return pointPolylineDistance(p,Array.from({length:49},(_,i)=>bezierPoint(e.points,i/48)));
+  if(e.type==='arc'){
+   let sweep=((e.endAngle-e.startAngle)%(2*Math.PI)+2*Math.PI)%(2*Math.PI);sweep=e.ccw?(sweep||2*Math.PI):(sweep?sweep-2*Math.PI:-2*Math.PI);
+   return pointPolylineDistance(p,Array.from({length:49},(_,i)=>[e.center[0]+Math.cos(e.startAngle+sweep*i/48)*e.radius,e.center[1]+Math.sin(e.startAngle+sweep*i/48)*e.radius]));
+  }
+  return Infinity;
+ };
+ const pickEntity=(q,pixels=8)=>{
+  const o=api.object(),doc=sketch.native(),rect=svg.getBoundingClientRect();if(!o||!doc?.entities?.length||!rect.width||!rect.height)return null;
+  const p=nativePoint(q),mmPerPx=o.params.size*Math.max(view[2]/rect.width,view[3]/rect.height),limit=Math.max(.05,mmPerPx*pixels);let best=null,bestD=limit;
+  for(const e of doc.entities){const d=entityDistance(p,e);if(d<bestD){bestD=d;best=e;}}
+  return best?.id||null;
+ };
 
  function contourMode(){if(api.object()?.sketch?.entities.length){api.status('Para editar contornos derivados, use Converter em contornos. O Sketch paramétrico permanece editável.');return false;}return true;}
  function snapLine(start,end){
@@ -282,7 +300,7 @@ export function createEditor(svg,api){
  if($('showSketchConstraints'))$('showSketchConstraints').onchange=render;
 
  svg.onpointerdown=e=>{
-  const o=api.object();if(!o)return;svg.setPointerCapture(e.pointerId);const q=point(e),n=e.target.dataset.node,l=e.target.dataset.loop,entity=e.target.dataset.entity;
+  const o=api.object();if(!o)return;svg.setPointerCapture(e.pointerId);const q=point(e),n=e.target.dataset.node,l=e.target.dataset.loop;let entity=e.target.dataset.entity;if(['select','trim','extend','dimension'].includes(tool))entity=pickEntity(q,8)||entity;
   if(e.button===1||e.button===2){drag={kind:'pan',x:e.clientX,y:e.clientY,view:[...view]};return;}
   if(e.target.dataset.dimensionEntity){openInlineDimension(e.target.dataset.dimensionEntity,e.clientX,e.clientY);return;}
   if(entity&&tool==='trim'){
@@ -321,8 +339,7 @@ export function createEditor(svg,api){
  };
  svg.onpointermove=e=>{
   const o=api.object();if(!o)return;
-  hoveredEntity=e.target?.dataset?.entity||null;
-  const q=point(e);
+  const q=point(e);hoveredEntity=['select','trim','extend','dimension'].includes(tool)?(pickEntity(q,8)||e.target?.dataset?.entity||null):(e.target?.dataset?.entity||null);
   if(!drag){if(tool==='bezier'&&bezierClicks.length){const raw=nativePoint(q),snap=e.shiftKey?{point:raw,relation:null}:snapNative(raw,sketch.native());bezierHover={point:snap.point,relation:snap.relation};inference=snap.relation?{...snap,point:snap.point,type:snap.relation.type}:null;}render();return;}
   if(drag.kind==='primitive'){updatePrimitiveDraft(q,{suppress:e.shiftKey||drag.suppress});render();return;}
   if(drag.kind==='trim-sweep'){
