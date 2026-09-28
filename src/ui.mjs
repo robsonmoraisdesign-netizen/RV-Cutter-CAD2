@@ -91,13 +91,18 @@ function destroyCurrentProject(){
  isolatedId=null;hoveredObjectId=null;expandedObjects.clear();editor?.reset();$('layers').replaceChildren();$('busy').hidden=true;closeDimensionEditor();lastSavedSignature=null;
 }
 async function closeCurrentProject(){
- return resolveProjectTransition({
-  active:state.screen==='studio'&&!!state.id,
-  prompt:askLeaveProject,
-  save:async()=>{updateHomePreview();return flush();},
-  discard:clearRecovery,
-  close:async()=>{destroyCurrentProject();}
- });
+ const trace={startedAt:Date.now(),choice:null,preview:false,saveStarted:false,saveFinished:false,saveOk:null,closeStarted:false,closeFinished:false,error:null};
+ globalThis.__RV_LAST_TRANSITION=trace;
+ try{
+  const result=await resolveProjectTransition({
+   active:state.screen==='studio'&&!!state.id,
+   prompt:async()=>{const choice=await askLeaveProject();trace.choice=choice;return choice;},
+   save:async()=>{trace.preview=true;updateHomePreview();trace.saveStarted=true;const ok=await flush();trace.saveFinished=true;trace.saveOk=ok;return ok;},
+   discard:clearRecovery,
+   close:async()=>{trace.closeStarted=true;destroyCurrentProject();trace.closeFinished=true;}
+  });
+  trace.result=result;trace.finishedAt=Date.now();return result;
+ }catch(e){trace.error=e?.stack||e?.message||String(e);trace.finishedAt=Date.now();throw e;}
 }
 function thumbnail(loop){const c=document.createElement('canvas');c.width=300;c.height=160;const ctx=c.getContext('2d');ctx.fillStyle='#eaf0f8';ctx.fillRect(0,0,300,160);if(loop?.length){ctx.beginPath();loop.forEach(([x,y],i)=>ctx[i?'lineTo':'moveTo'](150+x*130,80-y*130));ctx.closePath();ctx.fillStyle='#a6c5e9';ctx.fill();ctx.strokeStyle='#446a97';ctx.lineWidth=2;ctx.stroke();}return c.toDataURL('image/png')}
 function bytesDataUrl(bytes){let binary='';const step=0x8000;for(let i=0;i<bytes.length;i+=step)binary+=String.fromCharCode(...bytes.subarray(i,i+step));return 'data:image/png;base64,'+btoa(binary);}
@@ -359,5 +364,5 @@ let appearanceFrame=0;function refreshAppearance(){if(appearanceFrame)return;app
   };
 
 async function start(){sync();await loadPresets();await showHome();}
-window.RVTest={setStage,enterSketch,finishSketch,createNewSketch,convertToCutter,enforceBudget,refreshView,showHome,closeCurrentProject,askLeaveProject,destroyCurrentProject,projectSignature,markCurrentSaved,setParam,savePreset,applyPreset,presetRows,renameStored,deleteStored,diagnostics:()=>({worker:!!worker,pending:pending.size,queued:pendingBuildIds.size,running,sessionEpoch,screen:state.screen,render:viewer?.diagnostics?.()}),cacheStats,meshBytes,resetSession,state,active,generate,loadImage,loadSvg,project,traceSource,applyProject,commitImport,exportData,measurements,primaryDimension,selectObject,toggleIsolation,flush,catalog,newProject,editor,viewer,request,wait:async()=>{for(let i=0;i<1200;i++){await new Promise(r=>setTimeout(r,50));if(state.objects.length&&!running&&state.objects.filter(o=>o.visible).every(o=>!generatable(o)||o.result&&(o.result.released||o.cacheKey===keyFor(o))))return state.objects.map(o=>o.result);const bad=state.objects.find(o=>o.visible&&hasManufacturingFeature(o)&&o.error);if(!running&&bad)throw Error(bad.error);}throw Error('Tempo de geração excedido');}};
+window.RVTest={setStage,enterSketch,finishSketch,createNewSketch,convertToCutter,enforceBudget,refreshView,showHome,closeCurrentProject,askLeaveProject,destroyCurrentProject,projectSignature,markCurrentSaved,setParam,savePreset,applyPreset,presetRows,renameStored,deleteStored,diagnostics:()=>({worker:!!worker,pending:pending.size,queued:pendingBuildIds.size,running,sessionEpoch,screen:state.screen,transitioning,saveState:$('saveState')?.dataset?.state||null,transition:globalThis.__RV_LAST_TRANSITION||null,render:viewer?.diagnostics?.()}),cacheStats,meshBytes,resetSession,state,active,generate,loadImage,loadSvg,project,traceSource,applyProject,commitImport,exportData,measurements,primaryDimension,selectObject,toggleIsolation,flush,catalog,newProject,editor,viewer,request,wait:async()=>{for(let i=0;i<1200;i++){await new Promise(r=>setTimeout(r,50));if(state.objects.length&&!running&&state.objects.filter(o=>o.visible).every(o=>!generatable(o)||o.result&&(o.result.released||o.cacheKey===keyFor(o))))return state.objects.map(o=>o.result);const bad=state.objects.find(o=>o.visible&&hasManufacturingFeature(o)&&o.error);if(!running&&bad)throw Error(bad.error);}throw Error('Tempo de geração excedido');}};
 start();
