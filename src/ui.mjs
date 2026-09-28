@@ -87,7 +87,7 @@ function askLeaveProject(){
 async function clearRecovery(){try{await window.desktop?.clearRecovery?.();}catch(e){console.warn('Não foi possível limpar a recuperação:',e);}}
 function destroyCurrentProject(){
  resetSession();
- Object.assign(state,{id:null,name:'',source:null,objects:[],activeId:null,history:[],future:[],homePreview:null});
+ Object.assign(state,{id:null,name:'',source:null,objects:[],activeId:null,editingSketchId:null,history:[],future:[],homePreview:null});
  isolatedId=null;hoveredObjectId=null;expandedObjects.clear();editor?.reset();$('layers').replaceChildren();$('busy').hidden=true;closeDimensionEditor();lastSavedSignature=null;
 }
 async function closeCurrentProject(){
@@ -117,7 +117,7 @@ async function showHome(page=0){
     const card=document.createElement('button');card.className='recent-card';
     const img=new Image();img.loading='lazy';img.decoding='async';img.src=item.previewImage||thumbnail(item.preview);img.alt=item.previewImage?'Prévia 3D do projeto':'Prévia do projeto';
     const title=document.createElement('strong');title.textContent=item.name;
-    const sub=document.createElement('small');sub.textContent=`${item.count} objeto(s) · ${new Date(item.updatedAt).toLocaleString('pt-BR')}`;
+    const sub=document.createElement('small');sub.textContent=`${item.count} Sketch(es) · ${new Date(item.updatedAt).toLocaleString('pt-BR')}`;
     card.append(img,title,sub);
     card.onclick=async()=>{if(transitioning)return;transitioning=true;try{const data=await getStored(item.id);applyProject(data);state.history=[];state.future=[];enterStudio();markCurrentSaved();generate();}catch(e){status(e.message)}finally{transitioning=false;}};
     const actions=document.createElement('div');actions.className='project-actions';
@@ -194,7 +194,7 @@ for(const [number,range]of [['lineDelta','lineDeltaRange'],['offsetAmount','offs
 let generation=0,running=false,timer,sessionEpoch=0;const pendingBuildIds=new Set();
 const featureParams=o=>cutterFeature(o)?.params||o.params;const generatable=o=>hasManufacturingFeature(o)&&Array.isArray(o.loops)&&o.loops.length>0;const keyFor=o=>JSON.stringify([o.contourVersion||0,cutterFeature(o)?.id||null,featureParams(o)]);
 const builds=new WeakMap(),sourceRecords=new WeakMap();let cacheWrites=Promise.resolve();
-function resetSession(){clearTimeout(saveTimer);cancelAnimationFrame(appearanceFrame);appearanceFrame=0;importJob=null;$('importCandidates').replaceChildren();$('importDialog').close();lastSavedSignature=null;importRevision++;sessionEpoch++;generation++;clearTimeout(timer);pendingBuildIds.clear();running=false;worker?.terminate();worker=null;for(const p of pending.values())p.reject(Object.assign(Error('Operação cancelada ao trocar de projeto.'),{name:'AbortError'}));pending.clear();viewer?.clear();wasEmpty=true;lastLayout='';}
+function resetSession(){clearTimeout(saveTimer);cancelAnimationFrame(appearanceFrame);appearanceFrame=0;importJob=null;$('importCandidates').replaceChildren();$('importDialog').close();lastSavedSignature=null;importRevision++;sessionEpoch++;generation++;clearTimeout(timer);pendingBuildIds.clear();running=false;worker?.terminate();worker=null;for(const p of pending.values())p.reject(Object.assign(Error('Operação cancelada ao trocar de projeto.'),{name:'AbortError'}));pending.clear();state.editingSketchId=null;document.body.classList.remove('sketching','presenting');if($('editor'))$('editor').hidden=true;if($('editTools'))$('editTools').hidden=true;if($('sketchInspector'))$('sketchInspector').hidden=true;if($('finishSketch'))$('finishSketch').hidden=true;viewer?.clear();wasEmpty=true;lastLayout='';}
 async function ensure(o){if(!hasManufacturingFeature(o))throw Error('Este Sketch ainda não possui uma função 3D. Use “Converter em cortador”.');if(!o.loops.length)throw Error('Feche um perfil no Sketch antes de gerar ou exportar.');syncRuntimeParams(o);const key=keyFor(o),epoch=sessionEpoch;if(o.result&&o.cacheKey===key)return o.result;const old=builds.get(o);if(old?.key===key&&old.epoch===epoch)return old.promise;
  const promise=(async()=>{let source=sourceRecords.get(o);if(!source||source.loops!==o.loops||source.revision!==(o.contourVersion||0)){source={loops:o.loops,revision:o.contourVersion||0,hash:await digest(JSON.stringify(o.loops))};sourceRecords.set(o,source);}const params=structuredClone(featureParams(o)),cacheKey=await digest(ENGINE_VERSION+source.hash+JSON.stringify(params));
  const current=()=>epoch===sessionEpoch&&state.objects.includes(o)&&key===keyFor(o);
