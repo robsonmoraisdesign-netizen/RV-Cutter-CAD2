@@ -54,9 +54,11 @@ async function cdp(url){
   assert.equal(await evalv("RVTest.active().features.length"),0,'New Sketch must not auto-create a cutter feature');
 
   await evalv("document.querySelector('[data-tool=\"circle\"]').click(); true");
-  const box=await evalv("(()=>{const e=document.querySelector('#editor'),r=e.getBoundingClientRect(),v=document.querySelector('#viewport').getBoundingClientRect(),w=document.querySelector('.workspace').getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,viewport:{w:v.width,h:v.height},workspace:{w:w.width,h:w.height},hidden:e.hidden,display:getComputedStyle(e).display}})()");
+  const box=await evalv("(()=>{const e=document.querySelector('#editor'),r=e.getBoundingClientRect(),v=document.querySelector('#viewport').getBoundingClientRect(),w=document.querySelector('.workspace').getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,right:r.right,viewport:{x:v.x,w:v.width,h:v.height,right:v.right},workspace:{x:w.x,w:w.width,h:w.height,right:w.right},hidden:e.hidden,display:getComputedStyle(e).display}})()");
   console.log('Sketch viewport diagnostics',JSON.stringify(box));
   assert(box.w>300&&box.h>200,'Sketch canvas must be visible: '+JSON.stringify(box));
+  assert(box.viewport.right<=box.workspace.right+1,'Sketch viewport must stay inside workspace and not cover the inspector: '+JSON.stringify(box));
+  assert(box.right<=box.workspace.right+1,'Sketch canvas must stay inside workspace and not cover the inspector: '+JSON.stringify(box));
   const x=box.x+box.w*.48,y=box.y+box.h*.48;
   await send('Input.dispatchMouseEvent',{type:'mouseMoved',x,y,button:'none'});
   await send('Input.dispatchMouseEvent',{type:'mousePressed',x,y,button:'left',clickCount:1});
@@ -102,7 +104,8 @@ async function cdp(url){
   await evalv("RVTest.finishSketch(true);true");
 
   await evalv("document.querySelector('#homeBtn').click();true");await waitFor(()=>evalv("document.querySelector('#leaveProjectDialog').open"));
-  await evalv("document.querySelector('#leaveCancel').click();true");await waitFor(()=>evalv("!document.querySelector('#leaveProjectDialog').open"));
+  await evalv("document.querySelector('#leaveCancel').click();true");
+  await waitFor(()=>evalv("!document.querySelector('#leaveProjectDialog').open && !RVTest.diagnostics().navigationBusy"));
   assert.equal(await evalv("RVTest.state.screen"),'studio');
 
   await evalv("document.querySelector('#homeBtn').click();true");await waitFor(()=>evalv("document.querySelector('#leaveProjectDialog').open"));
