@@ -229,3 +229,7 @@ body.sketching #three{display:block!important}
 .feature-tree .layer-child.body{padding-left:20px;color:var(--v4-muted)}
 .tree-child-label{min-width:0;flex:1;border:0!important;background:transparent!important;color:inherit!important;text-align:left;padding:4px 2px!important;font-size:8px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tree-child-label:hover{color:var(--v4-text)!important}
+
+.feature-prompt{margin:11px 12px!important;padding:12px;border:1px dashed color-mix(in srgb,var(--v4-brand) 42%,var(--v4-line));border-radius:8px;background:var(--v4-brandSoft)}
+.feature-prompt strong{display:block;font-size:10px;color:var(--v4-text);margin:4px 0 6px}
+.feature-prompt p{margin:0;font-size:8px;line-height:1.55;color:var(--v4-muted)}
