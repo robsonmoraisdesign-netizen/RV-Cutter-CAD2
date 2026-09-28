@@ -6,8 +6,8 @@
   </button>
   <nav class="workspace-nav" aria-label="Workspaces">
     <button id="tabHome" class="workspace-tab active">Início</button>
-    <button id="tab3d" class="workspace-tab">3D</button>
-    <button id="tab2d" class="workspace-tab">Sketch 2D</button>
+    <button id="tab3d" class="workspace-tab">Modelo</button>
+    <button id="tab2d" class="workspace-tab" hidden aria-hidden="true">Sketch 2D</button>
     <button id="tabPresentation" class="workspace-tab">Apresentação</button>
   </nav>
   <div class="top-actions v4-actions">
@@ -22,13 +22,13 @@
 <section id="home" class="home-v4">
   <div class="home-v4-inner">
     <div class="library-hero">
-      <div><span class="eyebrow">WORKSPACE</span><h1>Biblioteca de projetos</h1><p>Projetos organizados por categoria. Cortador e carimbo são modos do mesmo projeto.</p></div>
+      <div><span class="eyebrow">WORKSPACE</span><h1>Biblioteca de projetos</h1><p>Um projeto pode reunir vários Sketches, funções e corpos 3D no mesmo espaço de trabalho.</p></div>
       <div class="library-hero-actions"><button id="openHome" class="secondary">Importar .rvcad</button><button class="primary big-action" id="newProject">+ Novo projeto</button></div>
     </div>
     <section class="library-section">
       <div class="library-section-head"><div><h2>Tipo de projeto</h2><p>Comece pelo tipo de trabalho. Novas categorias entram sem alterar o fluxo atual.</p></div></div>
       <div class="project-types">
-        <button class="project-type-card active-type" id="newCutterProject"><span class="type-icon">◯</span><strong>Cortadores &amp; carimbos</strong><span>Crie cortadores, carimbos ou ambos dentro do mesmo arquivo.</span></button>
+        <button class="project-type-card active-type" id="newCutterProject"><span class="type-icon">⌁</span><strong>Projeto paramétrico</strong><span>Crie Sketches e aplique funções como Cortador de biscoito sem sair do mesmo workspace.</span></button>
         <button class="project-type-card disabled-type" disabled><span class="coming-soon">EM BREVE</span><span class="type-icon">T</span><strong>Letras</strong><span>Projetos tipográficos e letras 3D.</span></button>
         <button class="project-type-card disabled-type" disabled><span class="coming-soon">EM BREVE</span><span class="type-icon">▣</span><strong>Caixas</strong><span>Caixas paramétricas, tampas e organizadores.</span></button>
       </div>
@@ -52,24 +52,25 @@
 </aside>
 <aside class="left project-drawer-v4">
   <div class="drawer-v4-head"><div class="drawer-title-edit"><span class="section-eyebrow">ESTRUTURA DO PROJETO</span><div class="project-title-row"><input id="name" aria-label="Nome do projeto" value="Novo projeto"><button id="renameProject" class="icon-button" title="Renomear projeto" aria-label="Renomear projeto">✎</button></div></div><span id="drawerSelectionCount" class="count-badge">1 selecionado</span></div>
-  <div class="scope-v4"><span>ESCOPO DE EDIÇÃO</span><div class="scope-v4-buttons"><button data-scope-choice="active" class="active">Objeto</button><button data-scope-choice="selection" disabled title="Multisseleção 3D será ativada na fase correspondente">Seleção</button><button data-scope-choice="all">Todos</button></div></div>
-  <div class="sidebar-heading legacy-sidebar-heading"><div><span class="section-eyebrow">PROJETO</span><h2>Objetos</h2></div><span id="objectCount" class="count-badge">0 objetos</span></div>
-  <button id="import" class="import"><span class="import-plus">+</span><span><strong>Adicionar desenho</strong><small>PNG, JPG, WebP ou SVG preenchido</small></span></button>
+  <div class="scope-v4"><span>ESCOPO DE EDIÇÃO</span><div class="scope-v4-buttons"><button data-scope-choice="active" class="active">Função</button><button data-scope-choice="selection" disabled title="Multisseleção 3D será ativada na fase correspondente">Seleção</button><button data-scope-choice="all">Todos</button></div></div>
+  <div class="sidebar-heading legacy-sidebar-heading"><div><span class="section-eyebrow">PROJETO</span><h2>Árvore</h2></div><span id="objectCount" class="count-badge">0 Sketches</span></div>
+  <div class="feature-primary-actions"><button id="newSketch" class="feature-action"><span>＋</span><strong>Novo Sketch</strong></button><button id="convertCutter" class="feature-action accent"><span>◆</span><strong>Converter em cortador</strong></button></div>
+  <button id="import" class="import"><span class="import-plus">+</span><span><strong>Importar arte como Sketch</strong><small>PNG, JPG, WebP ou SVG preenchido</small></span></button>
   <input type="file" id="artFile" accept="image/png,image/jpeg,image/webp,.svg" hidden>
   <details class="sample-drawer"><summary>Usar um exemplo</summary><div class="samples"><button id="pig">Porquinho</button><button id="cow">Vaquinha</button></div></details>
-  <div class="object-search-wrap"><span>⌕</span><input id="objectSearch" type="search" placeholder="Buscar objetos" aria-label="Buscar objetos"></div>
+  <div class="object-search-wrap"><span>⌕</span><input id="objectSearch" type="search" placeholder="Buscar Sketch ou função" aria-label="Buscar Sketch ou função"></div>
   <button id="isolationBanner" class="isolation-banner" hidden></button>
   <div id="layers"></div>
   <div class="layer-actions"><button id="showAll">Mostrar todas</button><button id="hideOthers">Isolar atual</button></div>
   <button id="removeObject" class="danger-quiet">Remover selecionado</button>
   <div class="left-spacer"></div>
-  <p class="hint sidebar-hint">Selecione um objeto para configurar. Ocultar e isolar são instantâneos: a câmera e a posição dos objetos permanecem no lugar.</p>
+  <p class="hint sidebar-hint">Duplo clique em um Sketch para editá-lo. Expanda a árvore para ver funções e corpos gerados.</p>
   <button id="help" class="help-button">? &nbsp; Biblioteca de projetos</button>
 </aside>
 <section class="workspace">
   <div class="toolbar">
     <div class="workspace-context-title"><span id="workspaceKicker">MODELO</span><strong id="workspaceTitle">Modelo 3D</strong></div>
-    <div class="view-actions"><button id="undo" class="icon-button" title="Desfazer (Ctrl+Z)">↶</button><button id="redo" class="icon-button" title="Refazer (Ctrl+Y)">↷</button><span class="toolbar-divider"></span><button id="fit">Enquadrar</button><button id="top">Superior</button><button id="iso">Perspectiva</button>
+    <div class="view-actions"><button id="finishSketch" class="finish-sketch" hidden>✓ Finalizar Sketch</button><button id="undo" class="icon-button" title="Desfazer (Ctrl+Z)">↶</button><button id="redo" class="icon-button" title="Refazer (Ctrl+Y)">↷</button><span class="toolbar-divider"></span><button id="fit">Enquadrar</button><button id="top">Superior</button><button id="iso">Perspectiva</button>
       <details class="visual-menu"><summary>Visual <span>⌄</span></summary><div class="visual-popover"><div class="popover-title"><strong>Visualização</strong><small>Apenas aparência do modelo</small></div>
         <label class="field">Organização<select id="arrangement"><option value="spread">Lado a lado</option><option value="nested">Centralizados / encaixados</option></select></label>
         <label class="field">Material visual<select id="material"><option value="pla">PLA normal</option><option value="matte">PLA fosco</option><option value="silk">PLA silk</option></select></label>
@@ -136,7 +137,8 @@
   <footer><span id="status" role="status">Pronto</span><div id="validation" class="validation">Importe uma arte.</div><span id="meshStats"></span></footer>
 </section>
 <aside class="right">
-  <div class="config-heading"><div><span class="section-eyebrow">PROPRIEDADES</span><h2 id="rightTitle">Configurar peça</h2></div><span id="activeObject" class="active-object">nenhum objeto</span></div>
+  <div class="config-heading"><div><span class="section-eyebrow">PROPRIEDADES</span><h2 id="rightTitle">Configurar função</h2></div><span id="activeObject" class="active-object">nenhum objeto</span></div>
+  <section id="featurePrompt" class="feature-prompt" hidden><span class="section-eyebrow">SKETCH SELECIONADO</span><strong>Sem função 3D</strong><p>Este Sketch contém apenas a geometria 2D. Use <b>Converter em cortador</b> na árvore do projeto para aplicar a função paramétrica.</p></section>
   <section id="objectMetrics" class="object-metrics" hidden><div class="metrics-head"><div><span class="mini-label">DIMENSÕES FINAIS</span><strong>Geometria gerada</strong></div><span class="metrics-precision">0,01 mm</span></div><div id="metricRows"></div><div class="object-quick-actions"><button id="focusActive">Enquadrar</button><button id="isolateActive">Isolar</button><button id="visibilityActive">Mostrar / ocultar</button></div><p class="metrics-hint">Clique em largura, profundidade ou em uma cota com ✎ para editar. O RV ajusta o parâmetro existente e mede novamente a geometria final.</p></section>
   <section id="sketchInspector" class="sketch-inspector" hidden>
     <div class="sketch-inspector-head"><div><span class="section-eyebrow">SKETCH 2D</span><h2 id="sketchSelectionTitle">Nada selecionado</h2></div><span class="inspector-badge">mm</span></div>
@@ -176,8 +178,8 @@
   <div class="palette-search"><span>⌕</span><input id="commandSearch" placeholder="Buscar ferramenta, parâmetro ou ação…"><kbd>Esc</kbd></div>
   <div id="commandResults" class="command-results">
     <button data-command="home"><span>Ir para Biblioteca</span><small>Workspace</small></button>
-    <button data-command="3d"><span>Abrir 3D</span><small>Workspace</small></button>
-    <button data-command="2d"><span>Abrir Sketch 2D</span><small>Workspace</small></button>
+    <button data-command="3d"><span>Voltar ao Modelo</span><small>Workspace</small></button>
+    <button data-command="2d"><span>Editar Sketch selecionado</span><small>Contexto</small></button>
     <button data-command="presentation"><span>Abrir Apresentação</span><small>Workspace</small></button>
     <button data-command="new"><span>Novo projeto</span><small>Projeto</small></button>
     <button data-command="save"><span>Salvar projeto</span><small>Projeto</small></button>
@@ -191,7 +193,7 @@
   <div class="leave-dialog-actions"><button id="leaveCancel">Cancelar</button><button id="leaveDiscard">Não salvar</button><button id="leaveSave" class="primary">Salvar</button></div>
 </dialog>
 <input type="file" id="projectFile" accept=".rvcad,.json" hidden>
-<dialog id="importDialog"><h2>Objetos encontrados</h2><p>Marque as figuras que devem virar cortadores. Letras e pequenos fragmentos podem ser desmarcados.</p><div id="importCandidates"></div><label class="check"><input type="checkbox" id="appendObjects">Adicionar ao projeto atual</label><div class="dialog-actions"><button id="cancelImport">Cancelar</button><button id="confirmImport" class="primary">Criar objetos selecionados</button></div></dialog>
+<dialog id="importDialog"><h2>Sketches encontrados</h2><p>Marque as figuras que devem entrar no projeto. Cada figura selecionada vira um Sketch independente; nenhuma função 3D é aplicada automaticamente.</p><div id="importCandidates"></div><label class="check"><input type="checkbox" id="appendObjects">Adicionar ao projeto atual</label><div class="dialog-actions"><button id="cancelImport">Cancelar</button><button id="confirmImport" class="primary">Criar Sketches selecionados</button></div></dialog>
 <dialog id="exportDialog"><h2>Exportar em lote</h2><p>STL em milímetros. Cortador e carimbo do mesmo objeto mantêm o mesmo centro XY. Em lotes, cada objeto é organizado sem perder o alinhamento entre suas peças.</p><label class="check"><input type="checkbox" id="exportVisible" checked>Somente objetos visíveis</label><label class="field">Organização<select id="exportMode"><option value="all">Tudo em um único STL</option><option value="object">Um STL por objeto (cortador + carimbo juntos)</option><option value="part">Um STL por peça (cortadores e carimbos separados)</option></select></label><div id="exportSummary"></div><div class="dialog-actions"><button id="closeExport">Cancelar</button><button id="confirmExport" class="primary">Exportar</button></div><p class="hint">“Juntos” mantém cortador e carimbo coincidentes no mesmo centro. Em arquivos separados, ambos preservam a mesma origem para reabrirem perfeitamente alinhados. STL não guarda cores.</p></dialog>
 <dialog id="helpDialog"><h2>Como trabalhar</h2><p>Importe uma arte preta sobre branco. Figuras com contornos externos independentes são detectadas como objetos. Revise a seleção para descartar letras e fragmentos.</p><p>No 2D: selecione e arraste pontos; duplo clique insere um ponto e Delete remove. Desenhar e Linha adicionam traços; Borracha apaga trechos. Selecionar região limita o ajuste de espessura. Offset altera o contorno selecionado.</p><p><strong>Medir:</strong> pressione M ou use o botão Medir. Clique em duas faces/pontos para obter ΔX, ΔY, ΔZ, distâncias projetadas XY/XZ/YZ, distância linear 3D e ângulo entre faces. A ferramenta apenas lê a malha exibida e não recalcula a geometria.</p><p>Na lista de objetos, clique no nome ou diretamente no modelo 3D para selecionar. O olho mostra/oculta; Isolar é temporário e não altera o conteúdo do projeto. Duplo clique ou F enquadra o objeto. As cotas com ✎ podem ser clicadas e editadas; o RV usa os parâmetros já existentes e mede novamente a geometria final.</p><p>Maior lado mede a arte. Lâmina e apoio aumentam as dimensões externas. Altura total inclui a base do cortador. Chanfro é medido verticalmente a partir da ponta. Espessura final é a distância nominal da ponta à face interna vertical.</p><p>Expansão da base projeta uma borda para fora do carimbo, em milímetros por lado, sem engrossar o relevo. No modo Cortador + carimbo, a lâmina e a base de apoio do cortador crescem junto pelo mesmo valor, preservando a folga existente entre as peças. Em Carimbo, apenas a base do carimbo é expandida. Expansão e recuo se compensam na base. Recuo da base elimina a sobra lateral do carimbo; remover borda externa retira o traço periférico do relevo. A altura da base do carimbo é independente no modo separado. No integrado existe uma base comum.</p><p>Centralizados mostra as peças no mesmo centro XY. O STL de lote sempre organiza os sólidos lado a lado para impressão. As cores, materiais e linhas de camada são visuais e não configuram filamentos nem geram G-code.</p><p>Os projetos recentes são cópias locais automáticas. Salve também um .rvcad para transportar ou guardar uma cópia. Projetos da versão 12 podem ser abertos.</p><button id="closeHelp" class="primary">Entendi</button></dialog>
 <script src="ui.js" defer></script><script src="layout-v14.js" defer></script><script src="measure-tool.js" defer></script><dialog id="renameDialog"><h2>Nome do projeto</h2><label class="field">Nome do arquivo e do histórico<input id="renameValue" maxlength="120"></label><div class="dialog-actions"><button id="cancelRename">Cancelar</button><button id="confirmRename" class="primary">Salvar nome</button></div></dialog><dialog id="nameDialog"><form method="dialog"><h3 id="nameDialogTitle">Nome</h3><input id="entryName" maxlength="160" required autocomplete="off"><div><button value="cancel" formnovalidate>Cancelar</button><button value="ok">Salvar</button></div></form></dialog></body></html>

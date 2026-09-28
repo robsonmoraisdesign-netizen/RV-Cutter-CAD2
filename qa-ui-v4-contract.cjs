@@ -11,12 +11,15 @@ for(const token of [
   'id="tabPresentation"',
   'id="cmdBtn"',
   'Biblioteca de projetos',
-  'Cortadores &amp; carimbos',
+  'Projeto paramétrico',
   'class="tool-rail-v4"',
   'class="left project-drawer-v4"',
   'class="studio-v4"',
   'class="workspace-nav"',
-  'id="commandPalette"'
+  'id="commandPalette"',
+  'id="newSketch"',
+  'id="convertCutter"',
+  'id="finishSketch"'
 ]) assert(html.includes(token),'Missing v4 shell contract: '+token);
 
 assert(!html.includes('<div class="tabs"><button id="tab3d"'),'Legacy local workspace tabs must not return.');
@@ -25,4 +28,7 @@ assert(css.includes('grid-template-columns:var(--v4-rail) var(--v4-drawer) minma
 assert(ui.includes("openCommandPalette"),'Command palette wiring missing.');
 assert(ui.includes("document.body.classList.toggle('drawer-collapsed')"),'Project drawer collapse wiring missing.');
 assert(ui.includes("$('projectLabel').textContent"),'Persistent project/library label sync missing.');
+assert(html.includes('id="tab2d" class="workspace-tab" hidden'),'Sketch must be contextual, not a separate visible workspace tab.');
+assert(ui.includes('function enterSketch(')&&ui.includes('function finishSketch('),'Unified Sketch editing lifecycle missing.');
+assert(ui.includes('featureTree(o)')&&ui.includes('convertToCutter'),'Sketch/Feature tree wiring missing.');
 console.log('Workspace System v4 contract: PASS');

@@ -44,16 +44,20 @@ async function cdp(url){
   await send('Page.navigate',{url:'http://127.0.0.1:8092/'});await waitFor(async()=>{const r=await send('Runtime.evaluate',{expression:'document.readyState==="complete" && !!window.RVTest',returnByValue:true});return r.result.value;},60000);
   const evalv=async expression=>(await send('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true})).result.value;
   assert(await evalv("document.querySelector('#home').classList.contains('home-v4')"),'V4 library must be active');
-  const homeShot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync('audit-home-14.26.png',Buffer.from(homeShot.data,'base64'));
+  const homeShot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync('audit-home-14.27.png',Buffer.from(homeShot.data,'base64'));
   await evalv("document.querySelector('#newProject').click(); true");
-  await waitFor(()=>evalv("RVTest.state.screen==='studio' && RVTest.state.stage==='2d'"));
-  assert(await evalv("!!document.querySelector('.onshape-ribbon')"),'Phase 2 active Sketch ribbon must be visible');
+  await waitFor(()=>evalv("RVTest.state.screen==='studio' && !!RVTest.state.editingSketchId"));
+  assert(await evalv("document.querySelector('#tab2d').hidden"),'Sketch must not be a separate visible workspace tab');
+  assert(await evalv("!document.querySelector('#three').hidden && !document.querySelector('#editor').hidden"),'Sketch must edit inside the same graphics workspace');
+  assert(await evalv("!!document.querySelector('.onshape-ribbon')"),'Contextual Sketch ribbon must be visible');
   assert(await evalv("!!document.querySelector('[data-tool=\"trim\"]') && !!document.querySelector('[data-tool=\"extend\"]') && !!document.querySelector('[data-tool=\"bezier\"]')"),'Phase 2 CAD tools must be present');
+  assert.equal(await evalv("RVTest.active().features.length"),0,'New Sketch must not auto-create a cutter feature');
+
   await evalv("document.querySelector('[data-tool=\"circle\"]').click(); true");
-  const box=await evalv("(()=>{const r=document.querySelector('#editor').getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height}})()");
-  assert(box.w>300&&box.h>200,'Sketch canvas must be visible');
+  const box=await evalv("(()=>{const e=document.querySelector('#editor'),r=e.getBoundingClientRect(),v=document.querySelector('#viewport').getBoundingClientRect(),w=document.querySelector('.workspace').getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,viewport:{w:v.width,h:v.height},workspace:{w:w.width,h:w.height},hidden:e.hidden,display:getComputedStyle(e).display}})()");
+  console.log('Sketch viewport diagnostics',JSON.stringify(box));
+  assert(box.w>300&&box.h>200,'Sketch canvas must be visible: '+JSON.stringify(box));
   const x=box.x+box.w*.48,y=box.y+box.h*.48;
-  // Onshape-style click sequence: center click, move, radius click.
   await send('Input.dispatchMouseEvent',{type:'mouseMoved',x,y,button:'none'});
   await send('Input.dispatchMouseEvent',{type:'mousePressed',x,y,button:'left',clickCount:1});
   await send('Input.dispatchMouseEvent',{type:'mouseReleased',x,y,button:'left',clickCount:1});
@@ -64,38 +68,57 @@ async function cdp(url){
   assert.equal(await evalv("RVTest.active().sketch.entities[0].type"),'circle');
   await evalv("(()=>{const i=document.querySelector('#sketchDimension');i.value='18';document.querySelector('#applySketchDimension').click();return true})()");
   await waitFor(()=>evalv("Math.abs(RVTest.active().params.size-36)<0.001"));
-  await evalv("RVTest.wait()");
+  assert.equal(await evalv("RVTest.active().result"),null,'Sketch alone must not generate 3D');
   assert(await evalv("document.querySelectorAll('.sketch-dimension').length>=1"),'Driving dimension must render on canvas');
-  assert(await evalv("document.querySelector('#sketchStatusChip').dataset.state.length>0"),'Sketch status must render');
-  assert(await evalv("document.querySelectorAll('.sketch-entity-hit').length>=1"),'CAD selection must use enlarged invisible hit targets');
-  await send('Input.dispatchKeyEvent',{type:'keyDown',key:'s',code:'KeyS',windowsVirtualKeyCode:83});
-  await send('Input.dispatchKeyEvent',{type:'keyUp',key:'s',code:'KeyS',windowsVirtualKeyCode:83});
-  await waitFor(()=>evalv("!document.querySelector('#sketchShortcutPalette').hidden"));
-  await evalv("document.querySelector('#sketchShortcutCommand').click();true");
-  const shot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync('audit-sketch-14.26.png',Buffer.from(shot.data,'base64'));
-  await evalv("document.querySelector('#tab3d').click();true");await waitFor(()=>evalv("RVTest.state.stage==='3d'"));
-  const shot3d=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync('audit-3d-14.26.png',Buffer.from(shot3d.data,'base64'));
+  assert(await evalv("document.querySelectorAll('.sketch-entity-hit').length>=1"),'Sketch selection must keep hit geometry');
+  const sketchShot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync('audit-sketch-14.27.png',Buffer.from(sketchShot.data,'base64'));
+
+  await evalv("document.querySelector('#finishSketch').click();true");await waitFor(()=>evalv("!RVTest.state.editingSketchId"));
+  await evalv("document.querySelector('#convertCutter').click();true");
+  await waitFor(()=>evalv("RVTest.active().features.some(f=>f.type==='cookie-cutter')"));
+  await evalv("RVTest.wait()");
+  await waitFor(()=>evalv("!!RVTest.active().result && RVTest.active().result.parts.length>0"));
+  await evalv("RVTest.setStage('3d');true");
+  await sleep(250);
+  const render3d=await evalv("RVTest.viewer.diagnostics()");
+  console.log('3D render diagnostics',JSON.stringify(render3d));
+  assert(render3d.host.width>300&&render3d.host.height>200,'3D host must have visible dimensions: '+JSON.stringify(render3d));
+  assert(render3d.canvas.cssWidth>300&&render3d.canvas.cssHeight>200,'WebGL canvas must fill the viewport');
+  assert(render3d.groups>=1&&render3d.visibleMeshes>=1,'3D scene must contain visible generated meshes');
+  assert(render3d.renderCalls>0,'Three.js renderer must execute draw calls');
+  assert(render3d.nonTransparentSamples>0,'3D framebuffer must contain rendered pixels');
+  const shot3d=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync('audit-3d-14.27.png',Buffer.from(shot3d.data,'base64'));
+
   await evalv("document.querySelector('#tabPresentation').click();true");await waitFor(()=>evalv("RVTest.state.stage==='presentation'"));
-  const shotPres=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync('audit-presentation-14.26.png',Buffer.from(shotPres.data,'base64'));
-  await evalv("document.querySelector('#tab2d').click();true");await waitFor(()=>evalv("RVTest.state.stage==='2d'"));
+  await sleep(250);
+  const renderPresentation=await evalv("RVTest.viewer.diagnostics()");
+  console.log('Presentation render diagnostics',JSON.stringify(renderPresentation));
+  assert(renderPresentation.groups>=1&&renderPresentation.visibleMeshes>=1,'Presentation scene must retain generated geometry: '+JSON.stringify(renderPresentation));
+  assert(renderPresentation.renderCalls>0,'Presentation must execute draw calls');
+  const shotPres=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync('audit-presentation-14.27.png',Buffer.from(shotPres.data,'base64'));
+
+  await evalv("RVTest.setStage('3d');RVTest.enterSketch();true");await waitFor(()=>evalv("!!RVTest.state.editingSketchId"));
+  assert(await evalv("!document.querySelector('#three').hidden && !document.querySelector('#editor').hidden"),'Re-entering Sketch must keep the unified graphics workspace');
+  await evalv("RVTest.finishSketch(true);true");
+
   await evalv("document.querySelector('#homeBtn').click();true");await waitFor(()=>evalv("document.querySelector('#leaveProjectDialog').open"));
   await evalv("document.querySelector('#leaveCancel').click();true");await waitFor(()=>evalv("!document.querySelector('#leaveProjectDialog').open"));
   assert.equal(await evalv("RVTest.state.screen"),'studio');
 
-  // SAVE: persist the current semantic Sketch, close every active resource, and show it in the library.
   await evalv("document.querySelector('#homeBtn').click();true");await waitFor(()=>evalv("document.querySelector('#leaveProjectDialog').open"));
-  await evalv("document.querySelector('#leaveSave').click();true");await waitFor(()=>evalv("RVTest.state.screen==='home'"));
+  await evalv("document.querySelector('#leaveSave').click();true");
+  try{await waitFor(()=>evalv("RVTest.state.screen==='home'"),8000);}
+  catch(e){console.log('Save/close diagnostics',JSON.stringify(await evalv("RVTest.diagnostics()")));throw e;}
   assert.equal(await evalv("RVTest.state.objects.length"),0);
   assert.equal(await evalv("RVTest.diagnostics().worker"),false);
   assert(await evalv("RVTest.catalog().then(x=>x.length>=1)"),'Saved project must exist in the library');
 
-  // Reopen from the library; this must create a fresh session and restore semantic entities.
   await waitFor(()=>evalv("document.querySelectorAll('.recent-card').length>=1"));
   await evalv("document.querySelector('.recent-card').click();true");await waitFor(()=>evalv("RVTest.state.screen==='studio'"));
   assert.equal(await evalv("RVTest.active().sketch.entities[0].type"),'circle');
+  assert.equal(await evalv("RVTest.active().features[0].type"),'cookie-cutter');
   assert.equal(await evalv("RVTest.active().sketch.entities[0].radius"),18);
 
-  // DISCARD: leave the reopened project without writing a new library version and fully tear down the session.
   await evalv("document.querySelector('#homeBtn').click();true");await waitFor(()=>evalv("document.querySelector('#leaveProjectDialog').open"));
   await evalv("document.querySelector('#leaveDiscard').click();true");await waitFor(()=>evalv("RVTest.state.screen==='home'"));
   assert.equal(await evalv("RVTest.state.objects.length"),0);
@@ -105,7 +128,7 @@ async function cdp(url){
   assert.deepEqual(exceptions.map(e=>e.params?.exceptionDetails?.text),[]);
   assert.deepEqual(severe.map(e=>e.params?.entry?.text),[]);
   dev.close();
-  console.log('CDP browser smoke: V4 shell + Phase 2 Sketch + project lifecycle PASS');
+  console.log('CDP browser smoke: unified Sketch/Feature workspace + verified 3D rendering PASS');
  }finally{
   proc.kill('SIGKILL');server.close();fs.rmSync(userData,{recursive:true,force:true});
   if(proc.exitCode&&!proc.killed)console.error(stderr.slice(-4000));
