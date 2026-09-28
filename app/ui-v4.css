@@ -252,3 +252,12 @@ body.sketching #three{display:block!important}
   overflow:hidden!important;
 }
 .workspace #viewport>#three[hidden]{display:none!important}
+
+/* 14.27 fixed workspace grid placement.
+   The contextual Sketch ribbon may be hidden, but the viewport must remain
+   on the flexible third row instead of being auto-placed into the collapsed
+   ribbon row. */
+.workspace>.toolbar{grid-row:1!important}
+.workspace>#editTools{grid-row:2!important}
+.workspace>#viewport{grid-row:3!important}
+.workspace>footer{grid-row:4!important}
