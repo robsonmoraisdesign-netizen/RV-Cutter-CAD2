@@ -93,7 +93,7 @@ jobs:
         run: |
           rm -rf desktop-smoke
           mkdir -p desktop-smoke
-          xvfb-run -a ./node_modules/.bin/electron app "--rv-desktop-smoke=$PWD/desktop-smoke"
+          xvfb-run -a ./node_modules/.bin/electron --no-sandbox app "--rv-desktop-smoke=$PWD/desktop-smoke"
           cat desktop-smoke/desktop-smoke.json
           test -s desktop-smoke/desktop-smoke.stl
 
@@ -104,9 +104,11 @@ jobs:
           $dir = Join-Path (Get-Location) 'desktop-smoke'
           Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Path $dir | Out-Null
-          & ".\node_modules\electron\dist\electron.exe" app "--rv-desktop-smoke=$dir"
-          if ($LASTEXITCODE -ne 0) { throw "Electron desktop smoke failed with code $LASTEXITCODE" }
-          Get-Content (Join-Path $dir 'desktop-smoke.json')
+          $electron = Join-Path (Get-Location) 'node_modules\electron\dist\electron.exe'
+          $p = Start-Process -FilePath $electron -ArgumentList @('app', "--rv-desktop-smoke=$dir") -Wait -PassThru
+          $result = Join-Path $dir 'desktop-smoke.json'
+          if (Test-Path $result) { Get-Content $result }
+          if ($p.ExitCode -ne 0) { throw "Electron desktop smoke failed with code $($p.ExitCode)" }
           if (-not (Test-Path (Join-Path $dir 'desktop-smoke.stl'))) { throw 'Desktop smoke STL was not saved' }
 
       - name: Upload Workspace UI audit
