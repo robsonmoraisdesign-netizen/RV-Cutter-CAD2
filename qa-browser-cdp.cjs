@@ -104,7 +104,8 @@ async function cdp(url){
   await evalv("RVTest.finishSketch(true);true");
 
   await evalv("document.querySelector('#homeBtn').click();true");await waitFor(()=>evalv("document.querySelector('#leaveProjectDialog').open"));
-  await evalv("document.querySelector('#leaveCancel').click();true");await waitFor(()=>evalv("!document.querySelector('#leaveProjectDialog').open"));
+  await evalv("document.querySelector('#leaveCancel').click();true");
+  await waitFor(()=>evalv("!document.querySelector('#leaveProjectDialog').open && !RVTest.diagnostics().navigationBusy"));
   assert.equal(await evalv("RVTest.state.screen"),'studio');
 
   await evalv("document.querySelector('#homeBtn').click();true");await waitFor(()=>evalv("document.querySelector('#leaveProjectDialog').open"));
