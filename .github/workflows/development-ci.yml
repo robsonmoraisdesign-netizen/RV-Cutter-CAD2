@@ -151,6 +151,13 @@ jobs:
           Compress-Archive -Path $folder -DestinationPath $zip -CompressionLevel Optimal
           $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
           "$hash  RV_Cutter_CAD_14.28.1_Windows_x64.zip" | Set-Content -Encoding ascii "$zip.sha256"
+          $existing = gh release view v14.28.1-preview --json targetCommitish,assets 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            $release = $existing | ConvertFrom-Json
+            if ($release.targetCommitish -ne $env:RV_RELEASE_SHA) { throw 'Preview tag already belongs to another commit; refusing to overwrite' }
+            if (($release.assets.name -contains 'RV_Cutter_CAD_14.28.1_Windows_x64.zip') -and ($release.assets.name -contains 'RV_Cutter_CAD_14.28.1_Windows_x64.zip.sha256')) { exit 0 }
+            throw 'Existing preview release is incomplete; inspect before replacing assets'
+          }
           gh release create v14.28.1-preview $zip "$zip.sha256" --target $env:RV_RELEASE_SHA --prerelease --title 'RV Cutter CAD 14.28.1 — Windows x64' --notes-file docs/REVISAO-14.28.1.md
           if ($LASTEXITCODE -ne 0) { throw 'Could not publish preview release' }
 
