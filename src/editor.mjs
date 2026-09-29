@@ -2,7 +2,7 @@ import {createSketchController} from './sketch/controller.mjs';
 import {simplify} from './geometry.mjs';
 
 export function createEditor(svg,api){
- let view=[-.65,-.65,1.3,1.3],tool='select',selected=-1,node=-1,region=null,drag=null,hoveredEntity=null,inference=null,bezierClicks=[],bezierHover=null;
+ let view=[-.65,-.65,1.3,1.3],tool='select',selected=-1,node=-1,region=null,drag=null,hoveredEntity=null,hoveredLoop=null,inference=null,bezierClicks=[],bezierHover=null;
  const NS='http://www.w3.org/2000/svg';
  const el=(tag,attrs)=>{const o=document.createElementNS(NS,tag);Object.entries(attrs).forEach(([k,v])=>v!==undefined&&v!==null&&o.setAttribute(k,v));return o;};
  const sketch=createSketchController(api);let arcClicks=[];
@@ -34,9 +34,22 @@ export function createEditor(svg,api){
  };
  const pickEntity=(q,pixels=8)=>{
   const o=api.object(),doc=sketch.native(),rect=svg.getBoundingClientRect();if(!o||!doc?.entities?.length||!rect.width||!rect.height)return null;
-  const p=nativePoint(q),mmPerPx=o.params.size*Math.max(view[2]/rect.width,view[3]/rect.height),limit=Math.max(.05,mmPerPx*pixels);let best=null,bestD=limit;
+  const p=nativePoint(q),mmPerPx=o.params.size*Math.max(view[2]/rect.width,view[3]/rect.height),limit=mmPerPx*pixels;let best=null,bestD=limit;
   for(const e of doc.entities){const d=entityDistance(p,e);if(d<bestD){bestD=d;best=e;}}
   return best?.id||null;
+ };
+
+ // Hit tolerance is measured in screen pixels, independently of zoom or model size.
+ const pickLoop=(q,pixels=8)=>{
+  const o=api.object(),rect=svg.getBoundingClientRect();
+  if(!o||o.sketch?.entities?.length||!rect.width||!rect.height)return null;
+  let best=null,distance=pixels*Math.max(view[2]/rect.width,view[3]/rect.height);
+  for(let i=0;i<o.loops.length;i++){
+   const pts=o.loops[i];if(!pts.length)continue;
+   const d=pointPolylineDistance(q,[...pts,pts[0]]);
+   if(d<distance){distance=d;best=i;}
+  }
+  return best;
  };
 
  function contourMode(){if(api.object()?.sketch?.entities.length){api.status('Para editar contornos derivados, use Converter em contornos. O Sketch paramétrico permanece editável.');return false;}return true;}
@@ -245,7 +258,7 @@ export function createEditor(svg,api){
   const n=sketch.native(),nativeCount=n?.entities?.length||0,stateMap=sketch.states();
   if(o.result?.bladeProfile?.length&&!nativeCount)svg.appendChild(el('path',{class:'blade-preview',d:o.result.bladeProfile.map(p=>path(p.map(([x,y])=>[x/o.result.params.size*(o.result.params.mirror?-1:1),y/o.result.params.size]))+'Z').join(' '),fill:'#d99c32','fill-opacity':.42,'fill-rule':'evenodd','pointer-events':'none'}));
   if(o.loops.length)svg.appendChild(el('path',{d:o.loops.map(p=>path(p)+'Z').join(' '),class:nativeCount?'sketch-derived-profile':'legacy-profile',fill:'#476a90','fill-rule':'evenodd','fill-opacity':nativeCount?.045:.42,'pointer-events':'none'}));
-  if(!nativeCount)o.loops.forEach((p,i)=>svg.appendChild(el('path',{d:path(p)+'Z',fill:'none',stroke:i===selected?'#e5852d':i===0?'#286bbb':'#597a97','stroke-width':i===selected?2:1.1,'vector-effect':'non-scaling-stroke','pointer-events':'stroke','data-loop':i})));
+  if(!nativeCount)o.loops.forEach((p,i)=>svg.appendChild(el('path',{d:path(p)+'Z',fill:'none',stroke:i===selected?'#e5852d':i===hoveredLoop?'#20a8ba':i===0?'#286bbb':'#597a97','stroke-width':i===selected?2:1.1,'vector-effect':'non-scaling-stroke','pointer-events':'stroke','data-loop':i})));
   if(selected>=0&&o.loops[selected]&&tool==='select'&&!nativeCount)o.loops[selected].forEach(([x,y],i)=>svg.appendChild(el('circle',{cx:x,cy:-y,r:view[2]*.004,fill:i===node?'#e88024':'white',stroke:'#bd6c21','stroke-width':1,'vector-effect':'non-scaling-stroke','data-node':i})));
   if(region)svg.appendChild(el('path',{d:path(region)+'Z',fill:'#7cbfff22',stroke:'#45b6a3','stroke-dasharray':'5 4','stroke-width':1.5,'vector-effect':'non-scaling-stroke','pointer-events':'none'}));
   if(drag?.points?.length)svg.appendChild(el('path',{d:path(drag.points),fill:'none',stroke:tool==='erase'?'#f18787':'#45b6a3','stroke-width':(+$('brushWidth')?.value||.8)/o.params.size,'stroke-linecap':'round','pointer-events':'none'}));
@@ -279,7 +292,7 @@ export function createEditor(svg,api){
   const selection=$('selection');
   if(selection)selection.textContent=drag?.kind==='box-select'?(drag.end?.[0]<drag.start[0]?'Seleção cruzada: toca a janela para selecionar.':'Seleção por janela: a entidade precisa ficar dentro.'):region?'Região selecionada para edição de contorno.':sketch.selected().length?`${sketch.selected().length} entidade(s) selecionada(s) · Shift adiciona à seleção`:selected>=0?`Contorno ${selected+1} · ${o.loops[selected]?.length||0} pontos`:tool==='trim'?'Trim: clique no trecho que deseja remover.':tool==='extend'?'Extend: clique perto da extremidade que deseja prolongar.':tool==='dimension'?'Cota: clique em uma linha, círculo ou arco.':tool==='bezier'?(bezierClicks.length?'Bézier: continue clicando · duplo clique ou Enter conclui.':'Bézier: clique para iniciar a curva.'):tool==='point'?'Ponto: clique para posicionar · Shift suprime inferências.':'Clique para selecionar · arraste no vazio para seleção por janela.';
  }
- function reset(){view=[-.65,-.65,1.3,1.3];selected=-1;node=-1;region=null;drag=null;arcClicks=[];bezierClicks=[];bezierHover=null;hoveredEntity=null;inference=null;sketch.reset();closeInlineDimension();render();}
+ function reset(){view=[-.65,-.65,1.3,1.3];selected=-1;node=-1;region=null;drag=null;arcClicks=[];bezierClicks=[];bezierHover=null;hoveredEntity=null;hoveredLoop=null;inference=null;sketch.reset();closeInlineDimension();render();}
  async function operate(op){const o=api.object();if(!o||!contourMode())return;const original=o.loops;try{api.status('Aplicando edição vetorial…');const loops=await api.request({action:'edit',loops:original,op:{...op,size:o.params.size}});if(api.object()?.id!==o.id||o.loops!==original){api.status('Edição cancelada porque o objeto mudou.');return;}api.history();delete o.sketch;o.loops=loops;selected=-1;node=-1;api.changed();render();}catch(e){api.status(e.message);}}
 
  function closeInlineDimension(){const box=$('sketchInlineDimension');if(box)box.hidden=true;}
@@ -300,7 +313,7 @@ export function createEditor(svg,api){
  if($('showSketchConstraints'))$('showSketchConstraints').onchange=render;
 
  svg.onpointerdown=e=>{
-  const o=api.object();if(!o)return;svg.setPointerCapture(e.pointerId);const q=point(e),n=e.target.dataset.node,l=e.target.dataset.loop;let entity=e.target.dataset.entity;if(['select','trim','extend','dimension'].includes(tool))entity=pickEntity(q,8)||entity;
+  const o=api.object();if(!o)return;svg.setPointerCapture(e.pointerId);const q=point(e),n=e.target.dataset.node;let l=e.target.dataset.loop,entity=e.target.dataset.entity;const explicitHandle=e.target.dataset.handle!==undefined;if(!explicitHandle&&n===undefined&&['select','trim','extend','dimension'].includes(tool))entity=pickEntity(q,8)||entity;if(l===undefined&&['select','move'].includes(tool)){const hit=pickLoop(q);if(hit!==null)l=hit;}
   if(e.button===1||e.button===2){drag={kind:'pan',x:e.clientX,y:e.clientY,view:[...view]};return;}
   if(e.target.dataset.dimensionEntity){openInlineDimension(e.target.dataset.dimensionEntity,e.clientX,e.clientY);return;}
   if(entity&&tool==='trim'){
@@ -339,8 +352,8 @@ export function createEditor(svg,api){
  };
  svg.onpointermove=e=>{
   const o=api.object();if(!o)return;
-  const q=point(e);hoveredEntity=['select','trim','extend','dimension'].includes(tool)?(pickEntity(q,8)||e.target?.dataset?.entity||null):(e.target?.dataset?.entity||null);
-  if(!drag){if(tool==='bezier'&&bezierClicks.length){const raw=nativePoint(q),snap=e.shiftKey?{point:raw,relation:null}:snapNative(raw,sketch.native());bezierHover={point:snap.point,relation:snap.relation};inference=snap.relation?{...snap,point:snap.point,type:snap.relation.type}:null;}render();return;}
+  const q=point(e),previousEntity=hoveredEntity,previousLoop=hoveredLoop;hoveredLoop=['select','move'].includes(tool)?pickLoop(q):null;hoveredEntity=['select','trim','extend','dimension'].includes(tool)?(pickEntity(q,8)||e.target?.dataset?.entity||null):(e.target?.dataset?.entity||null);
+  if(!drag){if(previousEntity===hoveredEntity&&previousLoop===hoveredLoop&&!(tool==='bezier'&&bezierClicks.length))return;if(tool==='bezier'&&bezierClicks.length){const raw=nativePoint(q),snap=e.shiftKey?{point:raw,relation:null}:snapNative(raw,sketch.native());bezierHover={point:snap.point,relation:snap.relation};inference=snap.relation?{...snap,point:snap.point,type:snap.relation.type}:null;}render();return;}
   if(drag.kind==='primitive'){updatePrimitiveDraft(q,{suppress:e.shiftKey||drag.suppress});render();return;}
   if(drag.kind==='trim-sweep'){
    const hit=document.elementFromPoint(e.clientX,e.clientY)?.closest?.('[data-entity]'),id=hit?.dataset?.entity;
@@ -369,7 +382,7 @@ export function createEditor(svg,api){
   inference=null;render();
  };
  svg.onpointercancel=()=>{if(drag&&['node','move'].includes(drag.kind))api.changed();if(drag?.kind!=='primitive'){drag=null;inference=null;}render();};
- svg.onpointerleave=()=>{if(!drag){hoveredEntity=null;inference=null;render();}};
+ svg.onpointerleave=()=>{if(!drag){hoveredLoop=null;hoveredEntity=null;inference=null;render();}};
  svg.oncontextmenu=e=>e.preventDefault();
  svg.onwheel=e=>{e.preventDefault();const f=e.deltaY>0?1.12:1/1.12;if(view[2]*f<.015||view[2]*f>12)return;const [x,negY]=point(e),y=-negY;view=[x+(view[0]-x)*f,y+(view[1]-y)*f,view[2]*f,view[3]*f];render();};
  svg.ondblclick=e=>{
@@ -397,3 +410,4 @@ export function createEditor(svg,api){
   getSelection:()=>({selected,node,region})
  };
 }
+
