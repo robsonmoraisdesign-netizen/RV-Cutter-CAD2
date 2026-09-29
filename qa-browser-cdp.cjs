@@ -42,13 +42,13 @@ async function cdp(url){
     };
   })();`});
   await send('Page.navigate',{url:'http://127.0.0.1:8092/'});await waitFor(async()=>{const r=await send('Runtime.evaluate',{expression:'document.readyState==="complete" && !!window.RVTest',returnByValue:true});return r.result.value;},60000);
-  const evalv=async expression=>(await send('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true})).result.value;
+  const evalv=async expression=>{const r=await send('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw Error(r.exceptionDetails.exception?.description||r.exceptionDetails.text);return r.result.value;};
   assert(await evalv("document.querySelector('#home').classList.contains('home-v4')"),'V4 library must be active');
   const homeShot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync('audit-home-14.27.png',Buffer.from(homeShot.data,'base64'));
   await evalv("document.querySelector('#newProject').click(); true");
   await waitFor(()=>evalv("RVTest.state.screen==='studio' && !!RVTest.state.editingSketchId"));
   assert(await evalv("document.querySelector('#tab2d').hidden"),'Sketch must not be a separate visible workspace tab');
-  assert(await evalv("!document.querySelector('#three').hidden && !document.querySelector('#editor').hidden"),'Sketch must edit inside the same graphics workspace');
+  assert(await evalv("!document.querySelector('#three').hidden && !document.querySelector('#editor').hasAttribute('hidden')"),'Sketch must edit inside the same graphics workspace');
   assert(await evalv("!!document.querySelector('.onshape-ribbon')"),'Contextual Sketch ribbon must be visible');
   assert(await evalv("!!document.querySelector('[data-tool=\"trim\"]') && !!document.querySelector('[data-tool=\"extend\"]') && !!document.querySelector('[data-tool=\"bezier\"]')"),'Phase 2 CAD tools must be present');
   assert.equal(await evalv("RVTest.active().features.length"),0,'New Sketch must not auto-create a cutter feature');
@@ -73,6 +73,11 @@ async function cdp(url){
   assert.equal(await evalv("RVTest.active().result"),null,'Sketch alone must not generate 3D');
   assert(await evalv("document.querySelectorAll('.sketch-dimension').length>=1"),'Driving dimension must render on canvas');
   assert(await evalv("document.querySelectorAll('.sketch-entity-hit').length>=1"),'Sketch selection must keep hit geometry');
+  await evalv("document.querySelector('#undo').click();true");
+  assert(await evalv("!!RVTest.state.editingSketchId && !document.querySelector('#editor').hasAttribute('hidden')"),'Undo must retain Sketch editing');
+  await evalv("document.querySelector('#redo').click();true");
+  assert.equal(await evalv("RVTest.active().sketch.entities[0].radius"),18);
+  assert(await evalv("RVTest.state.editingSketchId===RVTest.state.activeId"),'Redo must restore active editing context');
   const sketchShot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync('audit-sketch-14.27.png',Buffer.from(sketchShot.data,'base64'));
 
   await evalv("document.querySelector('#finishSketch').click();true");await waitFor(()=>evalv("!RVTest.state.editingSketchId"));
@@ -91,6 +96,9 @@ async function cdp(url){
   assert(render3d.nonTransparentSamples>0,'3D framebuffer must contain rendered pixels');
   const shot3d=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync('audit-3d-14.27.png',Buffer.from(shot3d.data,'base64'));
 
+  await evalv("(async()=>{const r=await RVTest.savePreset('QA preset');RVTest.setParam('wall',2);RVTest.applyPreset(r.id);await RVTest.wait();return true;})()");
+  assert(await evalv("RVTest.active().params.wall===RVTest.active().features[0].params.wall && RVTest.active().params.wall!==2"),'Preset must update persistent feature parameters');
+  assert(await evalv("(async()=>{const files=await RVTest.exportData('all',true);return Object.values(files).every(b=>b.length===84+50*new DataView(b.buffer,b.byteOffset,b.byteLength).getUint32(80,true));})()"),'STL triangle count must match exported payload');
   await evalv("document.querySelector('#tabPresentation').click();true");await waitFor(()=>evalv("RVTest.state.stage==='presentation'"));
   await sleep(250);
   const renderPresentation=await evalv("RVTest.viewer.diagnostics()");
@@ -100,7 +108,7 @@ async function cdp(url){
   const shotPres=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync('audit-presentation-14.27.png',Buffer.from(shotPres.data,'base64'));
 
   await evalv("RVTest.setStage('3d');RVTest.enterSketch();true");await waitFor(()=>evalv("!!RVTest.state.editingSketchId"));
-  assert(await evalv("!document.querySelector('#three').hidden && !document.querySelector('#editor').hidden"),'Re-entering Sketch must keep the unified graphics workspace');
+  assert(await evalv("!document.querySelector('#three').hidden && !document.querySelector('#editor').hasAttribute('hidden')"),'Re-entering Sketch must keep the unified graphics workspace');
   await evalv("RVTest.finishSketch(true);true");
 
   await evalv("document.querySelector('#homeBtn').click();true");await waitFor(()=>evalv("document.querySelector('#leaveProjectDialog').open"));
@@ -126,6 +134,19 @@ async function cdp(url){
   await evalv("document.querySelector('#leaveDiscard').click();true");await waitFor(()=>evalv("RVTest.state.screen==='home'"));
   assert.equal(await evalv("RVTest.state.objects.length"),0);
   assert.equal(await evalv("RVTest.diagnostics().worker"),false);
+  await evalv("RVTest.newProject()");
+  await evalv("window.firstSketch=RVTest.active().id;RVTest.createNewSketch();RVTest.selectObject(firstSketch);true");
+  assert(await evalv("RVTest.state.editingSketchId===firstSketch && RVTest.state.activeId===firstSketch"),'Selecting another Sketch must switch editor context');
+  await evalv("RVTest.commitImport([[[[-.5,-.5],[.5,-.5],[.5,.5],[-.5,.5]]]],'Imported square',null);true");
+  assert(await evalv("!RVTest.state.editingSketchId && document.querySelector('#editor').hasAttribute('hidden') && !document.body.classList.contains('sketching')"),'Import must leave a coherent model workspace');
+  await evalv("RVTest.enterSketch();RVTest.editor.setTool('select');true");
+  await sleep(100);
+  const pick=await evalv("(()=>{const s=document.querySelector('#editor'),p=new DOMPoint(0,.5).matrixTransform(s.getScreenCTM());return {x:p.x,y:p.y-6};})()");
+  await send('Input.dispatchMouseEvent',{type:'mouseMoved',...pick,button:'none'});
+  await send('Input.dispatchMouseEvent',{type:'mousePressed',...pick,button:'left',clickCount:1});
+  await send('Input.dispatchMouseEvent',{type:'mouseReleased',...pick,button:'left',clickCount:1});
+  assert(await evalv("!!document.querySelector('#editor path[data-loop][stroke=\"#e5852d\"]')"),'Imported contour must be selectable six pixels away');
+  console.log('Integration regressions: undo/redo, preset, STL, Sketch switch, import, proximity picking PASS');
   const exceptions=dev.events.filter(e=>e.method==='Runtime.exceptionThrown');
   const severe=dev.events.filter(e=>e.method==='Log.entryAdded'&&['error'].includes(e.params?.entry?.level));
   assert.deepEqual(exceptions.map(e=>e.params?.exceptionDetails?.text),[]);
@@ -137,3 +158,4 @@ async function cdp(url){
   if(proc.exitCode&&!proc.killed)console.error(stderr.slice(-4000));
  }
 })().catch(e=>{console.error(e);process.exit(1);});
+

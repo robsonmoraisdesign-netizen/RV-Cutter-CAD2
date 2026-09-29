@@ -9,9 +9,9 @@ const measuredValue=e=>e.type==='line'?lineLength(e):['circle','arc'].includes(e
 
 // Domain/controller shared by the existing SVG editor; no second editor or overlay app.
 export function createSketchController(api){
- let selected=[],points=[],lastSolution=null,cache=null,statusCache=null;
+ let selected=[],points=[],lastSolution=null,cache=null,statusCache=null,statesCache=null;
  function native(){const o=api.object();if(!o)return null;const key=[o,o.sketch,o.loops,o.params.size,o.contourVersion];if(cache&&key.every((v,i)=>v===cache.key[i]))return cache.value;cache={key,value:sketchFromObject(o)};return cache.value;}
- function invalidate(){cache=null;statusCache=null;}
+ function invalidate(){cache=null;statusCache=null;statesCache=null;}
  function transact(edit,changedIds=null){const o=api.object();if(!o)return false;try{
   const s=cloneSketch(native());edit(s);const r=resolveDocument(s,changedIds);
   const geometryChanged=o.params.size!==r.size||JSON.stringify(o.loops)!==JSON.stringify(r.loops);api.history();o.sketch=r.sketch;o.loops=r.loops;o.params.size=r.size;
@@ -145,7 +145,7 @@ export function createSketchController(api){
  }
  function convert(){const o=api.object();if(!o?.sketch)return;api.history();delete o.sketch;selected=[];points=[];invalidate();api.changed();api.status('Sketch convertido em contornos. Desfazer restaura as entidades e restrições.');}
  function describe(){const s=native();if(!s)return {label:'Sketch vazio',state:'free',dof:0};if(statusCache?.source===s)return statusCache.value;statusCache={source:s,value:sketchStatus(s,lastSolution)};return statusCache.value;}
- function states(){const s=native();return s?entityStates(s,lastSolution):new Map();}
+ function states(){const s=native();if(!s)return new Map();if(statesCache?.document===s&&statesCache.solution===lastSolution)return statesCache.value;statesCache={document:s,solution:lastSolution,value:entityStates(s,lastSolution)};return statesCache.value;}
  function selectionInfo(){
   const s=native();if(!s||!selected.length)return {count:0,entities:[],primary:null,rules:[]};
   const entities=selected.map(id=>getEntity(s,id)),primary=entities.length===1?entities[0]:null;
@@ -154,3 +154,4 @@ export function createSketchController(api){
  }
  return {native,create,constrain,dimension,movePoint,select,setSelection,selectBox,clearSelection,remove,rules,removeRule,toggleConstruction,trim,extend,convert,describe,states,selectionInfo,reset:()=>{selected=[];points=[];lastSolution=null;invalidate();},selected:()=>selected,points:()=>points};
 }
+
