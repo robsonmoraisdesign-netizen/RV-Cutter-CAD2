@@ -177,7 +177,8 @@ async function cdp(url){
   assert(multiRender.cadEdgeSets>=3,'CAD technical style must expose thresholded feature-edge sets without triangle wireframe');
   assert(multiRender.roleMeshes>0&&multiRender.opaqueRoleMeshes===multiRender.roleMeshes,'All CAD model surfaces must remain fully opaque');
   assert(multiRender.depthWritingRoleMeshes===multiRender.roleMeshes,'All CAD model surfaces must write depth so hidden edges remain occluded');
-  assert.equal(multiRender.background,'f7fafc','CAD technical style must use the neutral light viewport background');
+  const expectedViewportBg=await evalv("RVTheme.color('viewportBg').slice(1).toLowerCase()");
+  assert.equal(multiRender.background,expectedViewportBg,'CAD technical viewport background must come from the universal theme engine');
   const roleColors=Object.values(multiRender.roleColors||{});
   assert(roleColors.length>=3&&new Set(roleColors).size>=3,'CAD mode must preserve distinct vivid colors for cutter base, blade, stamp base and relief');
   const theme=await evalv("RVTheme.diagnostics()");
