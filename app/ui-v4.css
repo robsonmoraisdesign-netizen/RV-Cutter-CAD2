@@ -1,14 +1,11 @@
 :root{
-  --v4-bg:#10151a;--v4-chrome:#161c22;--v4-surface:#1d252d;--v4-surface2:#26313b;--v4-surface3:#31404c;
-  --v4-viewport:#eef4f7;--v4-line:#536575;--v4-line2:#33414d;--v4-text:#ffffff;--v4-text2:#e9f1f7;
-  --v4-muted:#a8bac8;--v4-brand:#2bd3b3;--v4-brand2:#69ead2;--v4-brandSoft:rgba(43,211,179,.18);
-  --v4-warm:#f2ad45;--v4-danger:#ff737c;--v4-success:#4bd39e;--v4-top:52px;--v4-rail:52px;--v4-drawer:235px;--v4-inspector:360px;
-  --v4-shadow:0 18px 48px rgba(0,0,0,.34);
+  --v4-bg:var(--rv-app-bg);--v4-chrome:var(--rv-chrome);--v4-surface:var(--rv-surface-1);--v4-surface2:var(--rv-surface-2);--v4-surface3:var(--rv-surface-3);
+  --v4-viewport:var(--rv-viewport-bg);--v4-line:var(--rv-border-strong);--v4-line2:var(--rv-border-subtle);--v4-text:var(--rv-text-primary);--v4-text2:var(--rv-text-secondary);
+  --v4-muted:var(--rv-text-muted);--v4-brand:var(--rv-accent);--v4-brand2:var(--rv-accent-hover);--v4-brandSoft:var(--rv-accent-soft);
+  --v4-warm:var(--rv-warning);--v4-danger:var(--rv-danger);--v4-success:var(--rv-success);--v4-top:52px;--v4-rail:52px;--v4-drawer:235px;--v4-inspector:360px;
+  --v4-shadow:var(--rv-shadow-elevation);
 }
-body.ui-light{
-  --v4-bg:#e9edf0;--v4-chrome:#f6f7f8;--v4-surface:#fafbfc;--v4-surface2:#fff;--v4-surface3:#edf1f3;
-  --v4-viewport:#dbe2e7;--v4-line:#cfd6dc;--v4-line2:#e0e5e8;--v4-text:#20262c;--v4-text2:#4b5560;--v4-muted:#7d8893;
-}
+body.ui-light,body.ui-dark{}
 html,body{background:var(--v4-bg);color:var(--v4-text)}
 body{font-family:Inter,"Segoe UI",system-ui,sans-serif}
 button,input,select{font-family:inherit}
@@ -418,11 +415,7 @@ input:focus,select:focus{border-color:#2bd3b3!important;box-shadow:0 0 0 2px rgb
 /* ========================================================================
    14.28.7 · stronger contrast + collision-safe viewport chrome
    ======================================================================== */
-:root{
-  --v4-bg:#080c10;--v4-chrome:#0d1319;--v4-surface:#121a21;--v4-surface2:#19242d;--v4-surface3:#22323f;
-  --v4-line:#4b6070;--v4-line2:#293945;--v4-text:#ffffff;--v4-text2:#edf5fa;--v4-muted:#91a6b5;
-  --v4-brand:#22ddb9;--v4-brand2:#72f2d7;--v4-brandSoft:rgba(34,221,185,.20);
-}
+:root{/* palette owned by theme-controller.mjs */}
 .app-header.v4-top,.workspace .toolbar,.project-drawer-v4,.right{background:#0d1319!important}
 .workspace-nav{background:#080c10!important;border-color:#344956!important}
 .project-drawer-v4 #layers,.object-search-wrap,input,select{background:#0a1117!important}
