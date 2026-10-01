@@ -13,8 +13,8 @@ self.onmessage=async({data:d})=>{try{
  if(d.action==='edit'){self.postMessage({id:d.id,loops:editContours(m,d.loops,d.op)});return;}
  if(d.action==='svg'){const sections=d.shapes.map(s=>new m.CrossSection(s,'EvenOdd'));let joined;try{joined=m.CrossSection.union(sections);self.postMessage({id:d.id,loops:joined.toPolygons()});}finally{joined?.delete();sections.forEach(s=>s.delete());}return;}
  const p=migrateParams(d.params),source=d.sourceHash||JSON.stringify(d.loops),ctx=graphContext(cache,source,p,solids);
- const result=build(m,d.loops,p,ctx);completed++;
+ const result=build(m,d.loops,p,ctx,{buildProfile:d.buildProfile||'normal'});completed++;
  // Transfer a copy: cached mesh buffers must never be detached.
- const output=prepareDisplay(structuredClone(result));output.calculation={version:ENGINE_VERSION,displayVersion:DISPLAY_VERSION,computed:ctx.computed,reused:ctx.reused,cache:cache.stats(),completed};
+ const output=prepareDisplay(structuredClone(result));output.calculation={version:ENGINE_VERSION,displayVersion:DISPLAY_VERSION,computed:ctx.computed,reused:ctx.reused,cache:cache.stats(),completed,buildProfile:result.buildProfile||d.buildProfile||'normal',sourcePoints:result.sourcePoints||0};
  self.postMessage({id:d.id,result:output},buffers(output));
 }catch(e){self.postMessage({id:d.id,error:e.message});}};
