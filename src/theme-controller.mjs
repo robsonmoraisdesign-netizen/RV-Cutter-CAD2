@@ -129,6 +129,7 @@ export function initTheme(){
 export function themeName(){return current;}
 export function themeRevision(){return revision;}
 export function themeSnapshot(){return {...normalized(current),name:current,revision};}
+export function themeDefinition(name){return {...normalized(name==='light'?'light':'dark')};}
 export function themeColor(role){return normalized(current)[role]||'#ff00ff';}
 export function themeDiagnostics(){
  const t=normalized(current),pairs=[
