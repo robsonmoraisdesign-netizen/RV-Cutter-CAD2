@@ -3,7 +3,7 @@ name: RV Cutter 14.28.12 Windows Delivery
 on:
   push:
     branches:
-      - feature/14.28.12-theme-engine
+      - feature/14.28.12-sketch-clarity
     paths:
       - .github/workflows/RV_Cutter_14_28_12_Windows.yml
       - app/**
