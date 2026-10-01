@@ -189,6 +189,38 @@ async function cdp(url){
   await waitFor(()=>evalv("RVTest.state.objects.every(o=>o.visible) && document.querySelector('#isolationBanner').hidden"));
   assert(await evalv("RVTest.state.objects.every((o,i)=>o.result===window.__showAllRefs[i])"),'Show All must not discard/rebuild in-memory geometry merely because objects were hidden or isolated');
 
+  const savedPreset=await evalv(`(async()=>{
+    const o=RVTest.active(),feature=o.features.find(f=>f.type==='cookie-cutter');
+    Object.assign(o.params,{mode:'separate',size:68,wall:1.1,height:14,rim:4.2,base:2.4,stampBase:2.2,stampExpansion:.6,stampInset:.25,clearance:.8,detailOffset:.12,outlineOffset:.4,relief:2.1,reliefOut:2.1,reliefIn:.7,reliefInverted:false,reliefSeparate:true,chamfer:true,tip:.35,chamferHeight:2.2,cornerRadius:1.4,mirror:false,removeOutline:false,outlineBand:.8,tolerance:.04,threshold:160,wallEdits:[{region:[[-.15,-.15],[.15,-.15],[.15,.15],[-.15,.15]],delta:.05}]});
+    feature.params=o.params;
+    const row=await RVTest.savePreset('QA preset completo');
+    return {id:row.id,version:row.version,wallEdits:row.params.wallEdits,mode:row.params.mode,reliefSeparate:row.params.reliefSeparate,chamfer:row.params.chamfer};
+  })()`);
+  assert.equal(savedPreset.version,2,'New presets must use complete schema v2');
+  assert.equal(savedPreset.mode,'separate');
+  assert.equal(savedPreset.reliefSeparate,true);
+  assert.equal(savedPreset.chamfer,true);
+  assert.equal(savedPreset.wallEdits.length,1,'Preset must preserve local blade edits instead of silently dropping them');
+
+  const immediatePreset=await evalv(`(()=>{
+    document.querySelector('#paramScope').value='all';
+    RVTest.state.objects.forEach(o=>{Object.assign(o.params,{mode:'integrated',wall:.65,height:11,relief:1.2,reliefSeparate:false,chamfer:false,wallEdits:[]});const f=o.features.find(x=>x.type==='cookie-cutter');f.params=o.params;});
+    window.__presetOldResults=RVTest.state.objects.map(o=>o.result);
+    RVTest.applyPreset(${JSON.stringify(savedPreset.id)});
+    const d=RVTest.diagnostics();
+    return {sameRefs:RVTest.state.objects.every((o,i)=>o.result===window.__presetOldResults[i]),batchProtected:d.batchProtected,visible:RVTest.state.objects.every(o=>o.visible!==false),params:RVTest.state.objects.map(o=>({mode:o.params.mode,size:o.params.size,wall:o.params.wall,height:o.params.height,relief:o.params.relief,reliefSeparate:o.params.reliefSeparate,chamfer:o.params.chamfer,tip:o.params.tip,chamferHeight:o.params.chamferHeight,wallEdits:o.params.wallEdits}))};
+  })()`);
+  assert(immediatePreset.sameRefs,'Applying a preset to multiple products must keep the previous valid geometry visible until replacements are ready');
+  assert.equal(immediatePreset.batchProtected,3,'Every product in a preset batch must be protected from mesh eviction while rebuilding');
+  assert(immediatePreset.visible,'Preset application must not hide products');
+  for(const p of immediatePreset.params){
+    assert.equal(p.mode,'separate');assert.equal(p.size,68);assert.equal(p.wall,1.1);assert.equal(p.height,14);assert.equal(p.relief,2.1);assert.equal(p.reliefSeparate,true);assert.equal(p.chamfer,true);assert.equal(p.tip,.35);assert.equal(p.chamferHeight,2.2);assert.equal(p.wallEdits.length,1);
+  }
+  await evalv("RVTest.wait()");
+  const presetDone=await evalv("RVTest.state.objects.map(o=>({released:!!o.result?.released,error:o.error||null,parts:o.result?.parts?.length||0,mode:o.params.mode,wall:o.params.wall,reliefSeparate:o.params.reliefSeparate,wallEdits:o.params.wallEdits?.length||0}))");
+  for(const row of presetDone){assert.equal(row.released,false,'Completed preset batch must not leave visible products released');assert.equal(row.error,null,'Completed preset batch must not leave a geometry error');assert(row.parts>=2,'Separate cutter+stamp preset must generate both products');assert.equal(row.mode,'separate');assert.equal(row.wall,1.1);assert.equal(row.reliefSeparate,true);assert.equal(row.wallEdits,1);}
+  console.log('Preset batch regression: complete parameters + visible geometry + protected rebuild PASS');
+
   const multiImport=await evalv(`(async()=>{
     async function png(name,kind){
       const c=document.createElement('canvas');c.width=120;c.height=120;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,120,120);x.fillStyle='#000';
