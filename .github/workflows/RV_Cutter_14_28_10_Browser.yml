@@ -3,7 +3,7 @@ name: RV Cutter 14.28.10 Browser Smoke
 on:
   push:
     branches:
-      - feature/14.28.10-preset-batch-stability
+      - feature/14.28.10-worker-recovery
     paths:
       - .github/workflows/RV_Cutter_14_28_10_Browser.yml
       - app/**
