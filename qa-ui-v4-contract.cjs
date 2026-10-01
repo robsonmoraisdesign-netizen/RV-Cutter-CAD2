@@ -4,6 +4,7 @@ const css=fs.readFileSync('app/ui-v4.css','utf8');
 const ui=fs.readFileSync('src/ui.mjs','utf8');
 const geometry=fs.readFileSync('src/geometry.mjs','utf8');
 const worker=fs.readFileSync('src/worker.mjs','utf8');
+// 14.28.10: one pathological object must not permanently poison the shared geometry worker.
 
 for(const token of [
   'class="app-header v4-top"','id="tabHome"','id="tab3d"','id="tab2d"','id="tabPresentation"',
