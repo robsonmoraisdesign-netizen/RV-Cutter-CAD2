@@ -1,0 +1,36 @@
+name: RV Cutter 14.28.4 Delivery Handoff
+
+on:
+  push:
+    branches:
+      - feature/14.28.4-multiobject-workflow
+    paths:
+      - .github/workflows/RV_Cutter_14_28_4_Handoff.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  handoff:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download validated 14.28.4 release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          mkdir -p handoff
+          gh release download v14.28.4-preview \
+            --repo "$GH_REPO" \
+            --pattern "RV_Cutter_CAD_14.28.4_Windows_x64.zip" \
+            --dir handoff
+          test -s handoff/RV_Cutter_CAD_14.28.4_Windows_x64.zip
+
+      - name: Upload delivery artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RV_Cutter_CAD_14.28.4_Delivery
+          path: handoff/RV_Cutter_CAD_14.28.4_Windows_x64.zip
+          if-no-files-found: error
+          retention-days: 30
