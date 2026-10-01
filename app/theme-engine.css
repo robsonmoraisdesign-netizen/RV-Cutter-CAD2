@@ -1,0 +1,238 @@
+/* RV Appearance Engine 14.28.11
+   Theme colors live only in src/theme-controller.mjs.
+   This layer maps semantic roles to every workspace surface/state. */
+
+:root{
+  --v4-bg:var(--rv-app-bg);
+  --v4-chrome:var(--rv-chrome);
+  --v4-surface:var(--rv-surface-1);
+  --v4-surface2:var(--rv-surface-2);
+  --v4-surface3:var(--rv-surface-3);
+  --v4-viewport:var(--rv-viewport-bg);
+  --v4-line:var(--rv-border-strong);
+  --v4-line2:var(--rv-border-subtle);
+  --v4-text:var(--rv-text-primary);
+  --v4-text2:var(--rv-text-secondary);
+  --v4-muted:var(--rv-text-muted);
+  --v4-brand:var(--rv-accent);
+  --v4-brand2:var(--rv-accent-hover);
+  --v4-brandSoft:var(--rv-accent-soft);
+  --v4-warm:var(--rv-warning);
+  --v4-danger:var(--rv-danger);
+  --v4-success:var(--rv-success);
+  --v4-shadow:var(--rv-shadow-elevation);
+
+  --rv-z-content:1;
+  --rv-z-floating:40;
+  --rv-z-popover:70;
+  --rv-z-toolbar:100;
+  --rv-z-modal:200;
+  --rv-z-critical:300;
+}
+
+html[data-rv-theme="dark"]{color-scheme:dark}
+html[data-rv-theme="light"]{color-scheme:light}
+
+html,body{
+  background:var(--rv-app-bg)!important;
+  color:var(--rv-text-primary)!important;
+  accent-color:var(--rv-accent);
+}
+body *{caret-color:var(--rv-accent)}
+::selection{background:var(--rv-accent-soft);color:var(--rv-text-primary)}
+
+:where(button,input,select,textarea,summary,[tabindex]):focus-visible{
+  outline:2px solid var(--rv-focus)!important;
+  outline-offset:2px!important;
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--rv-focus) 20%,transparent)!important;
+}
+:where(button,input,select,textarea):disabled{
+  color:var(--rv-text-disabled)!important;
+  border-color:var(--rv-border-subtle)!important;
+  opacity:.62;
+}
+:where(input,select,textarea){
+  background:var(--rv-input-bg)!important;
+  color:var(--rv-text-primary)!important;
+  border-color:var(--rv-border-strong)!important;
+}
+:where(input,select,textarea)::placeholder{color:var(--rv-text-muted)!important;opacity:1}
+:where(option){background:var(--rv-surface-elevated);color:var(--rv-text-primary)}
+
+.app-header,.tool-rail-v4,.workspace .toolbar,.workspace footer,
+.onshape-ribbon,.sketch-commandbar{
+  background:var(--rv-chrome)!important;
+  color:var(--rv-text-primary)!important;
+  border-color:var(--rv-border-subtle)!important;
+}
+.project-drawer-v4,.right,.sketch-contextbar,.library-section,.project-card{
+  background:var(--rv-surface-1)!important;
+  color:var(--rv-text-primary)!important;
+  border-color:var(--rv-border-subtle)!important;
+}
+.workspace,#viewport{background:var(--rv-viewport-bg)!important}
+
+:where(.hint,.mini-label,.section-eyebrow,.library-status,.brand-copy small,
+.workspace-context-title span,.popover-title small,.sketch-context-hint,
+.metrics-hint,.coming-soon,.save-state,.count-badge,.cap){
+  color:var(--rv-text-muted)!important;
+}
+:where(h1,h2,h3,h4,strong,label,.workspace-context-title strong,.project-title-row #name){
+  color:var(--rv-text-primary);
+}
+
+:where(.workspace-tab,.rail-tool,.header-action,.icon-button,.command-button,
+.layer-actions button,.help-button,.feature-action,.sketch-tool-button,
+.sketch-shortcut-button,.measure-actions button,.object-quick-actions button){
+  color:var(--rv-text-secondary)!important;
+  border-color:var(--rv-border-subtle)!important;
+}
+:where(.workspace-tab,.rail-tool,.header-action,.icon-button,.command-button,
+.layer-actions button,.help-button,.feature-action,.sketch-tool-button,
+.sketch-shortcut-button,.measure-actions button,.object-quick-actions button):hover:not(:disabled){
+  background:var(--rv-hover-bg)!important;
+  color:var(--rv-text-primary)!important;
+  border-color:var(--rv-border-strong)!important;
+}
+:where(.workspace-tab.active,.rail-tool.active,.sketch-tool-button.active,
+.sketch-shortcut-button.active,.scope-v4-buttons button.active){
+  background:var(--rv-accent-soft)!important;
+  color:var(--rv-text-primary)!important;
+  border-color:color-mix(in srgb,var(--rv-accent) 48%,var(--rv-border-strong))!important;
+}
+
+:where(.primary,.big-action,.v4-actions #export,.right .primary,.feature-action.accent){
+  background:var(--rv-accent)!important;
+  color:var(--rv-text-on-accent)!important;
+  border-color:transparent!important;
+}
+:where(.primary,.big-action,.v4-actions #export,.right .primary,.feature-action.accent):hover:not(:disabled){
+  background:var(--rv-accent-hover)!important;
+  color:var(--rv-text-on-accent)!important;
+}
+.danger-quiet,.validation.error,#saveState[data-state="error"]{color:var(--rv-danger)!important}
+#saveState[data-state="dirty"],#saveState[data-state="saving"]{color:var(--rv-warning)!important}
+#saveState[data-state="saved"]{color:var(--rv-success)!important}
+
+:where(dialog,.command-palette-v4,.leave-project-dialog){
+  background:var(--rv-surface-elevated)!important;
+  color:var(--rv-text-primary)!important;
+  border-color:var(--rv-border-strong)!important;
+  box-shadow:var(--rv-shadow-elevation)!important;
+}
+:where(dialog,.command-palette-v4,.leave-project-dialog)::backdrop{
+  background:var(--rv-overlay-backdrop)!important;
+  backdrop-filter:blur(2px);
+}
+:where(.visual-popover,.sketch-menu-popover,.command-results,.sample-drawer[open]){
+  background:var(--rv-surface-elevated)!important;
+  color:var(--rv-text-primary)!important;
+  border-color:var(--rv-border-strong)!important;
+  box-shadow:var(--rv-shadow-elevation)!important;
+  z-index:var(--rv-z-popover)!important;
+}
+.popover-separator,.toolbar-divider,.sketch-toolbar-divider{background:var(--rv-border-subtle)!important}
+
+.project-drawer-v4 .object-search-wrap,
+.scope-v4-buttons,.command-button kbd,.onshape-ribbon .sketch-status-chip{
+  background:var(--rv-input-bg)!important;
+  color:var(--rv-text-secondary)!important;
+  border-color:var(--rv-border-subtle)!important;
+}
+.project-drawer-v4 .layer:hover{background:var(--rv-hover-bg)!important}
+.project-drawer-v4 .layer.active{
+  background:var(--rv-accent-soft)!important;
+  border-color:color-mix(in srgb,var(--rv-accent) 45%,var(--rv-border-strong))!important;
+}
+
+body.sketching #editor{background:var(--rv-sketch-bg)!important}
+.sketch-inline-dimension,.sketch-shortcut-palette,.sketch-diagnostics-popover{
+  background:var(--rv-surface-elevated)!important;
+  color:var(--rv-text-primary)!important;
+  border-color:var(--rv-border-strong)!important;
+  box-shadow:var(--rv-shadow-elevation)!important;
+}
+.sketch-status-chip{
+  background:var(--rv-surface-2)!important;
+  color:var(--rv-text-secondary)!important;
+  border-color:var(--rv-border-strong)!important;
+}
+.sketch-status-chip .status-dot{background:var(--rv-text-muted)!important}
+.sketch-status-chip[data-state="partial"] .status-dot{background:var(--rv-warning)!important}
+.sketch-status-chip[data-state="defined"] .status-dot{background:var(--rv-success)!important}
+.sketch-status-chip[data-state="free"] .status-dot{background:var(--rv-info)!important}
+.sketch-status-chip[data-state="conflict"] .status-dot{background:var(--rv-danger)!important}
+
+.measure-toggle.active{
+  background:var(--rv-accent-soft)!important;
+  color:var(--rv-text-primary)!important;
+  border-color:var(--rv-accent)!important;
+}
+.measure-panel{
+  background:var(--rv-surface-elevated)!important;
+  color:var(--rv-text-primary)!important;
+  border-color:var(--rv-border-strong)!important;
+  box-shadow:var(--rv-shadow-elevation)!important;
+  z-index:var(--rv-z-floating)!important;
+}
+.measure-points,.measure-grid>div,.measure-coordinates{
+  background:var(--rv-surface-2)!important;
+  border-color:var(--rv-border-subtle)!important;
+}
+.measure-points span,.measure-grid span,.measure-coordinates summary{color:var(--rv-text-muted)!important}
+.measure-grid strong,.measure-coordinates code{color:var(--rv-text-primary)!important}
+.measure-grid .axis-x strong{color:var(--rv-measure-x)!important}
+.measure-grid .axis-y strong{color:var(--rv-measure-y)!important}
+.measure-grid .axis-z strong{color:var(--rv-measure-z)!important}
+.measure-grid .measure-primary{
+  border-color:var(--rv-accent)!important;
+  background:var(--rv-accent-soft)!important;
+}
+.measure-grid .measure-primary strong{color:var(--rv-text-primary)!important}
+
+.dimension-editor{
+  background:var(--rv-surface-elevated)!important;
+  color:var(--rv-text-primary)!important;
+  border-color:var(--rv-focus)!important;
+  box-shadow:var(--rv-shadow-elevation)!important;
+  z-index:var(--rv-z-popover)!important;
+}
+.dimension-editor>span,.dimension-editor>div:nth-child(2)>span{color:var(--rv-text-muted)!important}
+.dimension-editor input{
+  background:var(--rv-input-bg)!important;
+  color:var(--rv-text-primary)!important;
+  border-color:var(--rv-border-strong)!important;
+}
+
+.presentation-styles-v4,.piece-mode-host{
+  background:color-mix(in srgb,var(--rv-surface-elevated) 94%,transparent)!important;
+  color:var(--rv-text-primary)!important;
+  border-color:var(--rv-border-strong)!important;
+  box-shadow:0 10px 30px var(--rv-shadow-color)!important;
+}
+.presentation-styles-v4 button,.piece-mode-host button{
+  color:var(--rv-text-secondary)!important;
+  border-color:var(--rv-border-subtle)!important;
+}
+.presentation-styles-v4 button.active,.piece-mode-host button.active{
+  color:var(--rv-text-primary)!important;
+  border-color:var(--rv-accent)!important;
+  background:var(--rv-accent-soft)!important;
+}
+
+/* Hierarchy rule: modal > chrome > popover > viewport overlays > content. */
+.app-header{z-index:var(--rv-z-toolbar)!important}
+.command-palette-v4,.leave-project-dialog,dialog{z-index:var(--rv-z-modal)}
+.visual-popover,.sketch-menu-popover{z-index:var(--rv-z-popover)!important}
+.measure-overlay{z-index:calc(var(--rv-z-floating) - 1)!important}
+.measure-panel,.dimension-editor{z-index:var(--rv-z-floating)!important}
+
+/* Never allow translucent controls to lose their text contrast in light mode. */
+:where(.visual-popover,.measure-panel,.dimension-editor,.sketch-menu-popover,
+.command-palette-v4,.leave-project-dialog,.presentation-styles-v4,.piece-mode-host){
+  backdrop-filter:blur(10px);
+}
+:where(.visual-popover,.measure-panel,.dimension-editor,.sketch-menu-popover,
+.command-palette-v4,.leave-project-dialog) :where(p,span,label,strong,small,button,summary){
+  text-shadow:none!important;
+}
