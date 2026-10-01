@@ -59,7 +59,7 @@ export function migrateParams(params={}){const p={...defaults,...params,stampBas
  if(!Number.isFinite(p.reliefOut))p.reliefOut=p.reliefInverted?defaults.relief:p.relief;
  if(!Number.isFinite(p.reliefIn))p.reliefIn=p.reliefInverted?p.relief:Math.min(1,Math.max(.1,(p.mode==='integrated'?p.base:p.stampBase)*.4));
  return p;}
-export function build(m,loops,params,ctx=null){const started=performance.now(),p=migrateParams(params),keep=[];const hold=x=>(keep.push(x),x);const C=m.CrossSection,M=m.Manifold;
+export function build(m,loops,params,ctx=null,options={}){const started=performance.now(),p=migrateParams(params),keep=[];const hold=x=>(keep.push(x),x);const C=m.CrossSection,M=m.Manifold;
  const finite=['size','wall','height','rim','base','stampBase','stampInset','stampExpansion','outlineBand','tip','chamferHeight','clearance','detailOffset','outlineOffset','tolerance','cornerRadius','relief'];
  for(const k of finite)if(!Number.isFinite(p[k]))throw Error(`Valor inválido em ${k}: informe um número finito.`);
  const positive=[['size',.1],['wall',.01],['height',.05],['base',.01],['stampBase',.01],['outlineBand',.001],['tip',.001],['chamferHeight',.001],['tolerance',.0001],['relief',.001]];
@@ -74,41 +74,43 @@ export function build(m,loops,params,ctx=null){const started=performance.now(),p
  const memo=(node,fn)=>ctx?ctx.memo(node,fn):fn();
  const cachedCutter=p.mode==='separate'||p.mode==='cutter'?ctx?.get('cutter'):null,cachedStamp=(p.mode==='separate'||p.mode==='stamp')&&!p.reliefSeparate?ctx?.get('stamp'):null;
  const src=memo('source',()=>loops.map(l=>simplify(l,p.tolerance/p.size).map(([x,y])=>[x*p.size*(p.mirror?-1:1),y*p.size])).sort((a,b)=>Math.abs(area(b))-Math.abs(area(a))));
+ const sourcePoints=src.reduce((n,loop)=>n+loop.length,0),requestedProfile=options.buildProfile||'normal',automaticSafe=requestedProfile==='normal'&&(sourcePoints>1400||src.length>48),buildProfile=requestedProfile==='recovery'?'recovery':requestedProfile==='safe'||automaticSafe?'safe':'normal';
+ const roundSegments=buildProfile==='recovery'?64:buildProfile==='safe'?112:256,detailSegments=buildProfile==='recovery'?48:buildProfile==='safe'?80:128,maxChamferProfiles=buildProfile==='recovery'?12:buildProfile==='safe'?24:64;
  const silhouette=section=>{const polys=section.toPolygons().sort((a,b)=>Math.abs(area(b))-Math.abs(area(a)));if(!polys.length)throw Error('O recuo eliminou o contorno. Reduza o valor.');return hold(new C([polys[0]],'EvenOdd'));};
  const linkedCutterExpansion=p.mode==='separate'?p.stampExpansion:0;
- let original=hold(new C([src[0]],'EvenOdd')),outer=hold(new C(memo('outer',()=>silhouette(hold(hold(original.offset(p.outlineOffset+linkedCutterExpansion,'Round',2,256)).simplify(.002))).toPolygons()),'EvenOdd'));
+ let original=hold(new C([src[0]],'EvenOdd')),outer=hold(new C(memo('outer',()=>silhouette(hold(hold(original.offset(p.outlineOffset+linkedCutterExpansion,'Round',2,roundSegments)).simplify(.002))).toPolygons()),'EvenOdd'));
  let bladeSolid,rimOuter,inner,cutter,relief,stamp,stampBaseSolid,reliefPart,bladeProfile=[],reliefOutline=[];
  if(p.mode!=='stamp'&&!cachedCutter){
   const innerPolys=memo('inner',()=>{
-  inner=silhouette(hold(outer.offset(p.clearance,'Round',2,256)));
+  inner=silhouette(hold(outer.offset(p.clearance,'Round',2,roundSegments)));
   if(p.cornerRadius>0){
    const radius=p.cornerRadius+p.wall;
-   const rounded=hold(hold(inner.offset(radius,'Round',2,256)).offset(-radius,'Round',2,256));
+   const rounded=hold(hold(inner.offset(radius,'Round',2,roundSegments)).offset(-radius,'Round',2,roundSegments));
    inner=silhouette(hold(C.union([inner,rounded])));
   }
   return inner.toPolygons();});inner=hold(new C(innerPolys,'EvenOdd'));
   if(!Array.isArray(p.wallEdits)||p.wallEdits.length>100)throw Error('Excesso de ajustes locais na lâmina.');
   const makeBladeOuter=(fraction=1)=>{
    const width=p.chamfer?p.tip+(p.wall-p.tip)*fraction:p.wall;
-   let section=silhouette(hold(inner.offset(width,'Round',2,256)));
+   let section=silhouette(hold(inner.offset(width,'Round',2,roundSegments)));
    for(const edit of p.wallEdits){
     if(!Number.isFinite(edit.delta)||Math.abs(edit.delta)>2||!Array.isArray(edit.region)||edit.region.length!==4||!edit.region.flat().every(Number.isFinite))throw Error('Ajuste local inválido.');
     const mask=hold(new C([edit.region.map(([x,y])=>[x*p.size*(p.mirror?-1:1),y*p.size])],'EvenOdd'));
-    const modified=hold(section.offset(edit.delta*fraction,'Round',2,256));
+    const modified=hold(section.offset(edit.delta*fraction,'Round',2,roundSegments));
     section=silhouette(hold(C.union([hold(section.subtract(mask)),hold(modified.intersect(mask))])));
    }
    if(p.wallEdits.length){
     const low=p.chamfer?p.tip+(Math.max(.3,p.tip+.02)-p.tip)*fraction:.3,high=p.chamfer?p.tip+(5-p.tip)*fraction:5;
-    section=silhouette(hold(hold(C.union([section,hold(inner.offset(low,'Round',2,256))])).intersect(hold(inner.offset(high,'Round',2,256)))));
+    section=silhouette(hold(hold(C.union([section,hold(inner.offset(low,'Round',2,roundSegments))])).intersect(hold(inner.offset(high,'Round',2,roundSegments)))));
    }
    return section;
   };
-  const profiles=memo('blade',()=>{const bladeOuter=makeBladeOuter(),tipOuter=silhouette(hold(inner.offset(p.tip,'Round',2,256))),rings=[];
-   if(p.chamfer&&(p.tip<p.wall-1e-6||p.wallEdits.length)){const count=Math.max(2,Math.min(160,Math.ceil((p.wall-p.tip+p.wallEdits.reduce((s,e)=>s+Math.abs(e.delta),0))/.025)));let previous=bladeOuter;
+  const profiles=memo('blade',()=>{const bladeOuter=makeBladeOuter(),tipOuter=silhouette(hold(inner.offset(p.tip,'Round',2,roundSegments))),rings=[];
+   if(p.chamfer&&(p.tip<p.wall-1e-6||p.wallEdits.length)){const count=Math.max(2,Math.min(maxChamferProfiles,Math.ceil((p.wall-p.tip+p.wallEdits.reduce((s,e)=>s+Math.abs(e.delta),0))/.025)));let previous=bladeOuter;
    for(let i=1;i<count;i++){let section=makeBladeOuter(1-i/count);if(p.wallEdits.length)section=silhouette(hold(C.union([hold(section.intersect(previous)),tipOuter])));rings.push({poly:section.toPolygons()[0],fraction:i/count});previous=section;}}
    return {outer:bladeOuter.toPolygons(),tip:tipOuter.toPolygons(),rings};});
   const bladeOuter=hold(new C(profiles.outer,'EvenOdd'));
-  rimOuter=hold(new C(memo('rim',()=>silhouette(hold(C.union([hold(inner.offset(Math.max(p.rim,p.wall),'Round',2,256)),bladeOuter]))).toPolygons()),'EvenOdd'));
+  rimOuter=hold(new C(memo('rim',()=>silhouette(hold(C.union([hold(inner.offset(Math.max(p.rim,p.wall),'Round',2,roundSegments)),bladeOuter]))).toPolygons()),'EvenOdd'));
   bladeProfile=hold(bladeOuter.subtract(inner)).toPolygons();
   const savedBlade=ctx?.getSolid?.('bladeSolid');if(savedBlade){bladeSolid=hold(savedBlade.translate([0,0,0]));}else{
   if(p.chamfer&&(p.tip<p.wall-1e-6||p.wallEdits.length)){
@@ -121,13 +123,13 @@ export function build(m,loops,params,ctx=null){const started=performance.now(),p
   if(p.mode!=='integrated')cutter=hold(M.union([bladeSolid,hold(hold(rimOuter.subtract(inner)).extrude(p.base))]));
  }
  if(p.mode!=='cutter'&&!cachedStamp){
-  const artPolys=memo('art',()=>{let ink=hold(new C(src,'EvenOdd'));if(p.detailOffset)ink=hold(ink.offset(p.detailOffset,'Round',2,128));
-  if(p.removeOutline)ink=hold(ink.intersect(hold(original.offset(-p.outlineBand,'Round',2,256))));
-  const footprint=p.mode==='integrated'?outer:silhouette(hold(original.offset(-p.stampInset,'Round',2,256)));
+  const artPolys=memo('art',()=>{let ink=hold(new C(src,'EvenOdd'));if(p.detailOffset)ink=hold(ink.offset(p.detailOffset,'Round',2,detailSegments));
+  if(p.removeOutline)ink=hold(ink.intersect(hold(original.offset(-p.outlineBand,'Round',2,roundSegments))));
+  const footprint=p.mode==='integrated'?outer:silhouette(hold(original.offset(-p.stampInset,'Round',2,roundSegments)));
   const art=hold(ink.intersect(footprint));if(art.isEmpty())throw Error('Nenhum detalhe restou no carimbo. Reduza a remoção de borda ou o recuo.');return art.toPolygons();});
   reliefOutline=artPolys;
   const art=hold(new C(artPolys,'EvenOdd')),zBase=p.mode==='integrated'?p.base:p.stampBase;
-  const baseFootprint=hold(new C(memo('footprint',()=>{const footprint=p.mode==='integrated'?outer:silhouette(hold(original.offset(-p.stampInset,'Round',2,256)));return (p.mode!=='integrated'&&p.stampExpansion>0?silhouette(hold(original.offset(p.stampExpansion-p.stampInset,'Round',2,256))):footprint).toPolygons();}),'EvenOdd'));
+  const baseFootprint=hold(new C(memo('footprint',()=>{const footprint=p.mode==='integrated'?outer:silhouette(hold(original.offset(-p.stampInset,'Round',2,roundSegments)));return (p.mode!=='integrated'&&p.stampExpansion>0?silhouette(hold(original.offset(p.stampExpansion-p.stampInset,'Round',2,roundSegments))):footprint).toPolygons();}),'EvenOdd'));
   if(p.mode!=='integrated')stampBaseSolid=hold(baseFootprint.extrude(p.stampBase));
   if(p.reliefInverted){
    // Relevo invertido não cava a base estrutural. A profundidade define uma camada
@@ -158,7 +160,7 @@ export function build(m,loops,params,ctx=null){const started=performance.now(),p
  else if(p.mode==='separate')parts=p.reliefSeparate?[{name:'Cortador',solid:cutter},{name:'Base do carimbo',solid:stampBaseSolid},{name:'Relevo',solid:reliefPart}]:[{name:'Cortador',solid:cutter},{name:'Carimbo',solid:stamp}];
  else if(p.mode==='stamp')parts=p.reliefSeparate?[{name:'Base do carimbo',solid:stampBaseSolid},{name:'Relevo',solid:reliefPart}]:[{name:'Carimbo',solid:stamp}];
  else parts=[{name:'Cortador',solid:cutter}];
- const result={parts:parts.map(({name,solid})=>{if(name==='Cortador'&&cachedCutter)return cachedCutter.part;if(name==='Carimbo'&&cachedStamp)return cachedStamp.part;solid=hold(solid.setTolerance(.001));if(solid.status()!=='NoError'||solid.isEmpty())throw Error(`${name}: falha na construção do sólido (${solid.status()}).`);const mesh=cleanExportMesh(solid.getMesh()),stats=checkMesh(mesh);if(stats.open||stats.nonmanifold||!stats.finite)throw Error(`${name}: malha inválida (${JSON.stringify(stats)}), exportação bloqueada.`);const components=solid.decompose();const bodies=components.length;components.forEach(s=>s.delete());return {name,positions:Float32Array.from(mesh.vertProperties),indices:Uint32Array.from(mesh.triVerts),stride:mesh.numProp,volume:solid.volume(),bounds:solid.boundingBox(),stats,bodies};}),outline:outer.toPolygons(),reliefOutline,cuttingOutline:cachedCutter?.cuttingOutline||inner?.toPolygons()||[],bladeProfile:cachedCutter?.bladeProfile||bladeProfile,params:p};for(const part of result.parts){if(part.name==='Cortador'&&!cachedCutter)ctx?.set('cutter',{part,cuttingOutline:result.cuttingOutline,bladeProfile:result.bladeProfile});if(part.name==='Carimbo'&&!cachedStamp)ctx?.set('stamp',{part});}result.elapsed=performance.now()-started;return result;
+ const result={parts:parts.map(({name,solid})=>{if(name==='Cortador'&&cachedCutter)return cachedCutter.part;if(name==='Carimbo'&&cachedStamp)return cachedStamp.part;solid=hold(solid.setTolerance(.001));if(solid.status()!=='NoError'||solid.isEmpty())throw Error(`${name}: falha na construção do sólido (${solid.status()}).`);const mesh=cleanExportMesh(solid.getMesh()),stats=checkMesh(mesh);if(stats.open||stats.nonmanifold||!stats.finite)throw Error(`${name}: malha inválida (${JSON.stringify(stats)}), exportação bloqueada.`);const components=solid.decompose();const bodies=components.length;components.forEach(s=>s.delete());return {name,positions:Float32Array.from(mesh.vertProperties),indices:Uint32Array.from(mesh.triVerts),stride:mesh.numProp,volume:solid.volume(),bounds:solid.boundingBox(),stats,bodies};}),outline:outer.toPolygons(),reliefOutline,cuttingOutline:cachedCutter?.cuttingOutline||inner?.toPolygons()||[],bladeProfile:cachedCutter?.bladeProfile||bladeProfile,params:p,buildProfile,sourcePoints};for(const part of result.parts){if(part.name==='Cortador'&&!cachedCutter)ctx?.set('cutter',{part,cuttingOutline:result.cuttingOutline,bladeProfile:result.bladeProfile});if(part.name==='Carimbo'&&!cachedStamp)ctx?.set('stamp',{part});}result.elapsed=performance.now()-started;return result;
  }finally{keep.reverse().forEach(o=>o.delete());}}
 
 // Boolean editing preserves filled-region topology. Brush paths are widened to real areas.
