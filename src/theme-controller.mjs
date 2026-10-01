@@ -1,6 +1,9 @@
 const STORAGE_KEY='rv-theme-v2';
 const LEGACY_KEY='rv-ui-light';
 
+export const MODEL_COLORS=Object.freeze({cutterBase:'#2f9fe8',blade:'#126fd0',stampBase:'#25c7b5',relief:'#f2a93b'});
+export const LEGACY_MODEL_COLORS=Object.freeze({cutterBase:'#78a9ee',blade:'#e9b45e',stampBase:'#659ea9',relief:'#7be0b6'});
+
 const THEMES={
  dark:{
   appBg:'#080c10',chrome:'#0d1319',surface1:'#121a21',surface2:'#182128',surface3:'#22303a',surfaceElevated:'#263641',
@@ -51,7 +54,7 @@ const CSS_NAMES={
  sketchConstrained:'--rv-sketch-constrained',sketchConstruction:'--rv-sketch-construction',sketchConstraint:'--rv-sketch-constraint',sketchHandle:'--rv-sketch-handle',sketchBlade:'--rv-sketch-blade'
 };
 
-let current='dark',revision=0;
+let current='dark',revision=0,lastAudit={checked:0,corrected:0,violations:[]},auditTimer=0,observer=null;
 
 function parseColor(value){
  const s=String(value||'').trim();
@@ -93,11 +96,30 @@ function applyCss(tokens){
  }
 }
 
+function rgba(value){
+ const s=String(value||'').trim(),rgb=parseColor(s);if(!rgb)return null;
+ const m=s.match(/^rgba?\(([^)]+)\)$/i),alpha=m&&m[1].split(',').length>3?Math.max(0,Math.min(1,Number(m[1].split(',')[3]))):1;
+ return [...rgb,Number.isFinite(alpha)?alpha:1];
+}
+function composite(fg,bg){const a=fg[3]+bg[3]*(1-fg[3]);if(a<=1e-6)return [255,255,255,0];return [0,1,2].map(i=>(fg[i]*fg[3]+bg[i]*bg[3]*(1-fg[3]))/a).concat(a);}
+function effectiveBackground(el){
+ const layers=[];for(let n=el;n&&n.nodeType===1;n=n.parentElement){const v=rgba(getComputedStyle(n).backgroundColor);if(v&&v[3]>0)layers.push(v);if(v?.[3]>=.995)break;}
+ let bg=current==='light'?[255,255,255,1]:[8,12,16,1];for(let i=layers.length-1;i>=0;i--)bg=composite(layers[i],bg);return '#'+bg.slice(0,3).map(v=>Math.round(v).toString(16).padStart(2,'0')).join('');
+}
+export function auditContrast(root=document.body,{fix=true}={}){
+ if(!root)return {checked:0,corrected:0,violations:[]};const violations=[];let checked=0,corrected=0;
+ const nodes=root.querySelectorAll('button,label,p,span,small,strong,h1,h2,h3,h4,summary,input,select,textarea,code,[role="status"]');
+ for(const el of nodes){if(el.closest('[hidden],[aria-hidden="true"]')||el.dataset.rvContrastExempt==='true')continue;const cs=getComputedStyle(el),r=el.getBoundingClientRect();if(cs.display==='none'||cs.visibility==='hidden'||Number(cs.opacity)<.2||r.width<1||r.height<1)continue;const fg=cs.color,bg=effectiveBackground(el);if(!parseColor(fg)||!parseColor(bg))continue;const size=parseFloat(cs.fontSize)||12,weight=parseInt(cs.fontWeight)||400,min=size>=24||size>=18&&weight>=700?3:4.5,ratio=contrastRatio(fg,bg);checked++;if(ratio+1e-3<min){const safe=ensureContrast(fg,bg,min);violations.push({tag:el.tagName,id:el.id||null,className:typeof el.className==='string'?el.className:'',ratio:+ratio.toFixed(2),min,foreground:fg,background:bg,safe});if(fix){el.style.setProperty('--rv-auto-contrast',safe);el.classList.add('rv-contrast-guard');corrected++;}}else if(fix&&el.classList.contains('rv-contrast-guard')){el.classList.remove('rv-contrast-guard');el.style.removeProperty('--rv-auto-contrast');}}
+ lastAudit={checked,corrected,violations:violations.slice(0,100)};return lastAudit;
+}
+function scheduleContrastAudit(){clearTimeout(auditTimer);auditTimer=setTimeout(()=>requestAnimationFrame(()=>auditContrast(document.body)),30);}
+function installContrastObserver(){if(observer||!document.body)return;observer=new MutationObserver(m=>{if(m.some(x=>x.addedNodes?.length))scheduleContrastAudit();});observer.observe(document.body,{subtree:true,childList:true});}
+
 export function setTheme(name,{persist=true,emit=true}={}){
  current=name==='light'?'light':'dark';const tokens=normalized(current);revision++;applyCss(tokens);
  if(persist)try{localStorage.setItem(STORAGE_KEY,current);localStorage.removeItem(LEGACY_KEY);}catch{}
  if(emit)window.dispatchEvent(new CustomEvent('rv-theme-change',{detail:{name:current,revision,tokens:{...tokens}}}));
- return current;
+ scheduleContrastAudit();return current;
 }
 export function toggleTheme(){return setTheme(current==='light'?'dark':'light');}
 export function initTheme(){
@@ -114,9 +136,9 @@ export function themeDiagnostics(){
   ['textPrimary','surface2',7],['textSecondary','surface2',4.5],['textOnAccent','accent',4.5],
   ['dimensionText','dimensionBg',7],['dimensionEditable','dimensionBg',4.5],['measureLabel','viewportBg',4.5]
  ];
- return {theme:current,revision,pairs:pairs.map(([fg,bg,min])=>({fg,bg,min,ratio:+contrastRatio(t[fg],t[bg]).toFixed(2),pass:contrastRatio(t[fg],t[bg])>=min})),tokens:t};
+ return {theme:current,revision,pairs:pairs.map(([fg,bg,min])=>({fg,bg,min,ratio:+contrastRatio(t[fg],t[bg]).toFixed(2),pass:contrastRatio(t[fg],t[bg])>=min})),audit:lastAudit,tokens:t};
 }
 export function installThemeGlobal(){
- window.RVTheme={init:initTheme,set:setTheme,toggle:toggleTheme,name:themeName,color:themeColor,snapshot:themeSnapshot,contrastRatio,ensureContrast,diagnostics:themeDiagnostics};
- return window.RVTheme;
+ window.RVTheme={init:initTheme,set:setTheme,toggle:toggleTheme,name:themeName,color:themeColor,snapshot:themeSnapshot,contrastRatio,ensureContrast,audit:auditContrast,diagnostics:themeDiagnostics};
+ installContrastObserver();scheduleContrastAudit();return window.RVTheme;
 }
