@@ -149,7 +149,7 @@ async function cdp(url){
   await send('Input.dispatchMouseEvent',{type:'mouseMoved',...pick,button:'none'});
   await send('Input.dispatchMouseEvent',{type:'mousePressed',...pick,button:'left',clickCount:1});
   await send('Input.dispatchMouseEvent',{type:'mouseReleased',...pick,button:'left',clickCount:1});
-  assert(await evalv("!!document.querySelector('#editor path[data-loop][stroke=\"#e5852d\"]')"),'Imported contour must be selectable six pixels away');
+  assert(await evalv("(()=>{const p=document.querySelector('#editor path[data-loop]');return !!p&&p.getAttribute('stroke')===RVTheme.color('sketchSelected')})()"),'Imported contour must be selectable six pixels away');
   console.log('Integration regressions: undo/redo, preset, STL, Sketch switch, import, proximity picking PASS');
 
   await evalv("RVTest.finishSketch(true);true");
