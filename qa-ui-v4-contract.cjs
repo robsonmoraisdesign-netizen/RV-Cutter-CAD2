@@ -2,6 +2,8 @@ const assert=require('node:assert/strict'),fs=require('fs');
 const html=fs.readFileSync('app/index.html','utf8');
 const css=fs.readFileSync('app/ui-v4.css','utf8');
 const ui=fs.readFileSync('src/ui.mjs','utf8');
+const geometry=fs.readFileSync('src/geometry.mjs','utf8');
+const worker=fs.readFileSync('src/worker.mjs','utf8');
 
 for(const token of [
   'class="app-header v4-top"','id="tabHome"','id="tab3d"','id="tab2d"','id="tabPresentation"',
@@ -32,4 +34,7 @@ for(const token of ['installMasterLayout','syncMasterShell','syncViewportChrome'
   assert(ui.includes(token),'Missing v4 MASTER behavior: '+token);
 assert(ui.includes("document.body.classList.toggle('drawer-collapsed')"),'Project drawer collapse wiring missing.');
 assert(ui.includes('featureTree(o)')&&ui.includes('convertToCutter'),'Sketch/Feature tree wiring missing.');
+assert(ui.includes('RV_WORKER_TIMEOUT')&&ui.includes("buildProfile:'recovery'")&&ui.includes('workerRestarts'),'Stuck-worker watchdog and automatic recovery path missing.');
+assert(geometry.includes('maxChamferProfiles')&&geometry.includes("buildProfile==='recovery'?12")&&geometry.includes('automaticSafe'),'Adaptive complexity guard for expensive chamfer builds missing.');
+assert(worker.includes("buildProfile:d.buildProfile||'normal'"),'Worker must forward geometry build profiles.');
 console.log('Workspace System v4 MASTER COMPLETE contract: PASS');
