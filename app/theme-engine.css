@@ -259,3 +259,122 @@ body.sketching #editor{background:var(--rv-sketch-bg)!important}
 .command-palette-v4,.leave-project-dialog) :where(p,span,label,strong,small,button,summary){
   text-shadow:none!important;
 }
+
+
+/* Highest-priority semantic remap for legacy 14.28.x high-contrast overrides. */
+body[data-rv-theme] .right .primary,
+body[data-rv-theme] .finish-sketch,
+body[data-rv-theme] .v4-actions #export{
+  background:var(--rv-accent)!important;
+  color:var(--rv-text-on-accent)!important;
+  border-color:transparent!important;
+}
+body[data-rv-theme] .brand-mark{background:var(--rv-accent)!important;color:var(--rv-text-on-accent)!important}
+body[data-rv-theme] .workspace-nav{
+  background:var(--rv-app-bg)!important;
+  border-color:var(--rv-border-subtle)!important;
+}
+body[data-rv-theme] .workspace-tab{color:var(--rv-text-muted)!important}
+body[data-rv-theme] .workspace-tab:hover{
+  background:var(--rv-hover-bg)!important;color:var(--rv-text-primary)!important
+}
+body[data-rv-theme] .workspace-tab.active{
+  background:var(--rv-active-bg)!important;color:var(--rv-text-primary)!important;
+  box-shadow:inset 0 0 0 1px var(--rv-border-strong)!important
+}
+body[data-rv-theme] :is(.v4-actions .header-action,.v4-actions .icon-button,.command-button,.workspace .view-actions>button,.workspace .visual-menu>summary){
+  background:var(--rv-surface-2)!important;border-color:var(--rv-border-strong)!important;color:var(--rv-text-secondary)!important
+}
+body[data-rv-theme] :is(.v4-actions .header-action,.v4-actions .icon-button,.command-button,.workspace .view-actions>button,.workspace .visual-menu>summary):hover{
+  background:var(--rv-hover-bg)!important;border-color:var(--rv-focus)!important;color:var(--rv-text-primary)!important
+}
+body[data-rv-theme] :is(.brand-copy strong,.workspace-context-title strong,.right>.config-heading h2,.outliner-heading h2,.viewport-title strong,.right h2){
+  color:var(--rv-text-primary)!important;text-shadow:none!important
+}
+body[data-rv-theme] :is(.brand-copy small,.workspace-context-title span,.section-eyebrow,.outliner-heading .section-eyebrow,.canvas-eyebrow,.viewport-title .canvas-eyebrow){
+  color:var(--rv-accent-hover)!important
+}
+body[data-rv-theme] .right>.config-heading{
+  background:var(--rv-chrome)!important;border-bottom-color:var(--rv-border-subtle)!important
+}
+body[data-rv-theme] .inspector-levels{
+  background:var(--rv-app-bg)!important;border-color:var(--rv-border-subtle)!important
+}
+body[data-rv-theme] .inspector-levels button{color:var(--rv-text-muted)!important}
+body[data-rv-theme] .inspector-levels button.active{
+  background:var(--rv-active-bg)!important;color:var(--rv-text-primary)!important;
+  box-shadow:inset 0 0 0 1px var(--rv-border-strong)!important
+}
+body[data-rv-theme] :is(.param-group,.option-card,.preset-box,.preset-block,.advanced-card){
+  background:var(--rv-surface-2)!important;border-color:var(--rv-border-subtle)!important
+}
+body[data-rv-theme] :is(.param-group>summary,.option-card>summary){color:var(--rv-text-secondary)!important}
+body[data-rv-theme] :is(.range-pair label,.field,.check,.hint){color:var(--rv-text-secondary)!important}
+body[data-rv-theme] :is(input,select,textarea){
+  background:var(--rv-input-bg)!important;border-color:var(--rv-border-strong)!important;color:var(--rv-text-primary)!important
+}
+body[data-rv-theme] :is(input,select,textarea):focus{
+  border-color:var(--rv-focus)!important;
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--rv-focus) 20%,transparent)!important
+}
+body[data-rv-theme] .layer{background:var(--rv-surface-1)!important;border-color:var(--rv-border-subtle)!important}
+body[data-rv-theme] .layer:hover{background:var(--rv-hover-bg)!important;border-color:var(--rv-border-strong)!important}
+body[data-rv-theme] .layer.active{
+  background:var(--rv-accent-soft)!important;border-color:var(--rv-accent)!important;
+  box-shadow:inset 3px 0 0 var(--rv-accent)!important
+}
+body[data-rv-theme] .layer.active :is(.layer-name,.layer-name strong){color:var(--rv-text-primary)!important}
+body[data-rv-theme] .object-search-wrap,
+body[data-rv-theme] .project-drawer-v4 #layers{
+  background:var(--rv-surface-1)!important;border-color:var(--rv-border-subtle)!important
+}
+body[data-rv-theme] .piece-mode-host .mode-block{
+  background:var(--rv-surface-elevated)!important;border-color:var(--rv-border-strong)!important;
+  box-shadow:var(--rv-shadow-elevation)!important
+}
+body[data-rv-theme] .piece-mode-host .mini-label{color:var(--rv-text-muted)!important}
+body[data-rv-theme] .piece-mode-host .mode-grid button{color:var(--rv-text-secondary)!important}
+body[data-rv-theme] .piece-mode-host .mode-grid button.active{
+  background:var(--rv-accent-soft)!important;border-color:var(--rv-accent)!important;color:var(--rv-text-primary)!important
+}
+body[data-rv-theme] .viewport-title{
+  background:var(--rv-surface-elevated)!important;border-color:var(--rv-border-strong)!important;
+  box-shadow:0 10px 26px var(--rv-shadow-color)!important
+}
+body[data-rv-theme] .viewport-title span{color:var(--rv-text-muted)!important}
+body[data-rv-theme] .view-badge{
+  background:var(--rv-surface-elevated)!important;border-color:var(--rv-border-strong)!important;color:var(--rv-text-secondary)!important
+}
+body[data-rv-theme] .visual-popover{
+  background:var(--rv-surface-elevated)!important;border-color:var(--rv-border-strong)!important;color:var(--rv-text-primary)!important;
+  box-shadow:var(--rv-shadow-elevation)!important
+}
+body[data-rv-theme] .visual-popover .popover-title strong{color:var(--rv-text-primary)!important}
+body[data-rv-theme] .visual-popover .popover-title small{color:var(--rv-text-muted)!important}
+body[data-rv-theme] :is(.app-header.v4-top,.workspace .toolbar,.project-drawer-v4,.right){background:var(--rv-chrome)!important}
+body[data-rv-theme] :is(.workspace .toolbar,.right,.project-drawer-v4){border-color:var(--rv-border-subtle)!important}
+
+/* Sketch semantic states. */
+body[data-rv-theme] #editor .sketch-entity-visible.entity-under{stroke:var(--rv-sketch-entity)!important}
+body[data-rv-theme] #editor .sketch-entity-visible.entity-defined{stroke:var(--rv-sketch-constrained)!important}
+body[data-rv-theme] #editor .sketch-entity-visible.entity-conflict{stroke:var(--rv-danger)!important}
+body[data-rv-theme] #editor .sketch-entity-visible.entity-selected{stroke:var(--rv-sketch-selected)!important}
+body[data-rv-theme] #editor .sketch-entity-hit:hover + .sketch-entity-visible{stroke:var(--rv-sketch-hover)!important}
+body[data-rv-theme] #editor .sketch-reference-awake{stroke:var(--rv-sketch-selected)!important}
+body[data-rv-theme] #editor .sketch-box-select{fill:var(--rv-accent-soft)!important;stroke:var(--rv-info)!important}
+body[data-rv-theme] #editor .sketch-box-select.crossing{fill:var(--rv-accent-soft)!important;stroke:var(--rv-sketch-constrained)!important}
+body[data-rv-theme] #editor .sketch-inference-icon{fill:var(--rv-sketch-constrained)!important;stroke:var(--rv-sketch-handle)!important}
+body[data-rv-theme] #editor .sketch-midpoint-marker{fill:var(--rv-sketch-handle)!important;stroke:var(--rv-sketch-constrained)!important}
+body[data-rv-theme] #editor .sketch-dimension{fill:var(--rv-text-secondary)!important}
+body[data-rv-theme] #editor .sketch-dimension.driven{fill:var(--rv-text-muted)!important}
+body[data-rv-theme] #editor .sketch-constraint-badge{fill:var(--rv-sketch-constrained)!important}
+body[data-rv-theme] #editor .sketch-bezier-polygon{stroke:var(--rv-sketch-construction)!important}
+body[data-rv-theme] #editor .sketch-bezier-control{fill:var(--rv-sketch-handle)!important;stroke:var(--rv-sketch-construction)!important}
+body[data-rv-theme] #editor .bezier-preview{stroke:var(--rv-sketch-selected)!important}
+body[data-rv-theme] #editor .sketch-point-visible{fill:var(--rv-sketch-entity)!important}
+body[data-rv-theme] #editor .sketch-point-visible.entity-defined{fill:var(--rv-sketch-constrained)!important}
+body[data-rv-theme] #editor .sketch-point-visible.entity-conflict{fill:var(--rv-danger)!important}
+body[data-rv-theme] #editor .sketch-point-visible.entity-selected{fill:var(--rv-sketch-selected)!important}
+body[data-rv-theme] #editor .sketch-point-hit:hover + .sketch-point-visible{
+  fill:var(--rv-sketch-hover)!important;stroke:var(--rv-sketch-hover)!important
+}
