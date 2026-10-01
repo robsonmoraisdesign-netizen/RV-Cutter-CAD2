@@ -22,6 +22,10 @@ assert(css.includes('.inspector-levels'),'Essential/Advanced/Expert inspector mi
 assert(css.includes('.sketch-reference-tile'),'Multi-object Sketch reference dock missing.');
 assert(html.includes('value="cad" selected')&&html.includes('CAD técnico · faces + arestas'),'CAD technical display must be the default 3D style.');
 assert(css.includes('min-height:180px'),'Outliner must retain a usable object-list height.');
+assert(html.includes('todas as configurações salvas, inclusive modo, relevo, chanfro e ajustes locais da lâmina'),'Preset UI must describe complete parameter application.');
+assert(ui.includes("version:2,featureType:'cookie-cutter'"),'Preset v2 complete schema missing.');
+assert(ui.includes('batchProtectedIds')&&ui.includes('limit=384*1024*1024'),'Batch geometry protection/memory policy missing.');
+assert(!ui.includes('params.wallEdits=[];const row={id:uid(),name,params,version:1}'),'Legacy preset code must not silently strip wall edits.');
 assert(css.includes('#pieceModeHost:not([hidden])~.viewport-title{top:68px!important}'),'Viewport title must move below the piece-mode selector.');
 assert(css.includes('--v4-bg:#080c10')&&css.includes('--v4-text:#ffffff'),'Stronger high-contrast global UI palette missing.');
 for(const token of ['installMasterLayout','syncMasterShell','syncViewportChrome','ensureOutlinerVisible','convertAllToCutters','importFiles',"objects:()=>state.objects","state.stage='2d'","$('tab2d').onclick=()=>setStage('2d')"])
