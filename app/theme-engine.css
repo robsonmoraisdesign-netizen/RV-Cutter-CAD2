@@ -365,9 +365,11 @@ body[data-rv-theme] #editor .sketch-box-select{fill:var(--rv-accent-soft)!import
 body[data-rv-theme] #editor .sketch-box-select.crossing{fill:var(--rv-accent-soft)!important;stroke:var(--rv-sketch-constrained)!important}
 body[data-rv-theme] #editor .sketch-inference-icon{fill:var(--rv-sketch-constrained)!important;stroke:var(--rv-sketch-handle)!important}
 body[data-rv-theme] #editor .sketch-midpoint-marker{fill:var(--rv-sketch-handle)!important;stroke:var(--rv-sketch-constrained)!important}
-body[data-rv-theme] #editor .sketch-dimension{fill:var(--rv-text-secondary)!important}
-body[data-rv-theme] #editor .sketch-dimension.driven{fill:var(--rv-text-muted)!important}
-body[data-rv-theme] #editor .sketch-constraint-badge{fill:var(--rv-sketch-constrained)!important}
+body[data-rv-theme] #editor .sketch-dimension{fill:var(--rv-sketch-dimension)!important;stroke:var(--rv-sketch-text-outline)!important;font-weight:750!important}
+body[data-rv-theme] #editor .sketch-dimension.driven{fill:var(--rv-sketch-dimension-driven)!important;stroke:var(--rv-sketch-text-outline)!important;font-weight:650!important}
+body[data-rv-theme] #editor .sketch-live-dimension{fill:var(--rv-sketch-live-dimension)!important;stroke:var(--rv-sketch-text-outline)!important;font-weight:750!important}
+body[data-rv-theme] #editor .sketch-constraint-badge{fill:var(--rv-sketch-constraint-text)!important;stroke:var(--rv-sketch-text-outline)!important;font-weight:850!important}
+body[data-rv-theme] #editor .sketch-inference-icon{fill:var(--rv-sketch-constraint-text)!important;stroke:var(--rv-sketch-text-outline)!important}
 body[data-rv-theme] #editor .sketch-bezier-polygon{stroke:var(--rv-sketch-construction)!important}
 body[data-rv-theme] #editor .sketch-bezier-control{fill:var(--rv-sketch-handle)!important;stroke:var(--rv-sketch-construction)!important}
 body[data-rv-theme] #editor .bezier-preview{stroke:var(--rv-sketch-selected)!important}
@@ -377,4 +379,98 @@ body[data-rv-theme] #editor .sketch-point-visible.entity-conflict{fill:var(--rv-
 body[data-rv-theme] #editor .sketch-point-visible.entity-selected{fill:var(--rv-sketch-selected)!important}
 body[data-rv-theme] #editor .sketch-point-hit:hover + .sketch-point-visible{
   fill:var(--rv-sketch-hover)!important;stroke:var(--rv-sketch-hover)!important
+}
+
+
+/* 14.28.12 · Sketch readability pass — CAD canvas text and chrome are separate roles. */
+body[data-rv-theme].sketching .sketch-commandbar,
+body[data-rv-theme].sketching .sketch-contextbar{
+  color:var(--rv-text-primary)!important;
+}
+body[data-rv-theme].sketching .sketch-tool-button,
+body[data-rv-theme].sketching .v4-command-grid>button,
+body[data-rv-theme].sketching .reference-menu>button,
+body[data-rv-theme].sketching .constraint-menu>button{
+  font-size:10px!important;
+  font-weight:650!important;
+  color:var(--rv-text-secondary)!important;
+}
+body[data-rv-theme].sketching .sketch-tool-icon{font-size:18px!important}
+body[data-rv-theme].sketching .constraint-icon{
+  color:var(--rv-accent-hover)!important;
+  border-color:var(--rv-border-strong)!important;
+  font-weight:800!important;
+}
+body[data-rv-theme].sketching .sketch-show-constraints{
+  color:var(--rv-text-secondary)!important;
+  font-size:9.5px!important;
+  font-weight:600!important;
+}
+body[data-rv-theme].sketching .sketch-status-chip{
+  color:var(--rv-text-primary)!important;
+  font-size:10px!important;
+  font-weight:650!important;
+  min-width:150px!important;
+}
+body[data-rv-theme].sketching .sketch-contextbar #selection{
+  color:var(--rv-text-primary)!important;
+  font-size:10.5px!important;
+  font-weight:600!important;
+}
+body[data-rv-theme].sketching .sketch-context-hint{
+  color:var(--rv-text-secondary)!important;
+  font-size:9.5px!important;
+  font-weight:550!important;
+}
+body[data-rv-theme].sketching .sketch-inline-dimension{
+  background:var(--rv-surface-elevated)!important;
+  color:var(--rv-text-primary)!important;
+  border-color:var(--rv-focus)!important;
+}
+body[data-rv-theme].sketching .sketch-inline-dimension>span:first-child,
+body[data-rv-theme].sketching .sketch-inline-dimension>span:nth-child(3){
+  color:var(--rv-text-secondary)!important;
+  font-size:9.5px!important;
+  font-weight:650!important;
+}
+body[data-rv-theme].sketching .sketch-selection-meta{
+  color:var(--rv-text-secondary)!important;
+  font-size:11px!important;
+  line-height:1.55!important;
+}
+body[data-rv-theme].sketching .inspector-badge{
+  color:var(--rv-text-secondary)!important;
+  border-color:var(--rv-border-strong)!important;
+  font-size:9.5px!important;
+  font-weight:650!important;
+}
+body[data-rv-theme].sketching .sketch-dimension-row>span,
+body[data-rv-theme].sketching .sketch-driving small{
+  color:var(--rv-text-secondary)!important;
+  font-size:9.5px!important;
+}
+body[data-rv-theme].sketching .property-group-title .mini-label,
+body[data-rv-theme].sketching .sketch-menu-separator span{
+  color:var(--rv-text-secondary)!important;
+}
+body[data-rv-theme].sketching #editor .sketch-svg-text{
+  paint-order:stroke!important;
+  stroke-linejoin:round!important;
+}
+body[data-rv-theme].sketching #editor .sketch-dimension{
+  font-size:1.9%!important;
+  stroke-width:.0065!important;
+}
+body[data-rv-theme].sketching #editor .sketch-live-dimension{
+  font-size:1.85%!important;
+  stroke-width:.0065!important;
+}
+body[data-rv-theme].sketching #editor .sketch-constraint-badge,
+body[data-rv-theme].sketching #editor .sketch-inference-icon{
+  font-size:1.7%!important;
+  stroke-width:.0065!important;
+}
+body[data-rv-theme].sketching #editor .sketch-axis{
+  stroke:var(--rv-sketch-text-muted)!important;
+  opacity:.72!important;
 }
