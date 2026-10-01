@@ -4,6 +4,8 @@ const css=fs.readFileSync('app/ui-v4.css','utf8');
 const ui=fs.readFileSync('src/ui.mjs','utf8');
 const geometry=fs.readFileSync('src/geometry.mjs','utf8');
 const worker=fs.readFileSync('src/worker.mjs','utf8');
+const themeCss=fs.readFileSync('app/theme-engine.css','utf8');
+const themeSource=fs.readFileSync('src/theme-controller.mjs','utf8');
 // 14.28.10: one pathological object must not permanently poison the shared geometry worker.
 
 for(const token of [
@@ -18,7 +20,9 @@ for(const token of [
 assert(!html.includes('id="tab2d" class="workspace-tab" hidden'),'Sketch 2D must be a visible persistent workspace.');
 assert.equal((html.match(/id="viewport"/g)||[]).length,1,'Viewport ID must be unique.');
 assert(/id="artFile"[^>]*multiple/.test(html),'Artwork picker must support multiple image files.');
-assert(css.includes('--v4-brand:#22ddb9'),'Stronger high-contrast v4 teal token missing.');
+assert(css.includes('--v4-brand:var(--rv-accent)'),'V4 brand must be routed through the semantic appearance engine.');
+assert(html.includes('theme-engine.css')&&themeCss.includes('--rv-focus'),'Universal appearance engine stylesheet missing.');
+assert(themeSource.includes('THEMES=')&&themeSource.includes('auditContrast')&&themeSource.includes('ensureContrast'),'Universal theme/contrast controller missing.');
 assert(css.includes('grid-template-columns:var(--v4-rail) var(--v4-drawer) minmax(0,1fr) var(--v4-inspector)'),'V4 rail/drawer/viewport/inspector layout missing.');
 assert(css.includes('.piece-mode-host'),'Piece type selector must live in the viewport workspace.');
 assert(css.includes('.inspector-levels'),'Essential/Advanced/Expert inspector missing.');
@@ -30,7 +34,7 @@ assert(ui.includes("version:2,featureType:'cookie-cutter'"),'Preset v2 complete 
 assert(ui.includes('batchProtectedIds')&&ui.includes('limit=384*1024*1024'),'Batch geometry protection/memory policy missing.');
 assert(!ui.includes('params.wallEdits=[];const row={id:uid(),name,params,version:1}'),'Legacy preset code must not silently strip wall edits.');
 assert(css.includes('#pieceModeHost:not([hidden])~.viewport-title{top:68px!important}'),'Viewport title must move below the piece-mode selector.');
-assert(css.includes('--v4-bg:#080c10')&&css.includes('--v4-text:#ffffff'),'Stronger high-contrast global UI palette missing.');
+assert(css.includes('--v4-bg:var(--rv-app-bg)')&&css.includes('--v4-text:var(--rv-text-primary)'),'Global v4 palette must be semantic rather than hardcoded.');
 for(const token of ['installMasterLayout','syncMasterShell','syncViewportChrome','ensureOutlinerVisible','convertAllToCutters','importFiles',"objects:()=>state.objects","state.stage='2d'","$('tab2d').onclick=()=>setStage('2d')"])
   assert(ui.includes(token),'Missing v4 MASTER behavior: '+token);
 assert(ui.includes("document.body.classList.toggle('drawer-collapsed')"),'Project drawer collapse wiring missing.');
