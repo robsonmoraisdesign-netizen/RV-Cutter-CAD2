@@ -6,8 +6,8 @@
   </button>
   <nav class="workspace-nav" aria-label="Workspaces">
     <button id="tabHome" class="workspace-tab active">Início</button>
-    <button id="tab3d" class="workspace-tab">Modelo</button>
-    <button id="tab2d" class="workspace-tab" hidden aria-hidden="true">Sketch 2D</button>
+    <button id="tab3d" class="workspace-tab">3D</button>
+    <button id="tab2d" class="workspace-tab">Sketch 2D</button>
     <button id="tabPresentation" class="workspace-tab">Apresentação</button>
   </nav>
   <div class="top-actions v4-actions">
@@ -81,22 +81,24 @@
       </div></details>
     </div>
   </div>
-  <div id="editTools" hidden class="sketch-ribbon onshape-ribbon">
-    <div class="sketch-commandbar" role="toolbar" aria-label="Ferramentas do Sketch 2D">
-      <button data-tool="select" class="sketch-tool-button active" title="Selecionar (Esc)"><span class="sketch-tool-icon">↖</span><span>Selecionar</span></button>
-      <span class="sketch-toolbar-divider"></span>
-      <button data-tool="sketch-line" class="sketch-tool-button" title="Linha (L)"><span class="sketch-tool-icon">╱</span><span>Linha</span></button>
-      <button data-tool="rectangle" class="sketch-tool-button" title="Retângulo (R)"><span class="sketch-tool-icon">□</span><span>Retângulo</span></button>
-      <button data-tool="circle" class="sketch-tool-button" title="Círculo (C)"><span class="sketch-tool-icon">○</span><span>Círculo</span></button>
-      <button data-tool="arc" class="sketch-tool-button" title="Arco de 3 pontos (A)"><span class="sketch-tool-icon">⌒</span><span>Arco</span></button>
-      <button data-tool="bezier" class="sketch-tool-button" title="Bézier multiponto (B)"><span class="sketch-tool-icon">⌁</span><span>Bézier</span></button>
-      <button data-tool="point" class="sketch-tool-button" title="Ponto (P)"><span class="sketch-tool-icon">•</span><span>Ponto</span></button>
-      <span class="sketch-toolbar-divider"></span>
-      <button data-tool="trim" class="sketch-tool-button" title="Trim — aparar até as interseções (M)"><span class="sketch-tool-icon">✂</span><span>Trim</span></button>
-      <button data-tool="extend" class="sketch-tool-button" title="Extend — estender linha até o próximo limite"><span class="sketch-tool-icon">↗</span><span>Extend</span></button>
-      <button id="toggleConstruction" class="sketch-tool-button" title="Alternar geometria de construção"><span class="sketch-tool-icon">┄</span><span>Construção</span></button>
-      <span class="sketch-toolbar-divider"></span>
-      <details class="sketch-menu constraint-dropdown"><summary class="sketch-tool-button"><span class="sketch-tool-icon">⌘</span><span>Restrições</span><span class="chevron">⌄</span></summary><div class="sketch-menu-popover constraint-menu">
+  <div id="editTools" hidden class="sketch-ribbon v4-sketchbar">
+    <div class="sketch-commandbar v4-sketchbar-main" role="toolbar" aria-label="Ferramentas do Sketch 2D">
+      <button data-tool="select" class="sketch-tool-button active standalone-tool" title="Selecionar (Esc)"><span class="sketch-tool-icon">↖</span><span>Selecionar</span></button>
+      <details class="sketch-menu v4-menu-group"><summary class="sketch-tool-button group-summary"><span class="sketch-tool-icon">＋</span><span>Criar</span><span class="chevron">⌄</span></summary><div class="sketch-menu-popover v4-command-grid">
+        <button data-tool="sketch-line" title="Linha (L)"><span class="constraint-icon">╱</span>Linha / Polilinha</button>
+        <button data-tool="rectangle" title="Retângulo (R)"><span class="constraint-icon">□</span>Retângulo</button>
+        <button data-tool="circle" title="Círculo (C)"><span class="constraint-icon">○</span>Círculo</button>
+        <button data-tool="arc" title="Arco de 3 pontos (A)"><span class="constraint-icon">⌒</span>Arco</button>
+        <button data-tool="bezier" title="Bézier multiponto (B)"><span class="constraint-icon">⌁</span>Bézier / Spline</button>
+        <button data-tool="point" title="Ponto (P)"><span class="constraint-icon">•</span>Ponto</button>
+      </div></details>
+      <details class="sketch-menu v4-menu-group"><summary class="sketch-tool-button group-summary"><span class="sketch-tool-icon">✂</span><span>Modificar</span><span class="chevron">⌄</span></summary><div class="sketch-menu-popover v4-command-grid">
+        <button data-tool="trim" title="Aparar até as interseções (M)"><span class="constraint-icon">✂</span>Aparar</button>
+        <button data-tool="extend" title="Estender linha até o próximo limite"><span class="constraint-icon">↗</span>Estender</button>
+        <button id="toggleConstruction" type="button"><span class="constraint-icon">┄</span>Geometria de construção</button>
+        <button id="openThicknessFromSketch" type="button"><span class="constraint-icon">↔</span>Espessar / Offset</button>
+      </div></details>
+      <details class="sketch-menu constraint-dropdown v4-menu-group"><summary class="sketch-tool-button group-summary"><span class="sketch-tool-icon">∥</span><span>Restringir</span><span class="chevron">⌄</span></summary><div class="sketch-menu-popover constraint-menu">
         <button data-constraint="horizontal"><span class="constraint-icon">H</span>Horizontal</button>
         <button data-constraint="vertical"><span class="constraint-icon">V</span>Vertical</button>
         <button data-constraint="coincident"><span class="constraint-icon">●</span>Coincidente</button>
@@ -109,15 +111,24 @@
         <button data-constraint="collinear"><span class="constraint-icon">—</span>Colinear</button>
         <button data-constraint="fixed"><span class="constraint-icon">F</span>Fixar</button>
       </div></details>
-      <button id="sketchDimensionCommand" data-tool="dimension" class="sketch-tool-button" title="Cota (D)"><span class="sketch-tool-icon">↔</span><span>Cota</span></button>
-      <span class="sketch-toolbar-divider"></span>
-      <label class="sketch-show-constraints"><input id="showSketchConstraints" type="checkbox" checked><span>Restrições</span></label>
-      <button id="sketchShortcutCommand" class="sketch-shortcut-button" title="Atalhos do Sketch (S)">S</button>
+      <button id="sketchDimensionCommand" data-tool="dimension" class="sketch-tool-button standalone-tool" title="Cota (D)"><span class="sketch-tool-icon">↔</span><span>Cota</span></button>
+      <details class="sketch-menu v4-menu-group"><summary class="sketch-tool-button group-summary"><span class="sketch-tool-icon">⌁</span><span>Referência</span><span class="chevron">⌄</span></summary><div class="sketch-menu-popover reference-menu">
+        <label class="sketch-show-constraints"><input id="showSketchConstraints" type="checkbox" checked><span>Mostrar restrições</span></label>
+        <button id="sketchShortcutCommand" class="reference-action" title="Atalhos do Sketch (S)"><span class="constraint-icon">S</span>Paleta de atalhos</button>
+      </div></details>
+      <button id="sketchDiagnosticsCommand" class="sketch-tool-button standalone-tool" title="Diagnóstico do Sketch"><span class="sketch-tool-icon">◇</span><span>Diagnóstico</span></button>
       <span id="sketchStatusChip" class="sketch-status-chip" data-state="free"><span class="status-dot"></span><span id="sketchStatus">Sketch vazio</span></span>
     </div>
-    <div class="sketch-contextbar"><span id="selection">Clique para selecionar · arraste uma janela para selecionar em área.</span><span class="sketch-context-hint">Shift suprime inferências · D cota · M trim · S atalhos · Esc selecionar · botão do meio pan</span></div>
+    <div class="sketch-contextbar"><span id="selection">Clique para selecionar · arraste uma janela para selecionar em área.</span><span class="sketch-context-hint">Criar · Modificar · Restringir · Cota · Referência · Diagnóstico</span></div>
   </div>
-  <div id="viewport">
+  <div id="viewport">  <div id="viewport">
+    <div id="pieceModeHost" class="piece-mode-host" hidden></div>
+    <div id="presentationStyles" class="presentation-styles-v4" hidden>
+      <span class="presentation-style-label">ESTILOS DE APRESENTAÇÃO</span>
+      <button type="button" data-pres-style-proxy="illustrated" class="active"><span class="style-preview illustrated"></span><strong>Ilustrado</strong></button>
+      <button type="button" data-pres-style-proxy="technical"><span class="style-preview technical"></span><strong>Técnico</strong></button>
+      <button type="button" data-pres-style-proxy="sketch"><span class="style-preview sketch"></span><strong>Croqui</strong></button>
+    </div>
     <div id="sketchInlineDimension" class="sketch-inline-dimension" hidden><span id="sketchInlineDimensionLabel">Cota</span><input id="sketchInlineDimensionValue" type="number" step="0.01" inputmode="decimal"><span>mm</span><button id="sketchInlineDimensionApply" class="primary">✓</button></div>
     <div id="sketchShortcutPalette" class="sketch-shortcut-palette" hidden>
       <div class="shortcut-title"><strong>Sketch</strong><span>atalho S</span></div>
@@ -136,8 +147,13 @@
     </div><div id="three"></div><svg id="editor" xmlns="http://www.w3.org/2000/svg" hidden></svg><div id="dimensionEditor" class="dimension-editor" hidden><span id="dimensionAxisLabel">Medida</span><div><input id="dimensionValue" type="number" min="0.01" step="0.01" inputmode="decimal"><span>mm</span></div><div class="dimension-editor-actions"><button id="dimensionCancel" title="Cancelar">×</button><button id="dimensionApply" class="primary" title="Aplicar">✓</button></div></div><div class="viewport-title"><span class="canvas-eyebrow">OBJETO ATIVO</span><strong id="modelTitle">Novo projeto</strong><span id="modelSubtitle">Importe uma arte para começar</span></div><div id="busy" hidden>Preparando geometria…</div><div class="view-badge" id="dimensions"></div><div id="emptyCanvas"><div class="empty-icon">＋</div><strong>Traga seu desenho</strong><p>Importe uma imagem com uma ou várias figuras.</p><button id="importEmpty" class="primary">Importar arte</button></div></div>
   <footer><span id="status" role="status">Pronto</span><div id="validation" class="validation">Importe uma arte.</div><span id="meshStats"></span></footer>
 </section>
-<aside class="right">
+<aside class="right" data-level="essential">
   <div class="config-heading"><div><span class="section-eyebrow">PROPRIEDADES</span><h2 id="rightTitle">Configurar função</h2></div><span id="activeObject" class="active-object">nenhum objeto</span></div>
+  <div id="inspectorLevels" class="inspector-levels" role="group" aria-label="Nível de propriedades">
+    <button type="button" data-inspector-level="essential" class="active">Essencial</button>
+    <button type="button" data-inspector-level="advanced">Avançado</button>
+    <button type="button" data-inspector-level="expert">Especialista</button>
+  </div>
   <section id="featurePrompt" class="feature-prompt" hidden><span class="section-eyebrow">SKETCH SELECIONADO</span><strong>Sem função 3D</strong><p>Este Sketch contém apenas a geometria 2D. Use <b>Converter em cortador</b> na árvore do projeto para aplicar a função paramétrica.</p></section>
   <section id="objectMetrics" class="object-metrics" hidden><div class="metrics-head"><div><span class="mini-label">DIMENSÕES FINAIS</span><strong>Geometria gerada</strong></div><span class="metrics-precision">0,01 mm</span></div><div id="metricRows"></div><div class="object-quick-actions"><button id="focusActive">Enquadrar</button><button id="isolateActive">Isolar</button><button id="visibilityActive">Mostrar / ocultar</button></div><p class="metrics-hint">Clique em largura, profundidade ou em uma cota com ✎ para editar. O RV ajusta o parâmetro existente e mede novamente a geometria final.</p></section>
   <section id="sketchInspector" class="sketch-inspector" hidden>
