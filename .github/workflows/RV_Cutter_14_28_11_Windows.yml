@@ -3,7 +3,7 @@ name: RV Cutter 14.28.11 Windows Delivery
 on:
   push:
     branches:
-      - feature/14.28.11-worker-recovery
+      - feature/14.28.11-theme-engine
     paths:
       - .github/workflows/RV_Cutter_14_28_11_Windows.yml
       - app/**
