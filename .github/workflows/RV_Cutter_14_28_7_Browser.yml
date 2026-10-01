@@ -6,6 +6,9 @@ on:
       - feature/14.28.7-multiimport-performance
     paths:
       - .github/workflows/RV_Cutter_14_28_7_Browser.yml
+      - qa-browser-cdp.cjs
+      - app/**
+      - src/**
   workflow_dispatch:
 
 permissions:
