@@ -47,9 +47,12 @@ async function cdp(url){
   const homeShot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync('audit-home-14.27.png',Buffer.from(homeShot.data,'base64'));
   await evalv("document.querySelector('#newProject').click(); true");
   await waitFor(()=>evalv("RVTest.state.screen==='studio' && !!RVTest.state.editingSketchId"));
-  assert(await evalv("document.querySelector('#tab2d').hidden"),'Sketch must not be a separate visible workspace tab');
-  assert(await evalv("!document.querySelector('#three').hidden && !document.querySelector('#editor').hasAttribute('hidden')"),'Sketch must edit inside the same graphics workspace');
-  assert(await evalv("!!document.querySelector('.onshape-ribbon')"),'Contextual Sketch ribbon must be visible');
+  assert(await evalv("!document.querySelector('#tab2d').hidden && getComputedStyle(document.querySelector('#tab2d')).display!=='none'"),'Sketch 2D must be a visible persistent workspace tab');
+  assert(await evalv("document.querySelector('#tab2d').classList.contains('active') && RVTest.state.stage==='2d'"),'New project must enter the Sketch 2D workspace');
+  assert(await evalv("!document.querySelector('#three').hidden && !document.querySelector('#editor').hasAttribute('hidden')"),'Sketch workspace must retain the shared graphics viewport');
+  assert(await evalv("!!document.querySelector('.v4-sketchbar')"),'Approved grouped Sketch toolbar must be visible');
+  assert(await evalv("document.querySelectorAll('.v4-menu-group').length>=4"),'Sketch must expose grouped Create/Modify/Constrain/Reference menus');
+  assert(await evalv("document.querySelector('#inspectorLevels') && !!document.querySelector('[data-inspector-level=\"essential\"]')"),'Inspector levels must exist');
   assert(await evalv("!!document.querySelector('[data-tool=\"trim\"]') && !!document.querySelector('[data-tool=\"extend\"]') && !!document.querySelector('[data-tool=\"bezier\"]')"),'Phase 2 CAD tools must be present');
   assert.equal(await evalv("RVTest.active().features.length"),0,'New Sketch must not auto-create a cutter feature');
 
@@ -108,7 +111,8 @@ async function cdp(url){
   const shotPres=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync('audit-presentation-14.27.png',Buffer.from(shotPres.data,'base64'));
 
   await evalv("RVTest.setStage('3d');RVTest.enterSketch();true");await waitFor(()=>evalv("!!RVTest.state.editingSketchId"));
-  assert(await evalv("!document.querySelector('#three').hidden && !document.querySelector('#editor').hasAttribute('hidden')"),'Re-entering Sketch must keep the unified graphics workspace');
+  assert(await evalv("RVTest.state.stage==='2d' && document.querySelector('#tab2d').classList.contains('active')"),'Re-entering Sketch must activate the Sketch 2D workspace');
+  assert(await evalv("!document.querySelector('#three').hidden && !document.querySelector('#editor').hasAttribute('hidden')"),'Re-entering Sketch must keep the shared graphics viewport');
   await evalv("RVTest.finishSketch(true);true");
 
   await evalv("document.querySelector('#homeBtn').click();true");await waitFor(()=>evalv("document.querySelector('#leaveProjectDialog').open"));
@@ -152,7 +156,7 @@ async function cdp(url){
   assert.deepEqual(exceptions.map(e=>e.params?.exceptionDetails?.text),[]);
   assert.deepEqual(severe.map(e=>e.params?.entry?.text),[]);
   dev.close();
-  console.log('CDP browser smoke: unified Sketch/Feature workspace + verified 3D rendering PASS');
+  console.log('CDP browser smoke: v4 persistent workspaces + grouped Sketch menus + verified 3D rendering PASS');
  }finally{
   proc.kill('SIGKILL');server.close();fs.rmSync(userData,{recursive:true,force:true});
   if(proc.exitCode&&!proc.killed)console.error(stderr.slice(-4000));
