@@ -1,5 +1,6 @@
 import {createSketchController} from './sketch/controller.mjs';
 import {simplify} from './geometry.mjs';
+import {themeColor} from './theme-controller.mjs';
 
 export function createEditor(svg,api){
  let view=[-.65,-.65,1.3,1.3],tool='select',selected=-1,node=-1,region=null,drag=null,hoveredEntity=null,hoveredLoop=null,inference=null,bezierClicks=[],bezierHover=null;
@@ -272,12 +273,12 @@ export function createEditor(svg,api){
   const o=api.object();svg.replaceChildren();svg.setAttribute('viewBox',view.join(' '));if(!o)return;
   renderAxes();
   const n=sketch.native(),nativeCount=n?.entities?.length||0,stateMap=sketch.states();
-  if(o.result?.bladeProfile?.length&&!nativeCount)svg.appendChild(el('path',{class:'blade-preview',d:o.result.bladeProfile.map(p=>path(p.map(([x,y])=>[x/o.result.params.size*(o.result.params.mirror?-1:1),y/o.result.params.size]))+'Z').join(' '),fill:'#d99c32','fill-opacity':.42,'fill-rule':'evenodd','pointer-events':'none'}));
-  if(o.loops.length)svg.appendChild(el('path',{d:o.loops.map(p=>path(p)+'Z').join(' '),class:nativeCount?'sketch-derived-profile':'legacy-profile',fill:'#476a90','fill-rule':'evenodd','fill-opacity':nativeCount?.045:.42,'pointer-events':'none'}));
-  if(!nativeCount)o.loops.forEach((p,i)=>svg.appendChild(el('path',{d:path(p)+'Z',fill:'none',stroke:i===selected?'#e5852d':i===hoveredLoop?'#20a8ba':i===0?'#286bbb':'#597a97','stroke-width':i===selected?2:1.1,'vector-effect':'non-scaling-stroke','pointer-events':'stroke','data-loop':i})));
-  if(selected>=0&&o.loops[selected]&&tool==='select'&&!nativeCount)o.loops[selected].forEach(([x,y],i)=>svg.appendChild(el('circle',{cx:x,cy:-y,r:view[2]*.004,fill:i===node?'#e88024':'white',stroke:'#bd6c21','stroke-width':1,'vector-effect':'non-scaling-stroke','data-node':i})));
-  if(region)svg.appendChild(el('path',{d:path(region)+'Z',fill:'#7cbfff22',stroke:'#45b6a3','stroke-dasharray':'5 4','stroke-width':1.5,'vector-effect':'non-scaling-stroke','pointer-events':'none'}));
-  if(drag?.points?.length)svg.appendChild(el('path',{d:path(drag.points),fill:'none',stroke:tool==='erase'?'#f18787':'#45b6a3','stroke-width':(+$('brushWidth')?.value||.8)/o.params.size,'stroke-linecap':'round','pointer-events':'none'}));
+  if(o.result?.bladeProfile?.length&&!nativeCount)svg.appendChild(el('path',{class:'blade-preview',d:o.result.bladeProfile.map(p=>path(p.map(([x,y])=>[x/o.result.params.size*(o.result.params.mirror?-1:1),y/o.result.params.size]))+'Z').join(' '),fill:themeColor('sketchBlade'),'fill-opacity':.42,'fill-rule':'evenodd','pointer-events':'none'}));
+  if(o.loops.length)svg.appendChild(el('path',{d:o.loops.map(p=>path(p)+'Z').join(' '),class:nativeCount?'sketch-derived-profile':'legacy-profile',fill:themeColor('sketchUnder'),'fill-rule':'evenodd','fill-opacity':nativeCount?.045:.42,'pointer-events':'none'}));
+  if(!nativeCount)o.loops.forEach((p,i)=>svg.appendChild(el('path',{d:path(p)+'Z',fill:'none',stroke:i===selected?themeColor('sketchSelected'):i===hoveredLoop?themeColor('sketchHover'):i===0?themeColor('sketchEntity'):themeColor('sketchConstruction'),'stroke-width':i===selected?2:1.1,'vector-effect':'non-scaling-stroke','pointer-events':'stroke','data-loop':i})));
+  if(selected>=0&&o.loops[selected]&&tool==='select'&&!nativeCount)o.loops[selected].forEach(([x,y],i)=>svg.appendChild(el('circle',{cx:x,cy:-y,r:view[2]*.004,fill:i===node?themeColor('sketchSelected'):themeColor('sketchHandle'),stroke:themeColor('sketchConstraint'),'stroke-width':1,'vector-effect':'non-scaling-stroke','data-node':i})));
+  if(region)svg.appendChild(el('path',{d:path(region)+'Z',fill:themeColor('accentSoft'),'fill-opacity':.45,stroke:themeColor('sketchConstrained'),'stroke-dasharray':'5 4','stroke-width':1.5,'vector-effect':'non-scaling-stroke','pointer-events':'none'}));
+  if(drag?.points?.length)svg.appendChild(el('path',{d:path(drag.points),fill:'none',stroke:tool==='erase'?themeColor('danger'):themeColor('sketchConstrained'),'stroke-width':(+$('brushWidth')?.value||.8)/o.params.size,'stroke-linecap':'round','pointer-events':'none'}));
 
   if(nativeCount){
    for(const e of n.entities){
@@ -285,7 +286,7 @@ export function createEditor(svg,api){
     if(chosen&&tool==='select'){
      const handles=e.type==='point'?[['point',e.position]]:e.type==='line'?[['start',e.start],['end',e.end]]:e.type==='bezier'?e.points.map((p,i)=>[`control:${i}`,p]):[['center',e.center],['radius',[e.center[0]+e.radius,e.center[1]]]];
      if(e.type==='arc')for(const key of ['start','end']){const a=e[key+'Angle'];handles.push([key,[e.center[0]+Math.cos(a)*e.radius,e.center[1]+Math.sin(a)*e.radius]]);}
-     for(const [key,p] of handles){const cc=localPoint(p,n);svg.appendChild(el('circle',{cx:cc[0],cy:-cc[1],r:view[2]*.006,fill:sketch.points().some(p=>p.entity===e.id&&p.point===key)?'#f4b860':'#eef4f3',stroke:'#258d7d','stroke-width':1,'vector-effect':'non-scaling-stroke','data-entity':e.id,'data-handle':key}));}
+     for(const [key,p] of handles){const cc=localPoint(p,n);svg.appendChild(el('circle',{cx:cc[0],cy:-cc[1],r:view[2]*.006,fill:sketch.points().some(p=>p.entity===e.id&&p.point===key)?themeColor('warning'):themeColor('sketchHandle'),stroke:themeColor('sketchConstrained'),'stroke-width':1,'vector-effect':'non-scaling-stroke','data-entity':e.id,'data-handle':key}));}
     }
    }
    renderConstraints(n);renderDimensions(n,o);
@@ -417,6 +418,7 @@ export function createEditor(svg,api){
   bezierClicks=[];bezierHover=null;inference=null;render();return ok;
  }
  function setTool(t){tool=t;arcClicks=[];bezierClicks=[];bezierHover=null;drag=null;inference=null;closeInlineDimension();render();}
+ window.addEventListener('rv-theme-change',()=>render());
  return {
   sketch,render,reset,fit:()=>{view=[-.65,-.65,1.3,1.3];render()},
   setTool,getTool:()=>tool,openInlineDimension,finishBezier,
