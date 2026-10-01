@@ -47,8 +47,8 @@ function geometry(positions,indices){
  const edges=buildCadEdgePositions(part);
  assert.equal(edges.length,24,'internal triangulation edge should be suppressed in CAD display');
  assert(CAD_DISPLAY.edgeThreshold>=20&&CAD_DISPLAY.edgeThreshold<=40);
- assert.equal(DISPLAY_VERSION,'14.28.6-cad-2');
- assert(CAD_DISPLAY.edgeDepthBias>0&&CAD_DISPLAY.edgeWidth>=1,'CAD edges need depth bias and readable width');
+ assert.equal(DISPLAY_VERSION,'14.28.8-cad-3');
+ assert(CAD_DISPLAY.edgeDepthBias>0&&CAD_DISPLAY.edgeDepthBias<=.00001&&CAD_DISPLAY.edgeWidth>=1,'CAD edges need only a tiny anti-z-fighting depth bias; large bias leaks hidden edges through faces');
  assert(CAD_DISPLAY.ambient<1&&CAD_DISPLAY.key>2,'CAD lighting must preserve face contrast instead of washing it out');
 }
 

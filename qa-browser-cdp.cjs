@@ -175,6 +175,8 @@ async function cdp(url){
   assert(multiRender.groups>=3&&multiRender.visibleMeshes>=3,'Bulk conversion must place all imported arts in the 3D scene');
   assert.equal(await evalv("RVTest.state.view.material"),'cad','CAD technical style must be the default model display');
   assert(multiRender.cadEdgeSets>=3,'CAD technical style must expose thresholded feature-edge sets without triangle wireframe');
+  assert(multiRender.roleMeshes>0&&multiRender.opaqueRoleMeshes===multiRender.roleMeshes,'All CAD model surfaces must remain fully opaque');
+  assert(multiRender.depthWritingRoleMeshes===multiRender.roleMeshes,'All CAD model surfaces must write depth so hidden edges remain occluded');
   assert.equal(multiRender.background,'f7fafc','CAD technical style must use the neutral light viewport background');
   const roleColors=Object.values(multiRender.roleColors||{});
   assert(roleColors.length>=3&&new Set(roleColors).size>=3,'CAD mode must preserve distinct vivid colors for cutter base, blade, stamp base and relief');
