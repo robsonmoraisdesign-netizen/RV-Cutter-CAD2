@@ -187,11 +187,17 @@ async function cdp(url){
   await waitFor(()=>evalv("RVTest.state.objects.every(o=>o.visible) && document.querySelector('#isolationBanner').hidden"));
   assert(await evalv("RVTest.state.objects.every((o,i)=>o.result===window.__showAllRefs[i])"),'Show All must not discard/rebuild in-memory geometry merely because objects were hidden or isolated');
 
-  const svgA='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path fill="#000" d="M10 10H90V90H10Z"/></svg>';
-  const svgB='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path fill="#000" d="M50 8L92 88H8Z"/></svg>';
-  const multiImport=await evalv(`(async()=>{await RVTest.importFiles([new File([${JSON.stringify(svgA)}],'arte-a.svg',{type:'image/svg+xml'}),new File([${JSON.stringify(svgB)}],'arte-b.svg',{type:'image/svg+xml'})]);return {open:document.querySelector('#importDialog').open,candidates:document.querySelectorAll('#importCandidates .candidate').length,status:document.querySelector('#status').textContent};})()`);
+  const multiImport=await evalv(`(async()=>{
+    async function png(name,kind){
+      const c=document.createElement('canvas');c.width=120;c.height=120;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,120,120);x.fillStyle='#000';
+      if(kind==='rect')x.fillRect(20,25,80,70);else{x.beginPath();x.moveTo(60,14);x.lineTo(108,104);x.lineTo(12,104);x.closePath();x.fill();}
+      const blob=await new Promise(r=>c.toBlob(r,'image/png'));return new File([blob],name,{type:'image/png'});
+    }
+    await RVTest.importFiles([await png('arte-a.png','rect'),await png('arte-b.png','tri')]);
+    return {open:document.querySelector('#importDialog').open,candidates:document.querySelectorAll('#importCandidates .candidate').length,status:document.querySelector('#status').textContent};
+  })()`);
   console.log('Multi-image import diagnostics',JSON.stringify(multiImport));
-  assert(multiImport.open&&multiImport.candidates===2,'Multiple image review must open with both files: '+JSON.stringify(multiImport));
+  assert(multiImport.open&&multiImport.candidates===2,'Multiple image review must open with both raster files: '+JSON.stringify(multiImport));
   assert.equal(await evalv("document.querySelectorAll('#importCandidates input:checked').length"),2,'All objects from multiple selected files must be preselected');
   await evalv("document.querySelector('#appendObjects').checked=false;document.querySelector('#confirmImport').click();true");
   await waitFor(()=>evalv("RVTest.state.objects.length===2 && RVTest.state.stage==='2d'"));
