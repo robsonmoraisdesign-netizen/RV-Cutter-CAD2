@@ -1,18 +1,20 @@
 import * as T from 'three';
 
-export const DISPLAY_VERSION='14.28.5-cad-1';
+export const DISPLAY_VERSION='14.28.6-cad-2';
 export const CAD_DISPLAY=Object.freeze({
-  faceColor:'#9bc9e7',
-  edgeColor:'#31424d',
-  background:'#f5f7f8',
+  faceColor:'#45aaf2',
+  edgeColor:'#182934',
+  background:'#f7fafc',
   edgeThreshold:28,
   smoothAngle:35,
-  roughness:.82,
+  edgeWidth:1.08,
+  edgeDepthBias:.00042,
+  roughness:.62,
   metalness:0,
-  ambient:1.35,
-  key:1.65,
-  fill:.5,
-  gridOpacity:.18
+  ambient:.72,
+  key:2.25,
+  fill:.28,
+  gridOpacity:.24
 });
 
 export function buildCadEdgePositions(part,threshold=CAD_DISPLAY.edgeThreshold){

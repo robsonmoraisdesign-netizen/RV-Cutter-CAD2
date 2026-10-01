@@ -47,7 +47,9 @@ function geometry(positions,indices){
  const edges=buildCadEdgePositions(part);
  assert.equal(edges.length,24,'internal triangulation edge should be suppressed in CAD display');
  assert(CAD_DISPLAY.edgeThreshold>=20&&CAD_DISPLAY.edgeThreshold<=40);
- assert.equal(DISPLAY_VERSION,'14.28.5-cad-1');
+ assert.equal(DISPLAY_VERSION,'14.28.6-cad-2');
+ assert(CAD_DISPLAY.edgeDepthBias>0&&CAD_DISPLAY.edgeWidth>=1,'CAD edges need depth bias and readable width');
+ assert(CAD_DISPLAY.ambient<1&&CAD_DISPLAY.key>2,'CAD lighting must preserve face contrast instead of washing it out');
 }
 
 console.log('CAD display smoothing + feature-edge suppression: PASS');
