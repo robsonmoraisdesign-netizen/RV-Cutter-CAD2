@@ -30,6 +30,28 @@
   --rv-z-critical:300;
 }
 
+
+body.ui-light,body.ui-dark{
+  --v4-bg:var(--rv-app-bg);
+  --v4-chrome:var(--rv-chrome);
+  --v4-surface:var(--rv-surface-1);
+  --v4-surface2:var(--rv-surface-2);
+  --v4-surface3:var(--rv-surface-3);
+  --v4-viewport:var(--rv-viewport-bg);
+  --v4-line:var(--rv-border-strong);
+  --v4-line2:var(--rv-border-subtle);
+  --v4-text:var(--rv-text-primary);
+  --v4-text2:var(--rv-text-secondary);
+  --v4-muted:var(--rv-text-muted);
+  --v4-brand:var(--rv-accent);
+  --v4-brand2:var(--rv-accent-hover);
+  --v4-brandSoft:var(--rv-accent-soft);
+  --v4-warm:var(--rv-warning);
+  --v4-danger:var(--rv-danger);
+  --v4-success:var(--rv-success);
+  --v4-shadow:var(--rv-shadow-elevation);
+}
+
 html[data-rv-theme="dark"]{color-scheme:dark}
 html[data-rv-theme="light"]{color-scheme:light}
 
