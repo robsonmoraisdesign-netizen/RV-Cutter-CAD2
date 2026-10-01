@@ -142,8 +142,8 @@ async function cdp(url){
   await evalv("window.firstSketch=RVTest.active().id;RVTest.createNewSketch();RVTest.selectObject(firstSketch);true");
   assert(await evalv("RVTest.state.editingSketchId===firstSketch && RVTest.state.activeId===firstSketch"),'Selecting another Sketch must switch editor context');
   await evalv("RVTest.commitImport([[[[-.5,-.5],[.5,-.5],[.5,.5],[-.5,.5]]]],'Imported square',null);true");
-  assert(await evalv("!RVTest.state.editingSketchId && document.querySelector('#editor').hasAttribute('hidden') && !document.body.classList.contains('sketching')"),'Import must leave a coherent model workspace');
-  await evalv("RVTest.enterSketch();RVTest.editor.setTool('select');true");
+  assert(await evalv("RVTest.state.stage==='2d' && !!RVTest.state.editingSketchId && !document.querySelector('#editor').hasAttribute('hidden') && document.body.classList.contains('sketching')"),'Import must enter the Sketch workspace with the imported art active');
+  await evalv("RVTest.editor.setTool('select');true");
   await sleep(100);
   const pick=await evalv("(()=>{const s=document.querySelector('#editor'),p=new DOMPoint(0,.5).matrixTransform(s.getScreenCTM());return {x:p.x,y:p.y-6};})()");
   await send('Input.dispatchMouseEvent',{type:'mouseMoved',...pick,button:'none'});
