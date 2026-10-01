@@ -2,6 +2,7 @@ import {prepareDisplay,buffers} from './render-data.mjs';
 import {zipSync} from 'fflate';
 import {kernel,build,trace,editContours,migrateParams,stl} from './geometry.mjs';
 import {BoundedCache,SolidCache,graphContext,ENGINE_VERSION} from './dependencies.mjs';
+import {DISPLAY_VERSION} from './cad-display.mjs';
 let ready,completed=0;const cache=new BoundedCache(48*1024*1024),solids=new SolidCache();
 self.onmessage=async({data:d})=>{try{
  if(d.action==='stl'){const bytes=new Uint8Array(stl(d.mesh));self.postMessage({id:d.id,result:bytes},[bytes.buffer]);return;}
@@ -14,6 +15,6 @@ self.onmessage=async({data:d})=>{try{
  const p=migrateParams(d.params),source=d.sourceHash||JSON.stringify(d.loops),ctx=graphContext(cache,source,p,solids);
  const result=build(m,d.loops,p,ctx);completed++;
  // Transfer a copy: cached mesh buffers must never be detached.
- const output=prepareDisplay(structuredClone(result));output.calculation={version:ENGINE_VERSION,computed:ctx.computed,reused:ctx.reused,cache:cache.stats(),completed};
+ const output=prepareDisplay(structuredClone(result));output.calculation={version:ENGINE_VERSION,displayVersion:DISPLAY_VERSION,computed:ctx.computed,reused:ctx.reused,cache:cache.stats(),completed};
  self.postMessage({id:d.id,result:output},buffers(output));
 }catch(e){self.postMessage({id:d.id,error:e.message});}};

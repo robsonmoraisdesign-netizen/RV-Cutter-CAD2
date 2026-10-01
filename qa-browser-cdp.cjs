@@ -173,6 +173,9 @@ async function cdp(url){
   const multiRender=await evalv("RVTest.viewer.diagnostics()");
   console.log('Multi-object render diagnostics',JSON.stringify(multiRender));
   assert(multiRender.groups>=3&&multiRender.visibleMeshes>=3,'Bulk conversion must place all imported arts in the 3D scene');
+  assert.equal(await evalv("RVTest.state.view.material"),'cad','CAD technical style must be the default model display');
+  assert(multiRender.cadEdgeSets>=3,'CAD technical style must expose thresholded feature-edge sets without triangle wireframe');
+  assert.equal(multiRender.background,'f5f7f8','CAD technical style must use the neutral light viewport background');
   console.log('Multi-object regression: Outliner + persistent Sketch references + bulk 3D conversion PASS');
 
   const exceptions=dev.events.filter(e=>e.method==='Runtime.exceptionThrown');

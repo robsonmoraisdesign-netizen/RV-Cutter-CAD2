@@ -18,6 +18,7 @@ assert(css.includes('grid-template-columns:var(--v4-rail) var(--v4-drawer) minma
 assert(css.includes('.piece-mode-host'),'Piece type selector must live in the viewport workspace.');
 assert(css.includes('.inspector-levels'),'Essential/Advanced/Expert inspector missing.');
 assert(css.includes('.sketch-reference-tile'),'Multi-object Sketch reference dock missing.');
+assert(html.includes('value="cad" selected')&&html.includes('CAD técnico · faces + arestas'),'CAD technical display must be the default 3D style.');
 assert(css.includes('min-height:180px'),'Outliner must retain a usable object-list height.');
 for(const token of ['installMasterLayout','syncMasterShell','ensureOutlinerVisible','convertAllToCutters',"objects:()=>state.objects","state.stage='2d'","$('tab2d').onclick=()=>setStage('2d')"])
   assert(ui.includes(token),'Missing v4 MASTER behavior: '+token);
