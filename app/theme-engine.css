@@ -62,6 +62,7 @@ html,body{
 }
 body *{caret-color:var(--rv-accent)}
 ::selection{background:var(--rv-accent-soft);color:var(--rv-text-primary)}
+.rv-contrast-guard{color:var(--rv-auto-contrast)!important;fill:var(--rv-auto-contrast)!important}
 
 :where(button,input,select,textarea,summary,[tabindex]):focus-visible{
   outline:2px solid var(--rv-focus)!important;
