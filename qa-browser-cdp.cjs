@@ -179,10 +179,23 @@ async function cdp(url){
   const roleColors=Object.values(multiRender.roleColors||{});
   assert(roleColors.length>=3&&new Set(roleColors).size>=3,'CAD mode must preserve distinct vivid colors for cutter base, blade, stamp base and relief');
   const theme=await evalv("({bg:getComputedStyle(document.documentElement).getPropertyValue('--v4-bg').trim(),text:getComputedStyle(document.documentElement).getPropertyValue('--v4-text').trim(),brand:getComputedStyle(document.documentElement).getPropertyValue('--v4-brand').trim()})");
-  assert.deepEqual(theme,{bg:'#10151a',text:'#ffffff',brand:'#2bd3b3'},'Global UI must use the high-contrast palette');
+  assert.deepEqual(theme,{bg:'#080c10',text:'#ffffff',brand:'#22ddb9'},'Global UI must use the stronger high-contrast palette');
   const chromeRects=await evalv("(()=>{const a=document.querySelector('#pieceModeHost .mode-block')?.getBoundingClientRect(),b=document.querySelector('.viewport-title')?.getBoundingClientRect();return a&&b?{a:{l:a.left,r:a.right,t:a.top,b:a.bottom},b:{l:b.left,r:b.right,t:b.top,b:b.bottom}}:null})()");
   assert(chromeRects&&!(chromeRects.a.l<chromeRects.b.r&&chromeRects.a.r>chromeRects.b.l&&chromeRects.a.t<chromeRects.b.b&&chromeRects.a.b>chromeRects.b.t),'Piece selector and object title must never overlap');
   console.log('Multi-object regression: Outliner + persistent Sketch references + bulk 3D conversion PASS');
+  await evalv("window.__showAllRefs=RVTest.state.objects.map(o=>o.result);RVTest.toggleIsolation(RVTest.state.objects[0].id);RVTest.state.objects[1].visible=false;document.querySelector('#showAll').click();true");
+  await waitFor(()=>evalv("RVTest.state.objects.every(o=>o.visible) && document.querySelector('#isolationBanner').hidden"));
+  assert(await evalv("RVTest.state.objects.every((o,i)=>o.result===window.__showAllRefs[i])"),'Show All must not discard/rebuild in-memory geometry merely because objects were hidden or isolated');
+
+  const svgA='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path fill="#000" d="M10 10H90V90H10Z"/></svg>';
+  const svgB='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path fill="#000" d="M50 8L92 88H8Z"/></svg>';
+  await evalv(`RVTest.importFiles([new File([${JSON.stringify(svgA)}],'arte-a.svg',{type:'image/svg+xml'}),new File([${JSON.stringify(svgB)}],'arte-b.svg',{type:'image/svg+xml'})]);true`);
+  await waitFor(()=>evalv("document.querySelector('#importDialog').open && document.querySelectorAll('#importCandidates .candidate').length===2"));
+  assert.equal(await evalv("document.querySelectorAll('#importCandidates input:checked').length"),2,'All objects from multiple selected files must be preselected');
+  await evalv("document.querySelector('#appendObjects').checked=false;document.querySelector('#confirmImport').click();true");
+  await waitFor(()=>evalv("RVTest.state.objects.length===2 && RVTest.state.stage==='2d'"));
+  assert(await evalv("RVTest.state.objects.some(o=>/Arte A/i.test(o.name))&&RVTest.state.objects.some(o=>/Arte B/i.test(o.name))"),'Multiple image import must preserve per-file object naming');
+  assert.equal(await evalv("document.querySelectorAll('#viewport').length"),1,'Viewport ID must be unique');
 
   const exceptions=dev.events.filter(e=>e.method==='Runtime.exceptionThrown');
   const severe=dev.events.filter(e=>e.method==='Log.entryAdded'&&['error'].includes(e.params?.entry?.level));

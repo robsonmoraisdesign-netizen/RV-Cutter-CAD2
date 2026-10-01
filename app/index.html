@@ -55,8 +55,8 @@
   <div class="scope-v4"><span>ESCOPO DE EDIÇÃO</span><div class="scope-v4-buttons"><button data-scope-choice="active" class="active">Função</button><button data-scope-choice="selection" disabled title="Multisseleção 3D será ativada na fase correspondente">Seleção</button><button data-scope-choice="all">Todos</button></div></div>
   <div class="sidebar-heading outliner-heading"><div><span class="section-eyebrow">OUTLINER</span><h2>Objetos da cena</h2></div><span id="objectCount" class="count-badge">0 Sketches</span></div>
   <div class="feature-primary-actions"><button id="newSketch" class="feature-action"><span>＋</span><strong>Novo Sketch</strong></button><button id="convertCutter" class="feature-action accent"><span>◆</span><strong>Converter atual</strong></button><button id="convertAllCutters" class="feature-action multi-object-action" hidden><span>◆◆</span><strong>Converter todos em cortador</strong></button></div>
-  <button id="import" class="import"><span class="import-plus">+</span><span><strong>Importar arte como Sketch</strong><small>PNG, JPG, WebP ou SVG preenchido</small></span></button>
-  <input type="file" id="artFile" accept="image/png,image/jpeg,image/webp,.svg" hidden>
+  <button id="import" class="import"><span class="import-plus">+</span><span><strong>Importar uma ou várias artes</strong><small>PNG, JPG, WebP ou SVG · seleção múltipla</small></span></button>
+  <input type="file" id="artFile" accept="image/png,image/jpeg,image/webp,.svg" multiple hidden>
   <details class="sample-drawer"><summary>Usar um exemplo</summary><div class="samples"><button id="pig">Porquinho</button><button id="cow">Vaquinha</button></div></details>
   <div class="object-search-wrap"><span>⌕</span><input id="objectSearch" type="search" placeholder="Buscar Sketch ou função" aria-label="Buscar Sketch ou função"></div>
   <button id="isolationBanner" class="isolation-banner" hidden></button>
@@ -121,7 +121,7 @@
     </div>
     <div class="sketch-contextbar"><span id="selection">Clique para selecionar · arraste uma janela para selecionar em área.</span><span class="sketch-context-hint">Criar · Modificar · Restringir · Cota · Referência · Diagnóstico</span></div>
   </div>
-  <div id="viewport">  <div id="viewport">
+  <div id="viewport">
     <div id="pieceModeHost" class="piece-mode-host" hidden></div>
     <div id="presentationStyles" class="presentation-styles-v4" hidden>
       <span class="presentation-style-label">ESTILOS DE APRESENTAÇÃO</span>
