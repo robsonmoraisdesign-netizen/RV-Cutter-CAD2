@@ -1,7 +1,7 @@
 import {validateSketch} from './sketch/model.mjs';
 import Module from 'manifold-3d';
 export async function kernel(options={}){const m=await Module(options);m.setup();return m;}
-export const defaults={size:75,wall:0.8,height:12.5,rim:4,base:2.5,relief:4.5,reliefInverted:false,reliefOut:4.5,reliefIn:1,clearance:0.9,detailOffset:0,outlineOffset:0,mode:'integrated',mirror:false,threshold:160,tolerance:0.04,stampBase:2.5,stampInset:0,stampExpansion:0,removeOutline:false,outlineBand:0.8,chamfer:false,tip:0.4,chamferHeight:2,wallEdits:[],cornerRadius:2};
+export const defaults={size:75,wall:0.8,height:12.5,rim:4,base:2.5,relief:4.5,reliefInverted:false,reliefSeparate:false,reliefOut:4.5,reliefIn:1,clearance:0.9,detailOffset:0,outlineOffset:0,mode:'integrated',mirror:false,threshold:160,tolerance:0.04,stampBase:2.5,stampInset:0,stampExpansion:0,removeOutline:false,outlineBand:0.8,chamfer:false,tip:0.4,chamferHeight:2,wallEdits:[],cornerRadius:2};
 export function area(p){return p.reduce((a,v,i)=>{const q=p[(i+1)%p.length];return a+v[0]*q[1]-q[0]*v[1]},0)/2;}
 export function simplify(p,eps){if(p.length<5)return p;const seg=(p,a,b)=>{let dx=b[0]-a[0],dy=b[1]-a[1],t=Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/(dx*dx+dy*dy||1)));return Math.hypot(p[0]-a[0]-t*dx,p[1]-a[1]-t*dy)};const rdp=a=>{let d=0,k=0;for(let i=1;i<a.length-1;i++){let v=seg(a[i],a[0],a.at(-1));if(v>d){d=v;k=i}}return d>eps?[...rdp(a.slice(0,k+1)).slice(0,-1),...rdp(a.slice(k))]:[a[0],a.at(-1)];};let k=1,d=0;for(let i=1;i<p.length;i++){const v=Math.hypot(p[i][0]-p[0][0],p[i][1]-p[0][1]);if(v>d){d=v;k=i}}return [...rdp(p.slice(0,k+1)).slice(0,-1),...rdp([...p.slice(k),p[0]]).slice(0,-1)];}
 export function normalize(loops){const all=loops.flat();if(!all.length)throw Error('Nenhum contorno fechado encontrado.');let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;for(const [x,y]of all){minX=Math.min(x,minX);maxX=Math.max(x,maxX);minY=Math.min(y,minY);maxY=Math.max(y,maxY)}const scale=Math.max(maxX-minX,maxY-minY);if(!(scale>0))throw Error('Arte sem dimensão.');return loops.map(p=>p.map(([x,y])=>[(x-(minX+maxX)/2)/scale,(y-(minY+maxY)/2)/scale]));}
@@ -55,6 +55,7 @@ export function loft(m,lower,upper,z0,z1,floor=z0-1,intermediate=[]){
  return new m.Manifold(new m.Mesh({numProp:3,vertProperties:new Float32Array(verts),triVerts:new Uint32Array(faces)}));
 }
 export function migrateParams(params={}){const p={...defaults,...params,stampBase:params.stampBase??params.base??defaults.stampBase};
+ p.reliefSeparate=!!p.reliefSeparate;
  if(!Number.isFinite(p.reliefOut))p.reliefOut=p.reliefInverted?defaults.relief:p.relief;
  if(!Number.isFinite(p.reliefIn))p.reliefIn=p.reliefInverted?p.relief:Math.min(1,Math.max(.1,(p.mode==='integrated'?p.base:p.stampBase)*.4));
  return p;}
@@ -71,12 +72,12 @@ export function build(m,loops,params,ctx=null){const started=performance.now(),p
  if(!['integrated','separate','cutter','stamp'].includes(p.mode))throw Error('Modo de peça inválido.');
  try{
  const memo=(node,fn)=>ctx?ctx.memo(node,fn):fn();
- const cachedCutter=p.mode==='separate'||p.mode==='cutter'?ctx?.get('cutter'):null,cachedStamp=p.mode==='separate'||p.mode==='stamp'?ctx?.get('stamp'):null;
+ const cachedCutter=p.mode==='separate'||p.mode==='cutter'?ctx?.get('cutter'):null,cachedStamp=(p.mode==='separate'||p.mode==='stamp')&&!p.reliefSeparate?ctx?.get('stamp'):null;
  const src=memo('source',()=>loops.map(l=>simplify(l,p.tolerance/p.size).map(([x,y])=>[x*p.size*(p.mirror?-1:1),y*p.size])).sort((a,b)=>Math.abs(area(b))-Math.abs(area(a))));
  const silhouette=section=>{const polys=section.toPolygons().sort((a,b)=>Math.abs(area(b))-Math.abs(area(a)));if(!polys.length)throw Error('O recuo eliminou o contorno. Reduza o valor.');return hold(new C([polys[0]],'EvenOdd'));};
  const linkedCutterExpansion=p.mode==='separate'?p.stampExpansion:0;
  let original=hold(new C([src[0]],'EvenOdd')),outer=hold(new C(memo('outer',()=>silhouette(hold(hold(original.offset(p.outlineOffset+linkedCutterExpansion,'Round',2,256)).simplify(.002))).toPolygons()),'EvenOdd'));
- let bladeSolid,rimOuter,inner,cutter,relief,stamp,bladeProfile=[],reliefOutline=[];
+ let bladeSolid,rimOuter,inner,cutter,relief,stamp,stampBaseSolid,reliefPart,bladeProfile=[],reliefOutline=[];
  if(p.mode!=='stamp'&&!cachedCutter){
   const innerPolys=memo('inner',()=>{
   inner=silhouette(hold(outer.offset(p.clearance,'Round',2,256)));
@@ -127,6 +128,7 @@ export function build(m,loops,params,ctx=null){const started=performance.now(),p
   reliefOutline=artPolys;
   const art=hold(new C(artPolys,'EvenOdd')),zBase=p.mode==='integrated'?p.base:p.stampBase;
   const baseFootprint=hold(new C(memo('footprint',()=>{const footprint=p.mode==='integrated'?outer:silhouette(hold(original.offset(-p.stampInset,'Round',2,256)));return (p.mode!=='integrated'&&p.stampExpansion>0?silhouette(hold(original.offset(p.stampExpansion-p.stampInset,'Round',2,256))):footprint).toPolygons();}),'EvenOdd'));
+  if(p.mode!=='integrated')stampBaseSolid=hold(baseFootprint.extrude(p.stampBase));
   if(p.reliefInverted){
    // Relevo invertido não cava a base estrutural. A profundidade define uma camada
    // paramétrica acima da base; o desenho é subtraído apenas dessa camada.
@@ -136,15 +138,26 @@ export function build(m,loops,params,ctx=null){const started=performance.now(),p
    const face=hold(hold(faceFootprint.extrude(p.relief+.02)).translate([0,0,zBase-.02]));
    relief=hold(hold(art.extrude(p.relief+.02)).translate([0,0,zBase]));
    const engravedFace=hold(face.subtract(relief));
-   if(p.mode!=='integrated')stamp=hold(M.union([hold(baseFootprint.extrude(p.stampBase)),engravedFace]));
-   else stamp=engravedFace;
+   if(p.mode!=='integrated'){
+    stamp=hold(M.union([stampBaseSolid,engravedFace]));
+    if(p.reliefSeparate){
+     const exactFace=hold(hold(baseFootprint.extrude(p.relief)).translate([0,0,zBase]));
+     const engravingTool=hold(hold(art.extrude(p.relief+.02)).translate([0,0,zBase-.01]));
+     reliefPart=hold(exactFace.subtract(engravingTool));
+    }
+   }else stamp=engravedFace;
   }else{
    relief=hold(hold(art.extrude(p.relief+.02)).translate([0,0,zBase-.02]));
-   if(p.mode!=='integrated')stamp=hold(M.union([hold(baseFootprint.extrude(p.stampBase)),relief]));
+   if(p.mode!=='integrated'){
+    stamp=hold(M.union([stampBaseSolid,relief]));
+    if(p.reliefSeparate)reliefPart=hold(hold(art.extrude(p.relief)).translate([0,0,zBase]));
+   }
   }
  }
  let parts=[];if(p.mode==='integrated'){const baseSolid=hold(rimOuter.extrude(p.base)),stampSurface=p.reliefInverted?hold(M.union([baseSolid,stamp])):hold(M.union([baseSolid,relief]));parts=[{name:'Cortador integrado',solid:hold(M.union([bladeSolid,stampSurface]))}];}
- else if(p.mode==='separate')parts=[{name:'Cortador',solid:cutter},{name:'Carimbo',solid:stamp}];else parts=[p.mode==='cutter'?{name:'Cortador',solid:cutter}:{name:'Carimbo',solid:stamp}];
+ else if(p.mode==='separate')parts=p.reliefSeparate?[{name:'Cortador',solid:cutter},{name:'Base do carimbo',solid:stampBaseSolid},{name:'Relevo',solid:reliefPart}]:[{name:'Cortador',solid:cutter},{name:'Carimbo',solid:stamp}];
+ else if(p.mode==='stamp')parts=p.reliefSeparate?[{name:'Base do carimbo',solid:stampBaseSolid},{name:'Relevo',solid:reliefPart}]:[{name:'Carimbo',solid:stamp}];
+ else parts=[{name:'Cortador',solid:cutter}];
  const result={parts:parts.map(({name,solid})=>{if(name==='Cortador'&&cachedCutter)return cachedCutter.part;if(name==='Carimbo'&&cachedStamp)return cachedStamp.part;solid=hold(solid.setTolerance(.001));if(solid.status()!=='NoError'||solid.isEmpty())throw Error(`${name}: falha na construção do sólido (${solid.status()}).`);const mesh=cleanExportMesh(solid.getMesh()),stats=checkMesh(mesh);if(stats.open||stats.nonmanifold||!stats.finite)throw Error(`${name}: malha inválida (${JSON.stringify(stats)}), exportação bloqueada.`);const components=solid.decompose();const bodies=components.length;components.forEach(s=>s.delete());return {name,positions:Float32Array.from(mesh.vertProperties),indices:Uint32Array.from(mesh.triVerts),stride:mesh.numProp,volume:solid.volume(),bounds:solid.boundingBox(),stats,bodies};}),outline:outer.toPolygons(),reliefOutline,cuttingOutline:cachedCutter?.cuttingOutline||inner?.toPolygons()||[],bladeProfile:cachedCutter?.bladeProfile||bladeProfile,params:p};for(const part of result.parts){if(part.name==='Cortador'&&!cachedCutter)ctx?.set('cutter',{part,cuttingOutline:result.cuttingOutline,bladeProfile:result.bladeProfile});if(part.name==='Carimbo'&&!cachedStamp)ctx?.set('stamp',{part});}result.elapsed=performance.now()-started;return result;
  }finally{keep.reverse().forEach(o=>o.delete());}}
 

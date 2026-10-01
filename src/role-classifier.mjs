@@ -10,6 +10,8 @@ function normal(pts){const a=pts[0],u=pts[1].map((v,k)=>v-a[k]),v=pts[2].map((q,
 export function classifyDisplayRole(part,result,ids){
  const p=result.params,pts=triangle(part,ids),c=[0,0,0];for(const q of pts)for(let k=0;k<3;k++)c[k]+=q[k]/3;
  if(part.name==='Cortador')return c[2]<=p.base+.001?'cutterBase':'blade';
+ if(part.name==='Base do carimbo')return 'stampBase';
+ if(part.name==='Relevo')return 'relief';
  const integrated=part.name!=='Carimbo',top=integrated?p.base:p.stampBase;
  if(p.reliefInverted){
   const floor=top,ceiling=top+p.relief,epsZ=Math.max(.001,Math.abs(ceiling)*1e-5);
