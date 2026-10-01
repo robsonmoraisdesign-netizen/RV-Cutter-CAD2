@@ -17,7 +17,9 @@ const THEMES={
   dimensionBg:'#10202e',dimensionText:'#ffffff',dimensionEditable:'#8fd2ff',dimensionLine:'#1769d3',
   measureLabel:'#f8fbfd',measureOutline:'#0b1117',measureP1:'#c68400',measureP2:'#007f8a',measureX:'#d63f4e',measureY:'#26804f',measureZ:'#276fc1',
   sketchBg:'#edf2f1',sketchEntity:'#286bbb',sketchUnder:'#476a90',sketchSelected:'#d96d1f',sketchHover:'#008c9e',
-  sketchConstrained:'#187d6c',sketchConstruction:'#6b7c88',sketchConstraint:'#9a5b00',sketchHandle:'#ffffff',sketchBlade:'#b56f00',
+  sketchConstrained:'#187d6c',sketchConstruction:'#596d78',sketchConstraint:'#815000',sketchHandle:'#ffffff',sketchBlade:'#9b5d00',
+  sketchTextPrimary:'#17252a',sketchTextSecondary:'#2f444a',sketchTextMuted:'#53656c',sketchTextOutline:'#f8fbfa',
+  sketchDimension:'#233f46',sketchDimensionDriven:'#4c6067',sketchLiveDimension:'#7a4700',sketchConstraintText:'#12695d',
   selection3d:'#2d78b8',hover3d:'#183d59',selectionMix:'#91c8ff',hoverMix:'#75a8d5',
   neutralWhite:'#ffffff',viewportLight:'#e4eeff',viewportGround:'#263347',viewportFill:'#a6ceff'
  },
@@ -33,7 +35,9 @@ const THEMES={
   dimensionBg:'#ffffff',dimensionText:'#17212a',dimensionEditable:'#0b4f85',dimensionLine:'#0b63ce',
   measureLabel:'#17212a',measureOutline:'#ffffff',measureP1:'#9a6500',measureP2:'#006f78',measureX:'#b62f3d',measureY:'#1d7447',measureZ:'#1b63ad',
   sketchBg:'#f2f5f4',sketchEntity:'#1f62a8',sketchUnder:'#486b89',sketchSelected:'#b65c14',sketchHover:'#007b89',
-  sketchConstrained:'#126b5d',sketchConstruction:'#657783',sketchConstraint:'#8a5100',sketchHandle:'#ffffff',sketchBlade:'#9e6200',
+  sketchConstrained:'#126b5d',sketchConstruction:'#596b76',sketchConstraint:'#7d4a00',sketchHandle:'#ffffff',sketchBlade:'#945800',
+  sketchTextPrimary:'#17252a',sketchTextSecondary:'#30464c',sketchTextMuted:'#55676e',sketchTextOutline:'#ffffff',
+  sketchDimension:'#244149',sketchDimensionDriven:'#4d6269',sketchLiveDimension:'#774500',sketchConstraintText:'#11675b',
   selection3d:'#1b66a5',hover3d:'#315a73',selectionMix:'#7fbbf4',hoverMix:'#81a6c4',
   neutralWhite:'#ffffff',viewportLight:'#ffffff',viewportGround:'#c4d0d8',viewportFill:'#d7e7f2'
  }
@@ -51,7 +55,9 @@ const CSS_NAMES={
  dimensionBg:'--rv-dimension-bg',dimensionText:'--rv-dimension-text',dimensionEditable:'--rv-dimension-editable',dimensionLine:'--rv-dimension-line',
  measureLabel:'--rv-measure-label',measureOutline:'--rv-measure-outline',measureP1:'--rv-measure-p1',measureP2:'--rv-measure-p2',measureX:'--rv-measure-x',measureY:'--rv-measure-y',measureZ:'--rv-measure-z',
  sketchBg:'--rv-sketch-bg',sketchEntity:'--rv-sketch-entity',sketchUnder:'--rv-sketch-under',sketchSelected:'--rv-sketch-selected',sketchHover:'--rv-sketch-hover',
- sketchConstrained:'--rv-sketch-constrained',sketchConstruction:'--rv-sketch-construction',sketchConstraint:'--rv-sketch-constraint',sketchHandle:'--rv-sketch-handle',sketchBlade:'--rv-sketch-blade'
+ sketchConstrained:'--rv-sketch-constrained',sketchConstruction:'--rv-sketch-construction',sketchConstraint:'--rv-sketch-constraint',sketchHandle:'--rv-sketch-handle',sketchBlade:'--rv-sketch-blade',
+ sketchTextPrimary:'--rv-sketch-text-primary',sketchTextSecondary:'--rv-sketch-text-secondary',sketchTextMuted:'--rv-sketch-text-muted',sketchTextOutline:'--rv-sketch-text-outline',
+ sketchDimension:'--rv-sketch-dimension',sketchDimensionDriven:'--rv-sketch-dimension-driven',sketchLiveDimension:'--rv-sketch-live-dimension',sketchConstraintText:'--rv-sketch-constraint-text'
 };
 
 let current='dark',revision=0,lastAudit={checked:0,corrected:0,violations:[]},auditTimer=0,observer=null;
@@ -81,6 +87,13 @@ function normalized(name){
  raw.dimensionText=ensureContrast(raw.dimensionText,raw.dimensionBg,7);
  raw.dimensionEditable=ensureContrast(raw.dimensionEditable,raw.dimensionBg,4.5);
  raw.measureLabel=ensureContrast(raw.measureLabel,raw.viewportBg,4.5);
+ raw.sketchTextPrimary=ensureContrast(raw.sketchTextPrimary,raw.sketchBg,7);
+ raw.sketchTextSecondary=ensureContrast(raw.sketchTextSecondary,raw.sketchBg,4.5);
+ raw.sketchTextMuted=ensureContrast(raw.sketchTextMuted,raw.sketchBg,4.5);
+ raw.sketchDimension=ensureContrast(raw.sketchDimension,raw.sketchBg,7);
+ raw.sketchDimensionDriven=ensureContrast(raw.sketchDimensionDriven,raw.sketchBg,4.5);
+ raw.sketchLiveDimension=ensureContrast(raw.sketchLiveDimension,raw.sketchBg,4.5);
+ raw.sketchConstraintText=ensureContrast(raw.sketchConstraintText,raw.sketchBg,4.5);
  return raw;
 }
 
@@ -135,7 +148,9 @@ export function themeDiagnostics(){
  const t=normalized(current),pairs=[
   ['textPrimary','surface1',7],['textSecondary','surface1',4.5],['textMuted','surface1',4.5],
   ['textPrimary','surface2',7],['textSecondary','surface2',4.5],['textOnAccent','accent',4.5],
-  ['dimensionText','dimensionBg',7],['dimensionEditable','dimensionBg',4.5],['measureLabel','viewportBg',4.5]
+  ['dimensionText','dimensionBg',7],['dimensionEditable','dimensionBg',4.5],['measureLabel','viewportBg',4.5],
+  ['sketchTextPrimary','sketchBg',7],['sketchTextSecondary','sketchBg',4.5],['sketchTextMuted','sketchBg',4.5],
+  ['sketchDimension','sketchBg',7],['sketchDimensionDriven','sketchBg',4.5],['sketchLiveDimension','sketchBg',4.5],['sketchConstraintText','sketchBg',4.5]
  ];
  return {theme:current,revision,pairs:pairs.map(([fg,bg,min])=>({fg,bg,min,ratio:+contrastRatio(t[fg],t[bg]).toFixed(2),pass:contrastRatio(t[fg],t[bg])>=min})),audit:lastAudit,tokens:t};
 }
