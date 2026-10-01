@@ -1,0 +1,19 @@
+name: RV Native Windows Runner Probe
+
+on:
+  push:
+    branches:
+      - ci/freecad-native-preview
+    paths:
+      - ".github/workflows/rv-native-runner-probe.yml"
+
+jobs:
+  probe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probe Windows runner
+        shell: pwsh
+        run: |
+          Write-Host "RV native Windows runner available"
+          Get-ComputerInfo | Select-Object WindowsProductName, WindowsVersion, OsArchitecture
