@@ -140,6 +140,22 @@ export function createEditor(svg,api){
  function addText(text,p,attrs={}){
   const t=el('text',{x:p[0],y:-p[1],class:'sketch-svg-text',...attrs});t.textContent=text;svg.appendChild(t);return t;
  }
+ function renderReferenceDock(active){
+  const refs=(api.objects?.()||[]).filter(o=>o&&o.id!==active.id&&Array.isArray(o.loops)&&o.loops.length);
+  if(!refs.length)return;
+  const count=refs.length,cols=Math.min(5,Math.max(1,Math.ceil(Math.sqrt(count)))),rows=Math.ceil(count/cols);
+  const gap=Math.min(view[2],view[3])*.010,tile=Math.min(view[2]*.155,view[3]*.19,.27);
+  const totalW=cols*tile+(cols-1)*gap;
+  const startX=view[0]+view[2]-totalW-gap,startY=view[1]+gap;
+  refs.forEach((ref,i)=>{
+   const col=i%cols,row=Math.floor(i/cols),x=startX+col*(tile+gap),y=startY+row*(tile+gap);
+   const mini=el('svg',{x,y,width:tile,height:tile,viewBox:'-.62 -.62 1.24 1.24',preserveAspectRatio:'xMidYMid meet',class:'sketch-reference-tile','data-reference-object':ref.id,'aria-label':'Editar '+ref.name});
+   mini.appendChild(el('rect',{x:-.61,y:-.61,width:1.22,height:1.22,rx:.06,class:'sketch-reference-bg','data-reference-object':ref.id}));
+   mini.appendChild(el('path',{d:ref.loops.map(p=>path(p)+'Z').join(' '),class:'sketch-reference-shape','fill-rule':'evenodd','pointer-events':'none'}));
+   const label=el('text',{x:0,y:.54,class:'sketch-reference-label','pointer-events':'none'});label.textContent=String(ref.name||'Sketch').replace(/^Sketch\s*[·\d]*\s*/,'').slice(0,16);mini.appendChild(label);
+   svg.appendChild(mini);
+  });
+ }
  function renderAxes(){
   if(view[0]<=0&&view[0]+view[2]>=0)svg.appendChild(el('line',{x1:0,y1:view[1],x2:0,y2:view[1]+view[3],class:'sketch-axis sketch-axis-y','vector-effect':'non-scaling-stroke'}));
   if(view[1]<=0&&view[1]+view[3]>=0)svg.appendChild(el('line',{x1:view[0],y1:0,x2:view[0]+view[2],y2:0,class:'sketch-axis sketch-axis-x','vector-effect':'non-scaling-stroke'}));
@@ -288,7 +304,7 @@ export function createEditor(svg,api){
    const target=drag.endRelation?drag.end:drag.start,cc=localPoint(target,n);
    svg.appendChild(el('circle',{cx:cc[0],cy:-cc[1],r:view[2]*.009,class:'sketch-snap-marker','vector-effect':'non-scaling-stroke'}));
   }
-  renderBezierDraft(n);renderBox();renderInference(n);updateInspector(n);
+  renderBezierDraft(n);renderBox();renderInference(n);renderReferenceDock(o);updateInspector(n);
   const selection=$('selection');
   if(selection)selection.textContent=drag?.kind==='box-select'?(drag.end?.[0]<drag.start[0]?'Seleção cruzada: toca a janela para selecionar.':'Seleção por janela: a entidade precisa ficar dentro.'):region?'Região selecionada para edição de contorno.':sketch.selected().length?`${sketch.selected().length} entidade(s) selecionada(s) · Shift adiciona à seleção`:selected>=0?`Contorno ${selected+1} · ${o.loops[selected]?.length||0} pontos`:tool==='trim'?'Trim: clique no trecho que deseja remover.':tool==='extend'?'Extend: clique perto da extremidade que deseja prolongar.':tool==='dimension'?'Cota: clique em uma linha, círculo ou arco.':tool==='bezier'?(bezierClicks.length?'Bézier: continue clicando · duplo clique ou Enter conclui.':'Bézier: clique para iniciar a curva.'):tool==='point'?'Ponto: clique para posicionar · Shift suprime inferências.':'Clique para selecionar · arraste no vazio para seleção por janela.';
  }
@@ -313,6 +329,7 @@ export function createEditor(svg,api){
  if($('showSketchConstraints'))$('showSketchConstraints').onchange=render;
 
  svg.onpointerdown=e=>{
+  const reference=e.target.closest?.('[data-reference-object]');if(reference){e.preventDefault();api.activateObject?.(reference.dataset.referenceObject);return;}
   const o=api.object();if(!o)return;svg.setPointerCapture(e.pointerId);const q=point(e),n=e.target.dataset.node;let l=e.target.dataset.loop,entity=e.target.dataset.entity;const explicitHandle=e.target.dataset.handle!==undefined;if(!explicitHandle&&n===undefined&&['select','trim','extend','dimension'].includes(tool))entity=pickEntity(q,8)||entity;if(l===undefined&&['select','move'].includes(tool)){const hit=pickLoop(q);if(hit!==null)l=hit;}
   if(e.button===1||e.button===2){drag={kind:'pan',x:e.clientX,y:e.clientY,view:[...view]};return;}
   if(e.target.dataset.dimensionEntity){openInlineDimension(e.target.dataset.dimensionEntity,e.clientX,e.clientY);return;}

@@ -44,7 +44,7 @@
 </section>
 <main id="studio" hidden class="studio-v4">
 <aside class="tool-rail-v4" aria-label="Ferramentas globais">
-  <button id="drawerToggle" class="rail-tool active" title="Estrutura do projeto">☷</button>
+  <button id="drawerToggle" class="rail-tool active" title="Outliner · mostrar/ocultar objetos">☷</button>
   <button id="railFit" class="rail-tool" title="Enquadrar">⌗</button>
   <button id="railMeasure" class="rail-tool" title="Medir">⌖</button>
   <span class="rail-spacer"></span>
@@ -53,8 +53,8 @@
 <aside class="left project-drawer-v4">
   <div class="drawer-v4-head"><div class="drawer-title-edit"><span class="section-eyebrow">ESTRUTURA DO PROJETO</span><div class="project-title-row"><input id="name" aria-label="Nome do projeto" value="Novo projeto"><button id="renameProject" class="icon-button" title="Renomear projeto" aria-label="Renomear projeto">✎</button></div></div><span id="drawerSelectionCount" class="count-badge">1 selecionado</span></div>
   <div class="scope-v4"><span>ESCOPO DE EDIÇÃO</span><div class="scope-v4-buttons"><button data-scope-choice="active" class="active">Função</button><button data-scope-choice="selection" disabled title="Multisseleção 3D será ativada na fase correspondente">Seleção</button><button data-scope-choice="all">Todos</button></div></div>
-  <div class="sidebar-heading legacy-sidebar-heading"><div><span class="section-eyebrow">PROJETO</span><h2>Árvore</h2></div><span id="objectCount" class="count-badge">0 Sketches</span></div>
-  <div class="feature-primary-actions"><button id="newSketch" class="feature-action"><span>＋</span><strong>Novo Sketch</strong></button><button id="convertCutter" class="feature-action accent"><span>◆</span><strong>Converter em cortador</strong></button></div>
+  <div class="sidebar-heading outliner-heading"><div><span class="section-eyebrow">OUTLINER</span><h2>Objetos da cena</h2></div><span id="objectCount" class="count-badge">0 Sketches</span></div>
+  <div class="feature-primary-actions"><button id="newSketch" class="feature-action"><span>＋</span><strong>Novo Sketch</strong></button><button id="convertCutter" class="feature-action accent"><span>◆</span><strong>Converter atual</strong></button><button id="convertAllCutters" class="feature-action multi-object-action" hidden><span>◆◆</span><strong>Converter todos em cortador</strong></button></div>
   <button id="import" class="import"><span class="import-plus">+</span><span><strong>Importar arte como Sketch</strong><small>PNG, JPG, WebP ou SVG preenchido</small></span></button>
   <input type="file" id="artFile" accept="image/png,image/jpeg,image/webp,.svg" hidden>
   <details class="sample-drawer"><summary>Usar um exemplo</summary><div class="samples"><button id="pig">Porquinho</button><button id="cow">Vaquinha</button></div></details>

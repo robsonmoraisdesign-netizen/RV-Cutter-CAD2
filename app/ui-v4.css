@@ -326,3 +326,35 @@ body.presenting .workspace-tab#tabPresentation{background:var(--v4-surface3);col
  .piece-mode-host .mode-block{overflow:auto}
  .presentation-styles-v4{width:132px}
 }
+
+
+/* ========================================================================
+   14.28.4 · Multi-object workflow
+   ======================================================================== */
+.outliner-heading{padding:10px 10px 5px!important;margin:0!important;border-top:1px solid var(--v4-line2)}
+.outliner-heading .section-eyebrow{display:block!important;font-size:6px!important;letter-spacing:1px!important;color:var(--v4-brand2)!important;margin:0 0 3px!important}
+.outliner-heading h2{display:block!important;margin:0!important;font-size:10px!important;color:var(--v4-text)!important;font-weight:760!important}
+.outliner-heading #objectCount{align-self:center}
+.project-drawer-v4 #layers{flex:1 1 240px!important;min-height:180px!important;max-height:none!important;margin-top:3px!important;padding:4px!important;border:1px solid var(--v4-line2);border-radius:7px;background:color-mix(in srgb,var(--v4-bg) 72%,transparent)}
+.project-drawer-v4 .object-search-wrap{flex:none}
+.project-drawer-v4 .feature-primary-actions,.project-drawer-v4 .import,.project-drawer-v4 .sample-drawer,.project-drawer-v4 .layer-actions,.project-drawer-v4 #removeObject{flex:none}
+.feature-primary-actions{grid-template-columns:1fr 1fr!important}
+.feature-primary-actions .multi-object-action{grid-column:1/-1}
+.multi-object-action{border-color:color-mix(in srgb,var(--v4-brand) 48%,var(--v4-line2))!important;background:color-mix(in srgb,var(--v4-brandSoft) 65%,var(--v4-bg))!important}
+.multi-object-action strong{font-size:7.6px}
+#drawerToggle.active{background:var(--v4-brandSoft);color:var(--v4-brand2);border-color:color-mix(in srgb,var(--v4-brand) 35%,transparent)}
+body.drawer-collapsed #drawerToggle{background:transparent;color:var(--v4-muted);border-color:transparent}
+
+.sketch-reference-tile{overflow:visible;cursor:pointer;filter:drop-shadow(0 2px 5px rgba(30,40,44,.18))}
+.sketch-reference-bg{fill:rgba(248,250,250,.90);stroke:#aebbc0;stroke-width:.012}
+.sketch-reference-shape{fill:rgba(88,185,168,.10);stroke:#647c83;stroke-width:.014;vector-effect:non-scaling-stroke}
+.sketch-reference-label{fill:#4f6268;font-size:.085px;font-family:Inter,"Segoe UI",sans-serif;text-anchor:middle;font-weight:700;pointer-events:none}
+.sketch-reference-tile:hover .sketch-reference-bg{stroke:#2f9988;stroke-width:.018}
+.sketch-reference-tile:hover .sketch-reference-shape{stroke:#2f9988;fill:rgba(88,185,168,.18)}
+body.ui-light .sketch-reference-bg{fill:rgba(255,255,255,.96);stroke:#9aa8ae}
+
+@media(max-height:720px){
+ .project-drawer-v4 #layers{min-height:130px!important}
+ .project-drawer-v4 .sample-drawer{display:none}
+ .project-drawer-v4 .sidebar-hint{display:none}
+}

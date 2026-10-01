@@ -151,6 +151,30 @@ async function cdp(url){
   await send('Input.dispatchMouseEvent',{type:'mouseReleased',...pick,button:'left',clickCount:1});
   assert(await evalv("!!document.querySelector('#editor path[data-loop][stroke=\"#e5852d\"]')"),'Imported contour must be selectable six pixels away');
   console.log('Integration regressions: undo/redo, preset, STL, Sketch switch, import, proximity picking PASS');
+
+  await evalv("RVTest.finishSketch(true);true");
+  await evalv(`RVTest.commitImport([
+    [[[-.46,-.46],[.46,-.46],[.46,.46],[-.46,.46]]],
+    [[[0,-.48],[.46,.40],[-.46,.40]]],
+    [[[0,-.50],[.48,0],[0,.50],[-.48,0]]]
+  ],'Colecao QA',null,false);true`);
+  await waitFor(()=>evalv("RVTest.state.objects.length===3 && RVTest.state.stage==='2d' && !!RVTest.state.editingSketchId"));
+  assert.equal(await evalv("document.querySelectorAll('#layers .layer[data-object-id]').length"),3,'Outliner must list every imported Sketch');
+  assert.equal(await evalv("document.querySelectorAll('.sketch-reference-tile').length"),2,'All non-active arts must remain visible as Sketch references');
+  assert(await evalv("!document.body.classList.contains('drawer-collapsed') && document.querySelector('#layers').getBoundingClientRect().height>=120"),'Outliner must stay visibly open for multi-object work');
+  const beforeActive=await evalv("RVTest.state.editingSketchId");
+  await evalv("document.querySelector('.sketch-reference-tile').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,pointerId:77}));true");
+  await waitFor(()=>evalv("RVTest.state.editingSketchId!=="+JSON.stringify(beforeActive)));
+  assert.equal(await evalv("document.querySelectorAll('.sketch-reference-tile').length"),2,'Switching active Sketch must keep the other arts visible');
+  await evalv("document.querySelector('#convertAllCutters').click();true");
+  await waitFor(()=>evalv("RVTest.state.objects.every(o=>o.features.some(f=>f.type==='cookie-cutter'))"));
+  await evalv("RVTest.wait()");
+  await evalv("RVTest.setStage('3d');true");await sleep(250);
+  const multiRender=await evalv("RVTest.viewer.diagnostics()");
+  console.log('Multi-object render diagnostics',JSON.stringify(multiRender));
+  assert(multiRender.groups>=3&&multiRender.visibleMeshes>=3,'Bulk conversion must place all imported arts in the 3D scene');
+  console.log('Multi-object regression: Outliner + persistent Sketch references + bulk 3D conversion PASS');
+
   const exceptions=dev.events.filter(e=>e.method==='Runtime.exceptionThrown');
   const severe=dev.events.filter(e=>e.method==='Log.entryAdded'&&['error'].includes(e.params?.entry?.level));
   assert.deepEqual(exceptions.map(e=>e.params?.exceptionDetails?.text),[]);
