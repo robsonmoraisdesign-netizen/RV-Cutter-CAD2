@@ -85,7 +85,7 @@ export function build(m,loops,params,ctx=null,options={}){const started=performa
  const silhouette=section=>{const polys=section.toPolygons().sort((a,b)=>Math.abs(area(b))-Math.abs(area(a)));if(!polys.length)throw Error('O recuo eliminou o contorno. Reduza o valor.');return hold(new C([polys[0]],'EvenOdd'));};
  const linkedCutterExpansion=p.mode==='separate'?p.stampExpansion:0;
  let original=hold(new C([src[0]],'EvenOdd')),outer=hold(new C(memo('outer',()=>silhouette(hold(hold(original.offset(p.outlineOffset+linkedCutterExpansion,'Round',2,roundSegments)).simplify(.002))).toPolygons()),'EvenOdd'));
- let bladeSolid,rimOuter,inner,cutter,relief,stamp,stampBaseSolid,reliefPart,bladeProfile=[],reliefOutline=[];
+ let bladeSolid,rimOuter,inner,cutter,relief,stamp,stampBaseSolid,reliefPart,bladeProfile=[],reliefOutline=[],reinforcementRootOutline=[],reinforcementTransitionOutline=[];
  if(p.mode!=='stamp'&&!cachedCutter){
   const innerPolys=memo('inner',()=>{
   inner=silhouette(hold(outer.offset(p.clearance,'Round',2,roundSegments)));
@@ -124,6 +124,8 @@ export function build(m,loops,params,ctx=null,options={}){const started=performa
    // This avoids a second triangulation + boolean union at the blade wall,
    // which produced thin spike/triangle artifacts on high-curvature segments.
    const reinforcementOuter=silhouette(hold(bladeOuter.offset(p.reinforcementWidth,'Round',2,roundSegments)));
+   reinforcementRootOutline=reinforcementOuter.toPolygons()[0]||[];
+   reinforcementTransitionOutline=bladeOuter.toPolygons()[0]||[];
    const rootZ=p.base-.02,reinforcementEnd=p.base+p.reinforcementHeight,intermediate=[];
 
    if(p.chamfer&&(p.tip<p.wall-1e-6||p.wallEdits.length)){
@@ -204,7 +206,7 @@ export function build(m,loops,params,ctx=null,options={}){const started=performa
  else if(p.mode==='separate')parts=p.reliefSeparate?[{name:'Cortador',solid:cutter},{name:'Base do carimbo',solid:stampBaseSolid},{name:'Relevo',solid:reliefPart}]:[{name:'Cortador',solid:cutter},{name:'Carimbo',solid:stamp}];
  else if(p.mode==='stamp')parts=p.reliefSeparate?[{name:'Base do carimbo',solid:stampBaseSolid},{name:'Relevo',solid:reliefPart}]:[{name:'Carimbo',solid:stamp}];
  else parts=[{name:'Cortador',solid:cutter}];
- const result={parts:parts.map(({name,solid})=>{if(name==='Cortador'&&cachedCutter)return cachedCutter.part;if(name==='Carimbo'&&cachedStamp)return cachedStamp.part;solid=hold(solid.setTolerance(.001));if(solid.status()!=='NoError'||solid.isEmpty())throw Error(`${name}: falha na construção do sólido (${solid.status()}).`);const mesh=cleanExportMesh(solid.getMesh()),stats=checkMesh(mesh);if(stats.open||stats.nonmanifold||!stats.finite)throw Error(`${name}: malha inválida (${JSON.stringify(stats)}), exportação bloqueada.`);const components=solid.decompose();const bodies=components.length;components.forEach(s=>s.delete());return {name,positions:Float32Array.from(mesh.vertProperties),indices:Uint32Array.from(mesh.triVerts),stride:mesh.numProp,volume:solid.volume(),bounds:solid.boundingBox(),stats,bodies};}),outline:outer.toPolygons(),reliefOutline,cuttingOutline:cachedCutter?.cuttingOutline||inner?.toPolygons()||[],bladeProfile:cachedCutter?.bladeProfile||bladeProfile,params:p,buildProfile,sourcePoints};for(const part of result.parts){if(part.name==='Cortador'&&!cachedCutter)ctx?.set('cutter',{part,cuttingOutline:result.cuttingOutline,bladeProfile:result.bladeProfile});if(part.name==='Carimbo'&&!cachedStamp)ctx?.set('stamp',{part});}result.elapsed=performance.now()-started;return result;
+ const result={parts:parts.map(({name,solid})=>{if(name==='Cortador'&&cachedCutter)return cachedCutter.part;if(name==='Carimbo'&&cachedStamp)return cachedStamp.part;solid=hold(solid.setTolerance(.001));if(solid.status()!=='NoError'||solid.isEmpty())throw Error(`${name}: falha na construção do sólido (${solid.status()}).`);const mesh=cleanExportMesh(solid.getMesh()),stats=checkMesh(mesh);if(stats.open||stats.nonmanifold||!stats.finite)throw Error(`${name}: malha inválida (${JSON.stringify(stats)}), exportação bloqueada.`);const components=solid.decompose();const bodies=components.length;components.forEach(s=>s.delete());return {name,positions:Float32Array.from(mesh.vertProperties),indices:Uint32Array.from(mesh.triVerts),stride:mesh.numProp,volume:solid.volume(),bounds:solid.boundingBox(),stats,bodies};}),outline:outer.toPolygons(),reliefOutline,cuttingOutline:cachedCutter?.cuttingOutline||inner?.toPolygons()||[],bladeProfile:cachedCutter?.bladeProfile||bladeProfile,reinforcementRootOutline,reinforcementTransitionOutline,params:p,buildProfile,sourcePoints};for(const part of result.parts){if(part.name==='Cortador'&&!cachedCutter)ctx?.set('cutter',{part,cuttingOutline:result.cuttingOutline,bladeProfile:result.bladeProfile});if(part.name==='Carimbo'&&!cachedStamp)ctx?.set('stamp',{part});}result.elapsed=performance.now()-started;return result;
  }finally{keep.reverse().forEach(o=>o.delete());}}
 
 // Boolean editing preserves filled-region topology. Brush paths are widened to real areas.
