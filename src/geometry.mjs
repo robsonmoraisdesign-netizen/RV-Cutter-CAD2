@@ -38,6 +38,40 @@ function bandTriangles(m,polys){
  if(!changed)break;
  }return tri;
 }
+function matchedLoop(poly,count){
+ let p=area(poly)>0?poly.map(v=>v.slice()):poly.slice().reverse().map(v=>v.slice());
+ if(p.length>1&&Math.hypot(p[0][0]-p.at(-1)[0],p[0][1]-p.at(-1)[1])<1e-10)p.pop();
+ if(p.length<3)throw Error('Perfil insuficiente para o reforço.');
+ // Stable common seam: right-most point, then lowest Y as tie-break.
+ let anchor=0;
+ for(let i=1;i<p.length;i++)if(p[i][0]>p[anchor][0]+1e-9||(Math.abs(p[i][0]-p[anchor][0])<=1e-9&&p[i][1]<p[anchor][1]))anchor=i;
+ p=[...p.slice(anchor),...p.slice(0,anchor)];
+ const seg=[],cum=[0];let total=0;
+ for(let i=0;i<p.length;i++){const a=p[i],b=p[(i+1)%p.length],d=Math.hypot(b[0]-a[0],b[1]-a[1]);seg.push(d);total+=d;cum.push(total);}
+ if(!(total>1e-9))throw Error('Perfil degenerado no reforço.');
+ const out=[];let j=0;
+ for(let k=0;k<count;k++){
+  const target=total*k/count;
+  while(j<seg.length-1&&cum[j+1]<target)j++;
+  const a=p[j],b=p[(j+1)%p.length],d=seg[j]||1,t=(target-cum[j])/d;
+  out.push([a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t]);
+ }
+ return out;
+}
+function matchedLoft(m,profiles){
+ const count=Math.max(96,Math.min(2048,Math.ceil(Math.max(...profiles.map(r=>r.poly.length))*1.15)));
+ const rings=profiles.map(r=>({z:r.z,poly:matchedLoop(r.poly,count)})),verts=[],faces=[];
+ for(const ring of rings)for(const [x,y] of ring.poly)verts.push(x,y,ring.z);
+ for(const f of m.triangulate([rings[0].poly],1e-8,false))faces.push(f[2],f[1],f[0]);
+ for(let r=0;r<rings.length-1;r++){
+  const a=r*count,b=(r+1)*count;
+  for(let i=0;i<count;i++){const j=(i+1)%count;faces.push(a+i,a+j,b+j,a+i,b+j,b+i);}
+ }
+ const top=(rings.length-1)*count;
+ for(const f of m.triangulate([rings.at(-1).poly],1e-8,false))faces.push(f[0]+top,f[1]+top,f[2]+top);
+ return new m.Manifold(new m.Mesh({numProp:3,vertProperties:new Float32Array(verts),triVerts:new Uint32Array(faces)}));
+}
+
 export function loft(m,lower,upper,z0,z1,floor=z0-1,intermediate=[]){
  const ccw=p=>area(p)>0?p.map(v=>v.slice()):p.slice().reverse().map(v=>v.slice());
  const profiles=[{poly:lower,z:floor},{poly:lower,z:z0},...intermediate,{poly:upper,z:z1}].map(r=>({...r,poly:ccw(r.poly)}));
@@ -154,27 +188,21 @@ export function build(m,loops,params,ctx=null,options={}){const started=performa
     // Keep the normal blade wall vertical up to the start of the cutting-tip chamfer.
     if(reinforcementEnd<zBody-1e-6)intermediate.push({poly:bladeOuter.toPolygons()[0],z:zBody});
     for(const r of profiles.rings)intermediate.push({poly:r.poly,z:zBody+p.chamferHeight*r.fraction});
-    const continuousBlade=hold(loft(
-      m,
-      reinforcementOuter.toPolygons()[0],
-      tipOuter.toPolygons()[0],
-      rootZ,
-      p.height,
-      rootZ-.02,
-      intermediate
-    ));
+    const continuousBlade=hold(matchedLoft(m,[
+      {poly:reinforcementOuter.toPolygons()[0],z:rootZ-.02},
+      {poly:reinforcementOuter.toPolygons()[0],z:rootZ},
+      ...intermediate,
+      {poly:tipOuter.toPolygons()[0],z:p.height}
+    ]));
     if(continuousBlade.status()!=='NoError')throw Error('Não foi possível fechar a lâmina com reforço contínuo. Reduza a altura ou a largura do reforço.');
     bladeSolid=hold(continuousBlade.subtract(hold(inner.extrude(p.height+1))));
    }else{
-    const continuousBlade=hold(loft(
-      m,
-      reinforcementOuter.toPolygons()[0],
-      bladeOuter.toPolygons()[0],
-      rootZ,
-      p.height,
-      rootZ-.02,
-      intermediate
-    ));
+    const continuousBlade=hold(matchedLoft(m,[
+      {poly:reinforcementOuter.toPolygons()[0],z:rootZ-.02},
+      {poly:reinforcementOuter.toPolygons()[0],z:rootZ},
+      ...intermediate,
+      {poly:bladeOuter.toPolygons()[0],z:p.height}
+    ]));
     if(continuousBlade.status()!=='NoError')throw Error('Não foi possível fechar a lâmina com reforço contínuo. Reduza a altura ou a largura do reforço.');
     bladeSolid=hold(continuousBlade.subtract(hold(inner.extrude(p.height+1))));
    }
