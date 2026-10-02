@@ -4,6 +4,7 @@ import {CAD_DISPLAY} from './cad-display.mjs';
   var defaultHatchProfiles={
    cutterBase:{enabled:false,type:'parallel',mode:'overlay',rotation:28,color:'#65584d',thickness:.12,scale:4.8,intensity:.42},
    blade:{enabled:false,type:'parallel',mode:'overlay',rotation:-28,color:'#65584d',thickness:.11,scale:4.0,intensity:.38},
+   reinforcement:{enabled:false,type:'parallel',mode:'overlay',rotation:18,color:'#65584d',thickness:.11,scale:4.2,intensity:.38},
    stampBase:{enabled:false,type:'cross',mode:'overlay',rotation:42,color:'#65584d',thickness:.10,scale:5.2,intensity:.38},
    relief:{enabled:false,type:'double45',mode:'overlay',rotation:18,color:'#65584d',thickness:.09,scale:3.6,intensity:.34},
    shadow:{enabled:false,type:'cross',mode:'replace',rotation:45,color:'#4d443e',thickness:.10,scale:4.4,intensity:.44}
@@ -11,7 +12,7 @@ import {CAD_DISPLAY} from './cad-display.mjs';
 
   var presentationDefaults={
    style:'illustrated',shadeSoftness:.65,background:'#a9eaf8',modelColor:'#ffba24',componentColors:true,
-   colors:{cutterBase:'#e18e25',blade:'#ffbf28',stampBase:'#38bfb8',relief:'#f07891'},
+   colors:{cutterBase:'#e18e25',blade:'#ffbf28',reinforcement:'#a75cff',stampBase:'#38bfb8',relief:'#f07891'},
    lightAzimuth:-40,lightElevation:55,lightIntensity:2.4,ambient:.8,
    shadows:true,groundDistance:4,projectedShadows:true,modelShadows:true,modelShadowMode:'soft',
    aoIntensity:.32,aoRadius:1.4,shadowOpacity:.3,shadowSoftness:3,
