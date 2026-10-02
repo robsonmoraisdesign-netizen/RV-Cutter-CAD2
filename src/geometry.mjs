@@ -1,7 +1,7 @@
 import {validateSketch} from './sketch/model.mjs';
 import Module from 'manifold-3d';
 export async function kernel(options={}){const m=await Module(options);m.setup();return m;}
-export const defaults={size:75,wall:0.8,height:12.5,rim:4,base:2.5,relief:4.5,reliefInverted:false,reliefSeparate:false,reliefOut:4.5,reliefIn:1,clearance:0.9,detailOffset:0,outlineOffset:0,mode:'integrated',mirror:false,threshold:160,tolerance:0.04,stampBase:2.5,stampInset:0,stampExpansion:0,removeOutline:false,outlineBand:0.8,chamfer:false,tip:0.4,chamferHeight:2,wallEdits:[],cornerRadius:2};
+export const defaults={size:75,wall:0.8,height:12.5,rim:4,base:2.5,relief:4.5,reliefInverted:false,reliefSeparate:false,reliefOut:4.5,reliefIn:1,clearance:0.9,detailOffset:0,outlineOffset:0,mode:'integrated',mirror:false,threshold:160,tolerance:0.04,stampBase:2.5,stampInset:0,stampExpansion:0,removeOutline:false,outlineBand:0.8,chamfer:false,tip:0.4,chamferHeight:2,bladeReinforcement:false,reinforcementHeight:2,reinforcementWidth:1.5,wallEdits:[],cornerRadius:2};
 export function area(p){return p.reduce((a,v,i)=>{const q=p[(i+1)%p.length];return a+v[0]*q[1]-q[0]*v[1]},0)/2;}
 export function simplify(p,eps){if(p.length<5)return p;const seg=(p,a,b)=>{let dx=b[0]-a[0],dy=b[1]-a[1],t=Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/(dx*dx+dy*dy||1)));return Math.hypot(p[0]-a[0]-t*dx,p[1]-a[1]-t*dy)};const rdp=a=>{let d=0,k=0;for(let i=1;i<a.length-1;i++){let v=seg(a[i],a[0],a.at(-1));if(v>d){d=v;k=i}}return d>eps?[...rdp(a.slice(0,k+1)).slice(0,-1),...rdp(a.slice(k))]:[a[0],a.at(-1)];};let k=1,d=0;for(let i=1;i<p.length;i++){const v=Math.hypot(p[i][0]-p[0][0],p[i][1]-p[0][1]);if(v>d){d=v;k=i}}return [...rdp(p.slice(0,k+1)).slice(0,-1),...rdp([...p.slice(k),p[0]]).slice(0,-1)];}
 export function normalize(loops){const all=loops.flat();if(!all.length)throw Error('Nenhum contorno fechado encontrado.');let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;for(const [x,y]of all){minX=Math.min(x,minX);maxX=Math.max(x,maxX);minY=Math.min(y,minY);maxY=Math.max(y,maxY)}const scale=Math.max(maxX-minX,maxY-minY);if(!(scale>0))throw Error('Arte sem dimensão.');return loops.map(p=>p.map(([x,y])=>[(x-(minX+maxX)/2)/scale,(y-(minY+maxY)/2)/scale]));}
@@ -60,15 +60,21 @@ export function migrateParams(params={}){const p={...defaults,...params,stampBas
  if(!Number.isFinite(p.reliefIn))p.reliefIn=p.reliefInverted?p.relief:Math.min(1,Math.max(.1,(p.mode==='integrated'?p.base:p.stampBase)*.4));
  return p;}
 export function build(m,loops,params,ctx=null,options={}){const started=performance.now(),p=migrateParams(params),keep=[];const hold=x=>(keep.push(x),x);const C=m.CrossSection,M=m.Manifold;
- const finite=['size','wall','height','rim','base','stampBase','stampInset','stampExpansion','outlineBand','tip','chamferHeight','clearance','detailOffset','outlineOffset','tolerance','cornerRadius','relief'];
+ const finite=['size','wall','height','rim','base','stampBase','stampInset','stampExpansion','outlineBand','tip','chamferHeight','reinforcementHeight','reinforcementWidth','clearance','detailOffset','outlineOffset','tolerance','cornerRadius','relief'];
  for(const k of finite)if(!Number.isFinite(p[k]))throw Error(`Valor inválido em ${k}: informe um número finito.`);
- const positive=[['size',.1],['wall',.01],['height',.05],['base',.01],['stampBase',.01],['outlineBand',.001],['tip',.001],['chamferHeight',.001],['tolerance',.0001],['relief',.001]];
+ const positive=[['size',.1],['wall',.01],['height',.05],['base',.01],['stampBase',.01],['outlineBand',.001],['tip',.001],['chamferHeight',.001],['reinforcementHeight',.001],['reinforcementWidth',.001],['tolerance',.0001],['relief',.001]];
  for(const [k,lo]of positive)if(p[k]<lo)throw Error(`Valor inválido em ${k}: use um valor maior ou igual a ${lo}.`);
  if(p.rim<0||p.cornerRadius<0||p.clearance<0)throw Error('Base de apoio, proteção de cantos e folga não podem ser negativas.');
  const reliefBase=p.mode==='integrated'?p.base:p.stampBase;
  if(p.base>=p.height)throw Error('A base do cortador deve ser menor que a altura total.');
  if(p.mode==='integrated'&&p.base+p.relief>=p.height)throw Error('Base + relevo precisam ficar abaixo da borda de corte.');
  if(p.chamfer&&p.mode!=='stamp'&&(p.tip>p.wall||p.chamferHeight>p.height-p.base))throw Error('O chanfro deve caber acima da base; a ponta não pode superar a espessura da lâmina.');
+ if(p.bladeReinforcement&&p.mode!=='stamp'){
+  const availableWidth=Math.max(0,Math.max(p.rim,p.wall)-p.wall);
+  if(p.reinforcementWidth>availableWidth+1e-6)throw Error('A largura do reforço deve caber dentro da base de apoio. Aumente a base de apoio ou reduza a largura do reforço.');
+  const availableHeight=p.height-p.base-(p.chamfer?p.chamferHeight:0);
+  if(p.reinforcementHeight>availableHeight+1e-6)throw Error('A altura do reforço deve terminar antes do chanfro da ponta.');
+ }
  if(!['integrated','separate','cutter','stamp'].includes(p.mode))throw Error('Modo de peça inválido.');
  try{
  const memo=(node,fn)=>ctx?ctx.memo(node,fn):fn();
@@ -119,6 +125,13 @@ export function build(m,loops,params,ctx=null,options={}){const started=performa
    if(taper.status()!=='NoError')throw Error('Não foi possível fechar o chanfro. Reduza sua altura ou revise o contorno.');
    bladeSolid=hold(taper.subtract(hold(inner.extrude(p.height+1))));
   }else bladeSolid=hold(hold(hold(bladeOuter.subtract(inner)).extrude(p.height-p.base+.02)).translate([0,0,p.base-.02]));
+  if(p.bladeReinforcement){
+   const reinforcementOuter=silhouette(hold(bladeOuter.offset(p.reinforcementWidth,'Round',2,roundSegments)));
+   const reinforcementLoft=hold(loft(m,reinforcementOuter.toPolygons()[0],bladeOuter.toPolygons()[0],p.base-.02,p.base+p.reinforcementHeight,p.base-.04));
+   const reinforcement=hold(reinforcementLoft.subtract(hold(inner.extrude(p.base+p.reinforcementHeight+1))));
+   if(reinforcement.status()!=='NoError')throw Error('Não foi possível gerar o reforço da lâmina. Reduza a altura ou a largura do reforço.');
+   bladeSolid=hold(M.union([bladeSolid,reinforcement]));
+  }
   ctx?.setSolid?.('bladeSolid',bladeSolid.translate([0,0,0]));}
   if(p.mode!=='integrated')cutter=hold(M.union([bladeSolid,hold(hold(rimOuter.subtract(inner)).extrude(p.base))]));
  }
