@@ -9,10 +9,21 @@ function normal(pts){const a=pts[0],u=pts[1].map((v,k)=>v-a[k]),v=pts[2].map((q,
 // so faces exactly on the relief outline are classified consistently.
 export function classifyDisplayRole(part,result,ids){
  const p=result.params,pts=triangle(part,ids),c=[0,0,0];for(const q of pts)for(let k=0;k<3;k++)c[k]+=q[k]/3;
- if(part.name==='Cortador')return c[2]<=p.base+.001?'cutterBase':'blade';
+ const reinforcementSurface=()=>{
+  if(!p.bladeReinforcement||c[2]<=p.base+.001||c[2]>p.base+p.reinforcementHeight+.002)return false;
+  const root=result.reinforcementRootOutline,transition=result.reinforcementTransitionOutline;
+  if(!root?.length||!transition?.length)return false;
+  return insidePolys([root],c)&&!insidePolys([transition],c);
+ };
+ if(part.name==='Cortador'){
+  if(c[2]<=p.base+.001)return 'cutterBase';
+  if(reinforcementSurface())return 'reinforcement';
+  return 'blade';
+ }
  if(part.name==='Base do carimbo')return 'stampBase';
  if(part.name==='Relevo')return 'relief';
  const integrated=part.name!=='Carimbo',top=integrated?p.base:p.stampBase;
+ if(integrated&&reinforcementSurface())return 'reinforcement';
  if(p.reliefInverted){
   const floor=top,ceiling=top+p.relief,epsZ=Math.max(.001,Math.abs(ceiling)*1e-5);
   let cavity=false;
