@@ -1,0 +1,39 @@
+{
+  "version": "14.28.14",
+  "date": "2026-10-02",
+  "staticInventory": {
+    "buttons": 139,
+    "inputs": 48,
+    "selects": 16,
+    "labels": 48,
+    "summaries": 13,
+    "dialogs": 7,
+    "sections": 7,
+    "asides": 3,
+    "spans": 129,
+    "paragraphs": 31,
+    "headings": 12,
+    "ids": 211,
+    "uniqueClasses": 176
+  },
+  "hardcodedColors": {
+    "legacyStyle": 407,
+    "legacyUiV4": 151,
+    "themeEngine": 0,
+    "appearanceEngine": 0,
+    "uiRuntime": 0,
+    "viewerRuntime": 0,
+    "editorRuntime": 0,
+    "measureRuntime": 0
+  },
+  "runtimeAuditStorageKey": "rv-appearance-audit-v1",
+  "appearanceEngine": "14.28.14-appearance-1",
+  "sketch": {
+    "realOrigin": true,
+    "snapOrigin": true,
+    "snapAxisX": true,
+    "snapAxisY": true,
+    "parametricOriginConstraint": "coincidentOrigin",
+    "parametricAxisConstraint": "pointOnAxis"
+  }
+}
