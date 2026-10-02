@@ -38,6 +38,15 @@ function bandTriangles(m,polys){
  if(!changed)break;
  }return tri;
 }
+function densifyLoop(poly,maxLength=.6){
+ const out=[];
+ for(let i=0;i<poly.length;i++){
+  const a=poly[i],b=poly[(i+1)%poly.length],length=Math.hypot(b[0]-a[0],b[1]-a[1]);
+  const steps=Math.max(1,Math.ceil(length/maxLength));
+  for(let j=0;j<steps;j++){const t=j/steps;out.push([a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t]);}
+ }
+ return out;
+}
 export function loft(m,lower,upper,z0,z1,floor=z0-1,intermediate=[]){
  const ccw=p=>area(p)>0?p.map(v=>v.slice()):p.slice().reverse().map(v=>v.slice());
  const profiles=[{poly:lower,z:floor},{poly:lower,z:z0},...intermediate,{poly:upper,z:z1}].map(r=>({...r,poly:ccw(r.poly)}));
@@ -133,6 +142,8 @@ export function build(m,loops,params,ctx=null,options={}){const started=performa
    reinforcementTransitionOutline=bladeOuter.toPolygons()[0]||[];
    const rootZ=p.base-.02,reinforcementEnd=p.base+p.reinforcementHeight;
    const intermediate=[];
+   const reinforcementSegment=Math.max(.25,Math.min(.7,p.size/180));
+   const dense=poly=>densifyLoop(poly,reinforcementSegment);
    const count=Math.max(2,Math.min(maxChamferProfiles,Math.ceil(p.reinforcementWidth/.025)));
    let previous=reinforcementOuter;
    for(let i=1;i<count;i++){
@@ -140,19 +151,19 @@ export function build(m,loops,params,ctx=null,options={}){const started=performa
     let section=makeReinforcementOuter(1-fraction);
     // Mesma proteção de monotonicidade usada no chanfro quando há edições locais.
     if(p.wallEdits.length)section=silhouette(hold(section.intersect(previous)));
-    intermediate.push({poly:section.toPolygons()[0],z:rootZ+p.reinforcementHeight*fraction});
+    intermediate.push({poly:dense(section.toPolygons()[0]),z:rootZ+p.reinforcementHeight*fraction});
     previous=section;
    }
-   intermediate.push({poly:bladeOuter.toPolygons()[0],z:reinforcementEnd});
+   intermediate.push({poly:dense(bladeOuter.toPolygons()[0]),z:reinforcementEnd});
 
    if(p.chamfer&&(p.tip<p.wall-1e-6||p.wallEdits.length)){
     const zBody=p.height-p.chamferHeight,tipOuter=hold(new C(profiles.tip,'EvenOdd'));
-    if(reinforcementEnd<zBody-1e-6)intermediate.push({poly:bladeOuter.toPolygons()[0],z:zBody});
-    for(const r of profiles.rings)intermediate.push({poly:r.poly,z:zBody+p.chamferHeight*r.fraction});
+    if(reinforcementEnd<zBody-1e-6)intermediate.push({poly:dense(bladeOuter.toPolygons()[0]),z:zBody});
+    for(const r of profiles.rings)intermediate.push({poly:dense(r.poly),z:zBody+p.chamferHeight*r.fraction});
     const continuousBlade=hold(loft(
       m,
-      reinforcementOuter.toPolygons()[0],
-      tipOuter.toPolygons()[0],
+      dense(reinforcementOuter.toPolygons()[0]),
+      dense(tipOuter.toPolygons()[0]),
       rootZ,
       p.height,
       rootZ-.02,
@@ -163,8 +174,8 @@ export function build(m,loops,params,ctx=null,options={}){const started=performa
    }else{
     const continuousBlade=hold(loft(
       m,
-      reinforcementOuter.toPolygons()[0],
-      bladeOuter.toPolygons()[0],
+      dense(reinforcementOuter.toPolygons()[0]),
+      dense(bladeOuter.toPolygons()[0]),
       rootZ,
       p.height,
       rootZ-.02,
