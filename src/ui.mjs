@@ -12,6 +12,7 @@ import {createEditor} from './editor.mjs';
 import {resolveProjectTransition} from './project-transition.mjs';
 import {migrateSketchNode,attachCookieCutter,cutterFeature,hasManufacturingFeature,featureTree,syncRuntimeParams} from './project-model.mjs';
 import {initTheme,toggleTheme,themeName,themeColor,installThemeGlobal,themeDiagnostics,LEGACY_MODEL_COLORS} from './theme-controller.mjs';
+import {installAppearanceController,appearanceAudit,APPEARANCE_ENGINE_VERSION} from './appearance-controller.mjs';
 const $=id=>document.getElementById(id),uid=()=>crypto.randomUUID();
 const hueDistance=(a,b)=>{const d=Math.abs(a-b)%1;return Math.min(d,1-d);};
 const colorHue=hex=>{const hsl={h:0,s:0,l:0};new THREE.Color(hex).getHSL(hsl);return hsl.h;};
@@ -39,8 +40,9 @@ const randomReinforcementColor=()=>{
  const color=new THREE.Color().setHSL(bestHue,.68,.58);
  return '#'+color.getHexString();
 };
-installThemeGlobal();initTheme();
+installThemeGlobal();initTheme();installAppearanceController();
 $('appVersion').textContent=APP_VERSION;
+document.documentElement.dataset.rvAppearanceEngine=APPEARANCE_ENGINE_VERSION;
 function saveState(value){const el=$('saveState');el.dataset.state=value;el.textContent={dirty:'Alterações pendentes',saving:'Salvando…',saved:'Salvo',error:'Erro ao salvar',idle:'Biblioteca'}[value];}
 const state={id:uid(),name:'Novo projeto',source:null,objects:[],activeId:null,editingSketchId:null,history:[],future:[],view:{arrangement:'spread',material:'cad',componentColors:true,colors:{...initialColors,reinforcement:randomReinforcementColor()},showDims:true,layerLines:false,sliceEnabled:false,sliceHeight:12.5,wire:false,grid:true},stage:'3d',screen:'home',homePreview:null};
 let colorPaletteRows=[];
