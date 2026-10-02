@@ -5,7 +5,7 @@
   "main": "app/main.cjs",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "node qa13-geometry.mjs && node qa14-bevel.mjs && node qa14-corners.mjs && node qa148-expansion-linked.mjs && node qa148-runtime-worker.mjs && node qa14-export-center.mjs && node qa13-catalog.cjs && node qa1422-inverted-relief-volume.mjs && node qa14282-relief-separated.mjs && node qa14285-cad-display.mjs && node qa-sketch-phase1.mjs && node qa-sketch-integration.mjs && node qa1417-catalog.cjs && node qa-source-version.cjs && node qa-project-transition.mjs && node qa-sketch-constraints.mjs && node qa-sketch-ui-contract.cjs && node qa-sketch-snapping.mjs && node qa-ui-v4-contract.cjs && node qa142811-theme-engine.mjs && node qa142812-sketch-clarity.mjs && node qa-sketch-phase2.mjs && node qa-project-features.mjs && node qa142813-blade-reinforcement.mjs",
+    "test": "node qa13-geometry.mjs && node qa14-bevel.mjs && node qa14-corners.mjs && node qa148-expansion-linked.mjs && node qa148-runtime-worker.mjs && node qa14-export-center.mjs && node qa13-catalog.cjs && node qa1422-inverted-relief-volume.mjs && node qa14282-relief-separated.mjs && node qa14285-cad-display.mjs && node qa-sketch-phase1.mjs && node qa-sketch-integration.mjs && node qa1417-catalog.cjs && node qa-source-version.cjs && node qa-project-transition.mjs && node qa-sketch-constraints.mjs && node qa-sketch-ui-contract.cjs && node qa-sketch-snapping.mjs && node qa-ui-v4-contract.cjs && node qa142811-theme-engine.mjs && node qa142812-sketch-clarity.mjs && node qa-sketch-phase2.mjs && node qa-project-features.mjs && node qa142813-blade-reinforcement.mjs && node qa142813-reinforcement-visual.mjs",
     "start": "electron app"
   },
   "keywords": [],
