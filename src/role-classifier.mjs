@@ -10,10 +10,14 @@ function normal(pts){const a=pts[0],u=pts[1].map((v,k)=>v-a[k]),v=pts[2].map((q,
 export function classifyDisplayRole(part,result,ids){
  const p=result.params,pts=triangle(part,ids),c=[0,0,0];for(const q of pts)for(let k=0;k<3;k++)c[k]+=q[k]/3;
  const reinforcementSurface=()=>{
-  if(!p.bladeReinforcement||c[2]<=p.base+.001||c[2]>p.base+p.reinforcementHeight+.002)return false;
+  if(!p.bladeReinforcement)return false;
   const root=result.reinforcementRootOutline,transition=result.reinforcementTransitionOutline;
   if(!root?.length||!transition?.length)return false;
-  return insidePolys([root],c)&&!insidePolys([transition],c);
+  const samples=[c,...pts];
+  return samples.some(sample=>{
+   if(sample[2]<=p.base+.001||sample[2]>p.base+p.reinforcementHeight+.002)return false;
+   return insidePolys([root],sample)&&!insidePolys([transition],sample);
+  });
  };
  if(part.name==='Cortador'){
   if(c[2]<=p.base+.001)return 'cutterBase';
