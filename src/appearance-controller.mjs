@@ -8,9 +8,10 @@ const SELECTOR_ROLES=[
  ['.project-drawer-v4,.right,.library-section,.project-card,.sketch-contextbar,.option-card,.param-group','surface-panel'],
  ['dialog,.command-palette-v4,.leave-project-dialog,.visual-popover,.sketch-menu-popover,.sketch-inline-dimension,.sketch-shortcut-palette,.sketch-diagnostics-popover','surface-elevated'],
  ['#viewport,.workspace','surface-viewport'],
- ['.primary,.big-action,.feature-action.accent,#export,.right .primary','button-primary'],
+ ['.primary,.big-action,.feature-action.accent,#export,.right .primary,.finish-sketch','button-primary'],
  ['.danger-quiet,.danger,.delete,.destructive','button-danger'],
- ['.secondary-accent','button-accent'],
+ ['.secondary-accent,.isolation-banner','button-accent'],
+ ['.project-type-card,.import,.project-card','button-card'],
  ['.workspace-tab,.rail-tool,.header-action,.icon-button,.command-button,.layer-actions button,.help-button,.feature-action,.sketch-tool-button,.sketch-shortcut-button,.measure-actions button,.object-quick-actions button,.full-button,.button-row button','button-neutral'],
  ['input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]),select,textarea','field'],
  ['input[type="checkbox"],input[type="radio"],input[type="range"],input[type="color"]','field-control'],
@@ -36,6 +37,12 @@ function inferredRole(el){
  if(['label'].includes(tag))return {role:'text-primary',source:'fallback'};
  if(['p','small','span','code','output'].includes(tag))return {role:'text-secondary',source:'fallback'};
  if(tag==='summary')return {role:'summary',source:'fallback'};
+ if(['div','section','article'].includes(tag)){
+  const cs=getComputedStyle(el),bg=cs.backgroundColor,border=[cs.borderTopColor,cs.borderRightColor,cs.borderBottomColor,cs.borderLeftColor];
+  const coloredBackground=bg&&!/^rgba?\(0, 0, 0, 0\)$/.test(bg)&&bg!=='transparent';
+  const visibleBorder=border.some(v=>v&&v!=='transparent'&&!/^rgba?\(0, 0, 0, 0\)$/.test(v));
+  if(coloredBackground||visibleBorder)return {role:'surface-neutral',source:'computed'};
+ }
  return null;
 }
 
@@ -43,6 +50,7 @@ function colorBearing(el){
  const tag=el.tagName?.toLowerCase();
  if(['button','input','select','textarea','label','p','span','small','strong','h1','h2','h3','h4','summary','dialog','aside','header','footer','nav','code','output'].includes(tag))return true;
  if(el.matches?.('.app-header,.tool-rail-v4,.workspace,.right,.project-drawer-v4,.library-section,.project-card,.option-card,.param-group,.visual-popover,.sketch-menu-popover,.sketch-contextbar,.sketch-commandbar,.badge,.inspector-badge,.sketch-status-chip'))return true;
+ if(['div','section','article'].includes(tag)){const cs=getComputedStyle(el);if(cs.backgroundColor!=='rgba(0, 0, 0, 0)'||['solid','double','inset','outset'].includes(cs.borderTopStyle))return true;}
  return false;
 }
 function descriptor(el){
