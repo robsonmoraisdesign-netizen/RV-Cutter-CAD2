@@ -124,6 +124,13 @@ export function validateSketch(s) {
       entityEndpoint(p,c.point?.point);
       if(ln.type!=='line')throw Error('Ponto médio requer uma linha de referência.');
       if(c.point.entity===c.line)throw Error('Ponto médio requer entidades diferentes.');
+    } else if(c.type==='coincidentOrigin') {
+      const e=getEntity(s,c.point?.entity);
+      entityEndpoint(e,c.point?.point);
+    } else if(c.type==='pointOnAxis') {
+      const e=getEntity(s,c.point?.entity);
+      entityEndpoint(e,c.point?.point);
+      if(!['x','y'].includes(c.axis))throw Error('Eixo de referência inválido.');
     } else if(PAIR_LINE.has(c.type)) validatePairRef(s,c,'line');
     else if(PAIR_RADIAL.has(c.type)) validatePairRef(s,c,'radial');
     else if(c.type==='equal'){
