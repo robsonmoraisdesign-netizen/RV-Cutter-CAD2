@@ -15,8 +15,8 @@ export function createEditor(svg,api){
  const bezierPoint=(points,t)=>{let work=points.map(p=>[...p]);for(let level=work.length-1;level>0;level--)for(let i=0;i<level;i++)work[i]=[work[i][0]*(1-t)+work[i+1][0]*t,work[i][1]*(1-t)+work[i+1][1]*t];return work[0];};
  const entityMid=e=>e.type==='point'?[...e.position]:e.type==='line'?[(e.start[0]+e.end[0])/2,(e.start[1]+e.end[1])/2]:e.type==='bezier'?bezierPoint(e.points,.5):[...e.center];
  const entityName=e=>({point:'Ponto',line:'Linha',circle:'Círculo',arc:'Arco',bezier:'Bézier'}[e?.type]||'Entidade');
- const constraintLabel=t=>({horizontal:'H',vertical:'V',coincident:'●',midpoint:'◇',fixed:'F',parallel:'∥',perpendicular:'⊥',equal:'=',concentric:'◎',collinear:'—',tangent:'T'}[t]||'?');
- const ruleName=t=>({horizontal:'Horizontal',vertical:'Vertical',coincident:'Coincidente',midpoint:'Ponto médio',fixed:'Fixar',parallel:'Paralela',perpendicular:'Perpendicular',equal:'Igual',concentric:'Concêntrica',collinear:'Colinear',tangent:'Tangente',lineLength:'Comprimento',circleRadius:'Raio',arcRadius:'Raio do arco'}[t]||t);
+ const constraintLabel=t=>({horizontal:'H',vertical:'V',coincident:'●',coincidentOrigin:'O',pointOnAxis:'⊢',midpoint:'◇',fixed:'F',parallel:'∥',perpendicular:'⊥',equal:'=',concentric:'◎',collinear:'—',tangent:'T'}[t]||'?');
+ const ruleName=t=>({horizontal:'Horizontal',vertical:'Vertical',coincident:'Coincidente',coincidentOrigin:'Coincidente com a origem',pointOnAxis:'Ponto sobre eixo',midpoint:'Ponto médio',fixed:'Fixar',parallel:'Paralela',perpendicular:'Perpendicular',equal:'Igual',concentric:'Concêntrica',collinear:'Colinear',tangent:'Tangente',lineLength:'Comprimento',circleRadius:'Raio',arcRadius:'Raio do arco'}[t]||t);
  const normAngle=a=>Math.atan2(Math.sin(a),Math.cos(a));
  const lineAngle=e=>Math.atan2(e.end[1]-e.start[1],e.end[0]-e.start[0]);
  const lineMid=e=>[(e.start[0]+e.end[0])/2,(e.start[1]+e.end[1])/2];
@@ -61,27 +61,42 @@ export function createEditor(svg,api){
   return {end,inference:null,icon:null};
  }
  function snapNative(p,n){
+  const o=api.object(),rect=svg.getBoundingClientRect();
+  if(!o||!rect.width||!rect.height)return {point:p,relation:null,referenceId:null,icon:null,distance:null};
+  const mmPerPx=o.params.size*Math.max(view[2]/rect.width,view[3]/rect.height);
+  const pointLimit=mmPerPx*12,axisLimit=mmPerPx*10,originLimit=mmPerPx*14;
   const candidates=[];
+  // CAD datum references have explicit priority over ordinary geometry.
+  const originDistance=Math.hypot(p[0],p[1]);
+  if(originDistance<=originLimit)candidates.push({point:[0,0],relation:{type:'origin'},referenceId:'datum-origin',icon:'O',label:'Origem (0,0)',distance:originDistance,priority:0});
+  const dx=Math.abs(p[1]),dy=Math.abs(p[0]);
+  if(dx<=axisLimit)candidates.push({point:[p[0],0],relation:{type:'axis',axis:'x'},referenceId:'datum-axis-x',icon:'X',label:'Eixo X',distance:dx,priority:3});
+  if(dy<=axisLimit)candidates.push({point:[0,p[1]],relation:{type:'axis',axis:'y'},referenceId:'datum-axis-y',icon:'Y',label:'Eixo Y',distance:dy,priority:3});
   for(const e of n?.entities||[]){
-   if(e.type==='point')candidates.push({point:e.position,relation:{type:'coincident',ref:{entity:e.id,point:'point'}},referenceId:e.id,icon:'●'});
+   if(e.type==='point')candidates.push({point:e.position,relation:{type:'coincident',ref:{entity:e.id,point:'point'}},referenceId:e.id,icon:'●',label:'Ponto',priority:1});
    else if(e.type==='line'){
     candidates.push(
-      {point:e.start,relation:{type:'coincident',ref:{entity:e.id,point:'start'}},referenceId:e.id,icon:'●'},
-      {point:e.end,relation:{type:'coincident',ref:{entity:e.id,point:'end'}},referenceId:e.id,icon:'●'},
-      {point:lineMid(e),relation:{type:'midpoint',line:e.id},referenceId:e.id,icon:'◇'}
+      {point:e.start,relation:{type:'coincident',ref:{entity:e.id,point:'start'}},referenceId:e.id,icon:'●',label:'Extremidade',priority:1},
+      {point:e.end,relation:{type:'coincident',ref:{entity:e.id,point:'end'}},referenceId:e.id,icon:'●',label:'Extremidade',priority:1},
+      {point:lineMid(e),relation:{type:'midpoint',line:e.id},referenceId:e.id,icon:'◇',label:'Ponto médio',priority:2}
     );
-   }else if(e.type==='circle')candidates.push({point:e.center,relation:{type:'coincident',ref:{entity:e.id,point:'center'}},referenceId:e.id,icon:'●'});
+   }else if(e.type==='circle')candidates.push({point:e.center,relation:{type:'coincident',ref:{entity:e.id,point:'center'}},referenceId:e.id,icon:'●',label:'Centro',priority:1});
    else if(e.type==='bezier'){
-    e.points.forEach((p,i)=>candidates.push({point:p,relation:{type:'coincident',ref:{entity:e.id,point:`control:${i}`}},referenceId:e.id,icon:'●'}));
+    e.points.forEach((q,i)=>candidates.push({point:q,relation:{type:'coincident',ref:{entity:e.id,point:`control:${i}`}},referenceId:e.id,icon:'●',label:'Controle Bézier',priority:1}));
    }else if(e.type==='arc'){
-    candidates.push({point:e.center,relation:{type:'coincident',ref:{entity:e.id,point:'center'}},referenceId:e.id,icon:'●'});
-    for(const key of ['start','end']){const a=e[key+'Angle'];candidates.push({point:[e.center[0]+Math.cos(a)*e.radius,e.center[1]+Math.sin(a)*e.radius],relation:{type:'coincident',ref:{entity:e.id,point:key}},referenceId:e.id,icon:'●'});}
+    candidates.push({point:e.center,relation:{type:'coincident',ref:{entity:e.id,point:'center'}},referenceId:e.id,icon:'●',label:'Centro',priority:1});
+    for(const key of ['start','end']){const a=e[key+'Angle'];candidates.push({point:[e.center[0]+Math.cos(a)*e.radius,e.center[1]+Math.sin(a)*e.radius],relation:{type:'coincident',ref:{entity:e.id,point:key}},referenceId:e.id,icon:'●',label:'Extremidade',priority:1});}
    }
   }
-  const threshold=api.object().params.size*Math.max(view[2],view[3])*.018;
-  let best=null,bestD=threshold;
-  for(const candidate of candidates){const d=Math.hypot(candidate.point[0]-p[0],candidate.point[1]-p[1]);if(d<bestD){bestD=d;best=candidate;}}
-  return best?{point:[...best.point],relation:best.relation,referenceId:best.referenceId,icon:best.icon,distance:bestD}:{point:p,relation:null,referenceId:null,icon:null,distance:null};
+  let best=null;
+  for(const candidate of candidates){
+   const d=candidate.distance??Math.hypot(candidate.point[0]-p[0],candidate.point[1]-p[1]);
+   const limit=candidate.relation?.type==='axis'?axisLimit:pointLimit;
+   if(d>limit&&candidate.relation?.type!=='origin')continue;
+   const score=(candidate.priority??5)*1000+d/Math.max(mmPerPx,1e-9);
+   if(!best||score<best.score)best={...candidate,distance:d,score};
+  }
+  return best?{point:[...best.point],relation:best.relation,referenceId:best.referenceId,icon:best.icon,label:best.label,distance:best.distance}:{point:p,relation:null,referenceId:null,icon:null,label:null,distance:null};
  }
  function parallelInference(start,end,doc){
   const dx=end[0]-start[0],dy=end[1]-start[1],len=Math.hypot(dx,dy);if(len<1e-6)return null;
@@ -157,10 +172,11 @@ export function createEditor(svg,api){
    svg.appendChild(mini);
   });
  }
- function renderAxes(){
-  if(view[0]<=0&&view[0]+view[2]>=0)svg.appendChild(el('line',{x1:0,y1:view[1],x2:0,y2:view[1]+view[3],class:'sketch-axis sketch-axis-y','vector-effect':'non-scaling-stroke'}));
-  if(view[1]<=0&&view[1]+view[3]>=0)svg.appendChild(el('line',{x1:view[0],y1:0,x2:view[0]+view[2],y2:0,class:'sketch-axis sketch-axis-x','vector-effect':'non-scaling-stroke'}));
-  svg.appendChild(el('circle',{cx:0,cy:0,r:view[2]*.0035,class:'sketch-origin','vector-effect':'non-scaling-stroke'}));
+ function renderAxes(n){
+  const origin=localPoint([0,0],n),ox=origin[0],oy=-origin[1],originActive=inference?.referenceId==='datum-origin',xActive=inference?.referenceId==='datum-axis-x',yActive=inference?.referenceId==='datum-axis-y';
+  if(ox>=view[0]&&ox<=view[0]+view[2])svg.appendChild(el('line',{x1:ox,y1:view[1],x2:ox,y2:view[1]+view[3],class:'sketch-axis sketch-axis-y'+(yActive?' datum-active':''),'vector-effect':'non-scaling-stroke','data-datum':'axis-y'}));
+  if(oy>=view[1]&&oy<=view[1]+view[3])svg.appendChild(el('line',{x1:view[0],y1:oy,x2:view[0]+view[2],y2:oy,class:'sketch-axis sketch-axis-x'+(xActive?' datum-active':''),'vector-effect':'non-scaling-stroke','data-datum':'axis-x'}));
+  svg.appendChild(el('circle',{cx:ox,cy:oy,r:view[2]*.0045,class:'sketch-origin'+(originActive?' datum-active':''),'vector-effect':'non-scaling-stroke','data-datum':'origin'}));
  }
  function renderDimensions(n,o){
   for(const d of n.dimensions||[]){
@@ -246,6 +262,7 @@ export function createEditor(svg,api){
   if(!inference?.icon||!inference.point)return;
   const p=localPoint(inference.point,n);
   addText(inference.icon,[p[0]+view[2]*.018,p[1]+view[3]*.018],{class:'sketch-inference-icon',style:`font-size:${view[2]*.016}px`});
+  if(inference.label)addText(inference.label,[p[0]+view[2]*.032,p[1]+view[3]*.034],{class:'sketch-inference-label',style:`font-size:${view[2]*.012}px`});
  }
  function updateInspector(n){
   const info=sketch.selectionInfo(),status=sketch.describe();
@@ -271,8 +288,9 @@ export function createEditor(svg,api){
  function render(){
   if(svg.hasAttribute('hidden')){svg.replaceChildren();return;}
   const o=api.object();svg.replaceChildren();svg.setAttribute('viewBox',view.join(' '));if(!o)return;
-  renderAxes();
-  const n=sketch.native(),nativeCount=n?.entities?.length||0,stateMap=sketch.states();
+  const n=sketch.native();renderAxes(n);
+  const nativeCount=n?.entities?.length||0,stateMap=sketch.states();
+  //,nativeCount=n?.entities?.length||0,stateMap=sketch.states();
   if(o.result?.bladeProfile?.length&&!nativeCount)svg.appendChild(el('path',{class:'blade-preview',d:o.result.bladeProfile.map(p=>path(p.map(([x,y])=>[x/o.result.params.size*(o.result.params.mirror?-1:1),y/o.result.params.size]))+'Z').join(' '),fill:themeColor('sketchBlade'),'fill-opacity':.42,'fill-rule':'evenodd','pointer-events':'none'}));
   if(o.loops.length)svg.appendChild(el('path',{d:o.loops.map(p=>path(p)+'Z').join(' '),class:nativeCount?'sketch-derived-profile':'legacy-profile',fill:themeColor('sketchUnder'),'fill-rule':'evenodd','fill-opacity':nativeCount?.045:.42,'pointer-events':'none'}));
   if(!nativeCount)o.loops.forEach((p,i)=>svg.appendChild(el('path',{d:path(p)+'Z',fill:'none',stroke:i===selected?themeColor('sketchSelected'):i===hoveredLoop?themeColor('sketchHover'):i===0?themeColor('sketchEntity'):themeColor('sketchConstruction'),'stroke-width':i===selected?2:1.1,'vector-effect':'non-scaling-stroke','pointer-events':'stroke','data-loop':i})));
