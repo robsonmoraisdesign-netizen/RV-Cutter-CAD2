@@ -1,7 +1,7 @@
 const STORAGE_KEY='rv-theme-v2';
 const LEGACY_KEY='rv-ui-light';
 
-export const MODEL_COLORS=Object.freeze({cutterBase:'#2f9fe8',blade:'#126fd0',stampBase:'#25c7b5',relief:'#f2a93b'});
+export const MODEL_COLORS=Object.freeze({cutterBase:'#2f9fe8',blade:'#126fd0',reinforcement:'#b85cff',stampBase:'#25c7b5',relief:'#f2a93b'});
 export const LEGACY_MODEL_COLORS=Object.freeze({cutterBase:'#78a9ee',blade:'#e9b45e',stampBase:'#659ea9',relief:'#7be0b6'});
 
 const THEMES={
