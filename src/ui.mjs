@@ -13,11 +13,63 @@ import {resolveProjectTransition} from './project-transition.mjs';
 import {migrateSketchNode,attachCookieCutter,cutterFeature,hasManufacturingFeature,featureTree,syncRuntimeParams} from './project-model.mjs';
 import {initTheme,toggleTheme,themeName,themeColor,installThemeGlobal,themeDiagnostics,LEGACY_MODEL_COLORS} from './theme-controller.mjs';
 const $=id=>document.getElementById(id),uid=()=>crypto.randomUUID();
-const randomReinforcementColor=()=>{const c=new THREE.Color().setHSL(Math.random(),.62,.58);return '#'+c.getHexString();};
+function generateDistinctPalette(roles=Object.keys(initialColors)){
+ const n=Math.max(1,roles.length),start=Math.random(),step=1/n,direction=Math.random()<.5?1:-1;
+ const hues=roles.map((_,i)=>(start+direction*i*step+1)%1);
+ // Shuffle role assignment while preserving the evenly-spaced hue set.
+ for(let i=hues.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[hues[i],hues[j]]=[hues[j],hues[i]];}
+ const colors={};
+ for(let i=0;i<roles.length;i++){
+  const saturation=.58+Math.random()*.20;
+  const lightness=.50+Math.random()*.14;
+  const color=new THREE.Color().setHSL(hues[i],saturation,lightness);
+  colors[roles[i]]='#'+color.getHexString();
+ }
+ return colors;
+}
+const randomReinforcementColor=()=>generateDistinctPalette(['reinforcement']).reinforcement;
 installThemeGlobal();initTheme();
 $('appVersion').textContent=APP_VERSION;
 function saveState(value){const el=$('saveState');el.dataset.state=value;el.textContent={dirty:'Alterações pendentes',saving:'Salvando…',saved:'Salvo',error:'Erro ao salvar',idle:'Biblioteca'}[value];}
 const state={id:uid(),name:'Novo projeto',source:null,objects:[],activeId:null,editingSketchId:null,history:[],future:[],view:{arrangement:'spread',material:'cad',componentColors:true,colors:{...initialColors,reinforcement:randomReinforcementColor()},showDims:true,layerLines:false,sliceEnabled:false,sliceHeight:12.5,wire:false,grid:true},stage:'3d',screen:'home',homePreview:null};
+let colorPaletteRows=[];
+function loadColorPalettes(){
+ try{
+  const raw=JSON.parse(localStorage.getItem('rv-color-palettes-v1')||'[]');
+  colorPaletteRows=Array.isArray(raw)?raw.filter(p=>p&&typeof p.name==='string'&&p.colors&&typeof p.colors==='object'):[];
+ }catch{colorPaletteRows=[];}
+ renderColorPalettes();
+}
+function renderColorPalettes(){
+ const select=$('savedColorPalette');if(!select)return;
+ const current=select.value;
+ select.replaceChildren(new Option('Escolha uma paleta',''));
+ for(const p of colorPaletteRows)select.add(new Option(p.name,p.id));
+ if(colorPaletteRows.some(p=>p.id===current))select.value=current;
+}
+function persistColorPalettes(){
+ localStorage.setItem('rv-color-palettes-v1',JSON.stringify(colorPaletteRows));
+ renderColorPalettes();
+}
+function applyColorSet(colors){
+ state.view.colors={...initialColors,...state.view.colors,...colors};
+ for(const role of Object.keys(initialColors)){const input=$('color-'+role);if(input&&state.view.colors[role])input.value=state.view.colors[role];}
+ sync();refreshView();autosave();
+}
+async function saveCurrentColorPalette(){
+ const name=await askName('Salvar paleta de cores');
+ if(!name)return;
+ const clean=String(name).trim().slice(0,80);if(!clean)return;
+ const colors={};for(const role of Object.keys(initialColors))colors[role]=state.view.colors[role]||initialColors[role];
+ const existing=colorPaletteRows.find(p=>p.name.toLocaleLowerCase()===clean.toLocaleLowerCase());
+ if(existing){existing.colors=colors;existing.updatedAt=new Date().toISOString();$('savedColorPalette').value=existing.id;}
+ else{const row={id:uid(),name:clean,colors,version:1,createdAt:new Date().toISOString()};colorPaletteRows.push(row);persistColorPalettes();$('savedColorPalette').value=row.id;return;}
+ persistColorPalettes();
+}
+function applySavedColorPalette(id){
+ const row=colorPaletteRows.find(p=>p.id===id);if(!row)return;
+ applyColorSet(row.colors);status(`Paleta “${row.name}” aplicada.`);
+}
 const active=()=>state.objects.find(o=>o.id===state.activeId);let viewer,editor,isolatedId=null,hoveredObjectId=null;const expandedObjects=new Set();const displayed=o=>!!o&&(isolatedId?o.id===isolatedId:o.visible!==false);
 const groups=[['Dimensões da peça',null,[['size','Tamanho máximo do desenho',10,300,.5],['outlineOffset','Expansão externa',0,10,.1]]],['Cortador','cutterBase',[['wall','Espessura da lâmina',.3,5,.05],['cornerRadius','Proteção de cantos',0,10,.1],['height','Altura total',4,50,.1],['rim','Largura da base de apoio',1,15,.1],['base','Altura da base do cortador',.5,10,.1]]],['Carimbo','stampBase',[['stampBase','Altura da base do carimbo',.5,15,.1],['stampExpansion','Expansão da base',0,10,.05],['stampInset','Recuo lateral da base',0,5,.05],['clearance','Folga entre cortador e carimbo',.1,5,.05]]],['Relevo','relief',[['detailOffset','Espessura dos detalhes',-.4,1.5,.05],['relief','Altura / profundidade do relevo',.05,20,.1]]]];
 const control=([id,label,min,max,step],role)=>`<div class="range-pair" data-param="${id}"><label for="${id}">${role?`<i class="swatch" data-color="${role}"></i>`:''}${label}</label><input id="${id}" type="number" step="${step}" value="${defaults[id]}" title="Digite livremente. A barra mantém apenas uma faixa prática de arraste."><input id="${id}Range" type="range" min="${min}" max="${max}" step="${step}" value="${Math.min(max,Math.max(min,defaults[id]))}" aria-label="${label}"></div>`;
@@ -277,7 +329,12 @@ function visibilityMap(){const map=new Map();for(const o of state.objects)map.se
 function syncViewerVisibility(){viewer?.setVisibility(visibilityMap(),state.activeId);renderMetrics();renderLayers();if(state.editingSketchId)editor?.render();const missing=state.objects.filter(o=>displayed(o)&&generatable(o)&&(!o.result||o.result.released||o.cacheKey!==keyFor(o))).map(o=>o.id);if(missing.length)generate(missing);}
 let wasEmpty=true,lastLayout='';function refreshView(){if(!viewer)return;const allReady=state.objects.filter(o=>o.result),ready=allReady.map(o=>({...o,viewerVisible:displayed(o)}));viewer.update(ready,{...state.view,presentation:pres(),presentationMode:state.stage==='presentation'},state.activeId);$('export').disabled=!state.objects.some(generatable);const visibleReady=allReady.filter(o=>displayed(o)&&!o.result.released),count=visibleReady.reduce((n,o)=>n+o.result.parts.reduce((s,p)=>s+p.stats.triangles,0),0);$('meshStats').textContent=count?count.toLocaleString('pt-BR')+' triângulos':'';const o=active(),m=measurements(o);$('dimensions').textContent=m?m.parts.map(p=>`${p.name}: ${fmt(p.x)} × ${fmt(p.y)} × ${fmt(p.z)} mm`).join('  ·  '):'';renderMetrics();const layoutKey=allReady.map(o=>o.id+o.params.mode).join(':')+state.view.arrangement;if(allReady.length&&(wasEmpty||layoutKey!==lastLayout)){viewer.fit();if(state.stage==='presentation'&&pres().camera)viewer.restoreCamera(pres().camera);}lastLayout=layoutKey;wasEmpty=!allReady.length;if(state.editingSketchId)editor?.render();}
 for(const k of ['arrangement','material','componentColors','showDims','layerLines','sliceEnabled','wire','grid'])$(k).onchange=()=>{const e=$(k);state.view[k]=e.type==='checkbox'?e.checked:e.value;refreshView();autosave();};
-for(const role of Object.keys(initialColors))$('color-'+role).oninput=()=>{state.view.colors[role]=$('color-'+role).value;sync();refreshView();autosave()};$('randomColors').onclick=()=>{for(const role of Object.keys(initialColors)){const c=new THREE.Color().setHSL(Math.random(),.55,.62);state.view.colors[role]='#'+c.getHexString();}sync();refreshView();autosave()};
+for(const role of Object.keys(initialColors))$('color-'+role).oninput=()=>{state.view.colors[role]=$('color-'+role).value;sync();refreshView();autosave()};
+$('randomColors').onclick=()=>{applyColorSet(generateDistinctPalette(Object.keys(initialColors)));status('Nova paleta variada gerada com matizes afastados.');};
+$('saveColorPalette').onclick=async()=>{try{await saveCurrentColorPalette();status('Paleta salva para reutilização.');}catch(e){status('Falha ao salvar paleta: '+e.message);}};
+$('applyColorPalette').onclick=()=>applySavedColorPalette($('savedColorPalette').value);
+$('savedColorPalette').onchange=()=>{if($('savedColorPalette').value)applySavedColorPalette($('savedColorPalette').value);};
+$('deleteColorPalette').onclick=()=>{const id=$('savedColorPalette').value,row=colorPaletteRows.find(p=>p.id===id);if(!row||!confirm(`Excluir a paleta “${row.name}”?`))return;colorPaletteRows=colorPaletteRows.filter(p=>p.id!==id);persistColorPalettes();status('Paleta excluída.');};
 for(const id of ['sliceRange','sliceHeight'])$(id).oninput=()=>{state.view.sliceHeight=+$(id).value;$(id==='sliceRange'?'sliceHeight':'sliceRange').value=state.view.sliceHeight;refreshView()};
 $('showAll').onclick=()=>{isolatedId=null;state.objects.forEach(o=>o.visible=true);sync();syncViewerVisibility();autosave();status('Todos os objetos estão visíveis. Peças mantidas em memória reaparecem sem recálculo.');};$('hideOthers').onclick=()=>toggleIsolation();$('removeObject').onclick=()=>{if(active())removeById(state.activeId);};$('focusActive').onclick=()=>active()&&viewer?.focus(state.activeId);$('isolateActive').onclick=()=>toggleIsolation();$('visibilityActive').onclick=()=>{const o=active();if(!o)return;o.visible=!o.visible;if(!o.visible&&isolatedId===o.id)isolatedId=null;sync();if(o.visible&&generatable(o)&&(!o.result||o.cacheKey!==keyFor(o)))generate([o.id]);else syncViewerVisibility();autosave();};
 function openDimensionEditor(evt){if(!evt?.editable||!evt.objectId)return;const o=state.objects.find(x=>x.id===evt.objectId);if(!o||!o.result)return;state.activeId=o.id;const ed=$('dimensionEditor'),input=$('dimensionValue'),label=$('dimensionAxisLabel');ed.dataset.objectId=o.id;ed.dataset.axis=evt.dimensionAxis;label.textContent=evt.dimensionAxis==='x'?'Largura':evt.dimensionAxis==='y'?'Profundidade':'Altura';input.value=Number(evt.dimensionValue).toFixed(2);const vp=$('viewport').getBoundingClientRect();ed.style.left=Math.max(12,Math.min(vp.width-190,(evt.clientX??vp.left+vp.width/2)-vp.left+8))+'px';ed.style.top=Math.max(56,Math.min(vp.height-70,(evt.clientY??vp.top+vp.height/2)-vp.top-22))+'px';ed.hidden=false;input.focus();input.select();sync();}
@@ -465,7 +522,7 @@ let appearanceFrame=0;function refreshAppearance(){if(appearanceFrame)return;app
     }
   };
 
-async function start(){sync();await loadPresets();await showHome();}
+async function start(){loadColorPalettes();sync();await loadPresets();await showHome();}
 window.RVTest={setStage,enterSketch,finishSketch,createNewSketch,convertToCutter,convertAllToCutters,ensureOutlinerVisible,enforceBudget,refreshView,showHome,closeCurrentProject,askLeaveProject,destroyCurrentProject,projectSignature,markCurrentSaved,setParam,savePreset,applyPreset,presetRows,renameStored,deleteStored,diagnostics:()=>({theme:themeDiagnostics(),worker:!!worker,workerRestarts,pending:pending.size,queued:pendingBuildIds.size,batchProtected:batchProtectedIds.size,running,sessionEpoch,screen:state.screen,transitioning,navigationBusy,saveState:$('saveState')?.dataset?.state||null,transition:globalThis.__RV_LAST_TRANSITION||null,render:viewer?.diagnostics?.()}),cacheStats,meshBytes,resetSession,state,active,generate,loadImage,loadSvg,importFiles,project,traceSource,applyProject,commitImport,commitImportBatch,exportData,measurements,primaryDimension,selectObject,toggleIsolation,flush,catalog,newProject,editor,viewer,request,wait:async()=>{for(let i=0;i<1200;i++){await new Promise(r=>setTimeout(r,50));if(state.objects.length&&!running&&state.objects.filter(o=>o.visible).every(o=>!generatable(o)||o.result&&(o.result.released||o.cacheKey===keyFor(o))))return state.objects.map(o=>o.result);const bad=state.objects.find(o=>o.visible&&hasManufacturingFeature(o)&&o.error);if(!running&&bad)throw Error(bad.error);}throw Error('Tempo de geração excedido');}};
 start();
 
