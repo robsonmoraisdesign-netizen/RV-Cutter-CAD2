@@ -128,11 +128,31 @@ export function build(m,loops,params,ctx=null,options={}){const started=performa
    reinforcementTransitionOutline=bladeOuter.toPolygons()[0]||[];
    const rootZ=p.base-.02,reinforcementEnd=p.base+p.reinforcementHeight,intermediate=[];
 
+   // Build a progressive family of offsets instead of a single annular jump.
+   // A single jump between contours with different vertex topology can create
+   // long bridge triangles at concave cusps. Small successive offsets keep
+   // every band local while preserving the same linear chamfer envelope.
+   const reinforceSteps=Math.max(
+     6,
+     Math.min(24,Math.ceil(Math.max(p.reinforcementWidth/.18,p.reinforcementHeight/.45)))
+   );
+   for(let i=1;i<reinforceSteps;i++){
+    const t=i/reinforceSteps;
+    const width=p.reinforcementWidth*(1-t);
+    const section=width>1e-6
+      ? silhouette(hold(bladeOuter.offset(width,'Round',2,roundSegments)))
+      : bladeOuter;
+    intermediate.push({
+      poly:section.toPolygons()[0],
+      z:rootZ+(reinforcementEnd-rootZ)*t
+    });
+   }
+   intermediate.push({poly:bladeOuter.toPolygons()[0],z:reinforcementEnd});
+
    if(p.chamfer&&(p.tip<p.wall-1e-6||p.wallEdits.length)){
     const zBody=p.height-p.chamferHeight,tipOuter=hold(new C(profiles.tip,'EvenOdd'));
-    if(reinforcementEnd<zBody-1e-6)intermediate.push({poly:bladeOuter.toPolygons()[0],z:reinforcementEnd});
     // Keep the normal blade wall vertical up to the start of the cutting-tip chamfer.
-    intermediate.push({poly:bladeOuter.toPolygons()[0],z:zBody});
+    if(reinforcementEnd<zBody-1e-6)intermediate.push({poly:bladeOuter.toPolygons()[0],z:zBody});
     for(const r of profiles.rings)intermediate.push({poly:r.poly,z:zBody+p.chamferHeight*r.fraction});
     const continuousBlade=hold(loft(
       m,
@@ -146,7 +166,6 @@ export function build(m,loops,params,ctx=null,options={}){const started=performa
     if(continuousBlade.status()!=='NoError')throw Error('Não foi possível fechar a lâmina com reforço contínuo. Reduza a altura ou a largura do reforço.');
     bladeSolid=hold(continuousBlade.subtract(hold(inner.extrude(p.height+1))));
    }else{
-    if(reinforcementEnd<p.height-1e-6)intermediate.push({poly:bladeOuter.toPolygons()[0],z:reinforcementEnd});
     const continuousBlade=hold(loft(
       m,
       reinforcementOuter.toPolygons()[0],
