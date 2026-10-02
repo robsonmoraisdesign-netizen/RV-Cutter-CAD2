@@ -13,6 +13,8 @@ import {resolveProjectTransition} from './project-transition.mjs';
 import {migrateSketchNode,attachCookieCutter,cutterFeature,hasManufacturingFeature,featureTree,syncRuntimeParams} from './project-model.mjs';
 import {initTheme,toggleTheme,themeName,themeColor,installThemeGlobal,themeDiagnostics,LEGACY_MODEL_COLORS} from './theme-controller.mjs';
 const $=id=>document.getElementById(id),uid=()=>crypto.randomUUID();
+const hueDistance=(a,b)=>{const d=Math.abs(a-b)%1;return Math.min(d,1-d);};
+const colorHue=hex=>{const hsl={h:0,s:0,l:0};new THREE.Color(hex).getHSL(hsl);return hsl.h;};
 function generateDistinctPalette(roles=Object.keys(initialColors)){
  const n=Math.max(1,roles.length),start=Math.random(),step=1/n,direction=Math.random()<.5?1:-1;
  const hues=roles.map((_,i)=>(start+direction*i*step+1)%1);
@@ -27,7 +29,16 @@ function generateDistinctPalette(roles=Object.keys(initialColors)){
  }
  return colors;
 }
-const randomReinforcementColor=()=>generateDistinctPalette(['reinforcement']).reinforcement;
+const randomReinforcementColor=()=>{
+ const reference=Object.entries(initialColors).filter(([role])=>role!=='reinforcement').map(([,hex])=>colorHue(hex));
+ let bestHue=Math.random(),bestDistance=-1;
+ for(let i=0;i<32;i++){
+  const candidate=Math.random(),distance=reference.length?Math.min(...reference.map(h=>hueDistance(candidate,h))):1;
+  if(distance>bestDistance){bestHue=candidate;bestDistance=distance;}
+ }
+ const color=new THREE.Color().setHSL(bestHue,.68,.58);
+ return '#'+color.getHexString();
+};
 installThemeGlobal();initTheme();
 $('appVersion').textContent=APP_VERSION;
 function saveState(value){const el=$('saveState');el.dataset.state=value;el.textContent={dirty:'Alterações pendentes',saving:'Salvando…',saved:'Salvo',error:'Erro ao salvar',idle:'Biblioteca'}[value];}
