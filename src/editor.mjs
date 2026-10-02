@@ -365,7 +365,13 @@ export function createEditor(svg,api){
    if(drag?.kind==='primitive'){commitPrimitive(q,{suppress:e.shiftKey});return;}
    beginPrimitive(q,{suppress:e.shiftKey});render();return;
   }
-  if(tool==='arc'){arcClicks.push(nativePoint(q));if(arcClicks.length===3){sketch.create('arc',...arcClicks);arcClicks=[];}else api.status('Arco de 3 pontos · clique '+(arcClicks.length+1)+' de 3.');render();return;}
+  if(tool==='arc'){
+   const raw=nativePoint(q),snap=e.shiftKey?{point:raw,relation:null}:snapNative(raw,sketch.native());
+   arcClicks.push({point:snap.point,relation:snap.relation});
+   if(arcClicks.length===3){sketch.create('arc',arcClicks[0].point,arcClicks[1].point,arcClicks[2].point,{startRelation:arcClicks[0].relation,endRelation:arcClicks[2].relation});arcClicks=[];inference=null;}
+   else{inference=snap.relation?{...snap,point:snap.point,type:snap.relation.type}:null;api.status('Arco de 3 pontos · clique '+(arcClicks.length+1)+' de 3.');}
+   render();return;
+  }
   if(tool==='bezier'){
    const raw=nativePoint(q),snap=e.shiftKey?{point:raw,relation:null}:snapNative(raw,sketch.native());
    if(e.detail>=2&&bezierClicks.length>=2){
@@ -397,7 +403,10 @@ export function createEditor(svg,api){
    render();return;
   }
   if(drag.kind==='box-select'){drag.end=q;render();return;}
-  if(drag.kind==='entity-point'){drag.end=nativePoint(q);return;}
+  if(drag.kind==='entity-point'){
+   const raw=nativePoint(q),snap=e.shiftKey?{point:raw,relation:null,referenceId:null,icon:null}:snapNative(raw,sketch.native());
+   drag.end=snap.point;drag.endRelation=snap.relation;inference=snap.relation?{...snap,point:snap.point,type:snap.relation.type}:null;render();return;
+  }
   if(drag.kind==='node'){o.loops[selected][node]=q;render();}
   else if(drag.kind==='move'){o.loops[selected]=drag.original.map(v=>[v[0]+q[0]-drag.start[0],v[1]+q[1]-drag.start[1]]);render();}
   else if(drag.kind==='region'){const a=drag.start;region=[[Math.min(a[0],q[0]),Math.min(a[1],q[1])],[Math.max(a[0],q[0]),Math.min(a[1],q[1])],[Math.max(a[0],q[0]),Math.max(a[1],q[1])],[Math.min(a[0],q[0]),Math.max(a[1],q[1])]];render();}
@@ -412,7 +421,7 @@ export function createEditor(svg,api){
    const a=nativePoint(d.start),b=nativePoint(d.end||d.start),bounds={minX:Math.min(a[0],b[0]),minY:Math.min(a[1],b[1]),maxX:Math.max(a[0],b[0]),maxY:Math.max(a[1],b[1])};
    sketch.selectBox(bounds,{crossing:(d.end?.[0]??d.start[0])<d.start[0],extend:d.extend});
   }
-  if(d.kind==='entity-point'&&d.end)sketch.movePoint(d.entity,d.handle,d.end);
+  if(d.kind==='entity-point'&&d.end)sketch.movePoint(d.entity,d.handle,d.end,d.endRelation||null);
   if(['node','move'].includes(d.kind))api.changed();
   if(d.kind==='stroke'&&d.points.length)operate({type:'stroke',points:d.points,width:+$('brushWidth')?.value||.8,subtract:tool==='erase'});
   inference=null;render();
