@@ -44,6 +44,8 @@ export function createSketchController(api){
       if(!rel)return;
       if(rel.type==='coincident')addConstraint(s,'coincident',{a:{entity:e.id,point:which},b:rel.ref});
       if(rel.type==='midpoint')addConstraint(s,'midpoint',{point:{entity:e.id,point:which},line:rel.line});
+      if(rel.type==='origin')addConstraint(s,'coincidentOrigin',{point:{entity:e.id,point:which}});
+      if(rel.type==='axis')addConstraint(s,'pointOnAxis',{point:{entity:e.id,point:which},axis:rel.axis});
     };
     applyInference('start',options.startRelation|| (options.startRef?{type:'coincident',ref:options.startRef}:null));
     applyInference('end',options.endRelation|| (options.endRef?{type:'coincident',ref:options.endRef}:null));
@@ -51,16 +53,22 @@ export function createSketchController(api){
     const rel=options.pointRelation||null;
     if(rel?.type==='coincident')addConstraint(s,'coincident',{a:{entity:e.id,point:'point'},b:rel.ref});
     if(rel?.type==='midpoint')addConstraint(s,'midpoint',{point:{entity:e.id,point:'point'},line:rel.line});
+    if(rel?.type==='origin')addConstraint(s,'coincidentOrigin',{point:{entity:e.id,point:'point'}});
+    if(rel?.type==='axis')addConstraint(s,'pointOnAxis',{point:{entity:e.id,point:'point'},axis:rel.axis});
    }else if(e.type==='circle'){
     const rel=options.centerRelation||(options.centerRef?{type:'coincident',ref:options.centerRef}:null);
     if(rel?.type==='coincident')addConstraint(s,'coincident',{a:{entity:e.id,point:'center'},b:rel.ref});
     if(rel?.type==='midpoint')addConstraint(s,'midpoint',{point:{entity:e.id,point:'center'},line:rel.line});
+    if(rel?.type==='origin')addConstraint(s,'coincidentOrigin',{point:{entity:e.id,point:'center'}});
+    if(rel?.type==='axis')addConstraint(s,'pointOnAxis',{point:{entity:e.id,point:'center'},axis:rel.axis});
    }else if(e.type==='bezier'){
     for(const [i,rel] of (options.controlRelations||[]).entries()){
       if(!rel)continue;
       const point={entity:e.id,point:`control:${i}`};
       if(rel.type==='coincident')addConstraint(s,'coincident',{a:point,b:rel.ref});
       if(rel.type==='midpoint')addConstraint(s,'midpoint',{point,line:rel.line});
+      if(rel.type==='origin')addConstraint(s,'coincidentOrigin',{point});
+      if(rel.type==='axis')addConstraint(s,'pointOnAxis',{point,axis:rel.axis});
     }
    }
   }points=[];
