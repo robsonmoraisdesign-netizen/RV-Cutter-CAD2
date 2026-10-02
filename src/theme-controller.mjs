@@ -77,13 +77,22 @@ export function ensureContrast(preferred,background,min=4.5){
  return candidates.sort((a,b)=>contrastRatio(b,background)-contrastRatio(a,background))[0];
 }
 export function contrastText(background,preferred=null,min=4.5){return ensureContrast(preferred,background,min);}
+function ensureAcross(preferred,backgrounds,min=4.5){
+ const candidates=[preferred,'#0b1117','#17212a','#ffffff','#f8fbfd'].filter(Boolean);
+ return candidates.sort((a,b)=>Math.min(...backgrounds.map(bg=>contrastRatio(b,bg)))-Math.min(...backgrounds.map(bg=>contrastRatio(a,bg))))[0];
+}
 
 function normalized(name){
  const raw={...(THEMES[name]||THEMES.dark)};
  raw.textPrimary=ensureContrast(raw.textPrimary,raw.surface1,7);
  raw.textSecondary=ensureContrast(raw.textSecondary,raw.surface1,4.5);
  raw.textMuted=ensureContrast(raw.textMuted,raw.surface1,4.5);
- raw.textOnAccent=ensureContrast(name==='light'?'#ffffff':'#10231f',raw.accent,4.5);
+ raw.textDisabled=ensureAcross(raw.textDisabled,[raw.surface1,raw.surface2,raw.inputBg],4.5);
+ raw.textOnAccent=ensureAcross(name==='light'?'#ffffff':'#10231f',[raw.accent,raw.accentHover],4.5);
+ raw.danger=ensureContrast(raw.danger,raw.surface1,4.5);
+ raw.warning=ensureContrast(raw.warning,raw.surface1,4.5);
+ raw.success=ensureContrast(raw.success,raw.surface1,4.5);
+ raw.info=ensureContrast(raw.info,raw.surface1,4.5);
  raw.dimensionText=ensureContrast(raw.dimensionText,raw.dimensionBg,7);
  raw.dimensionEditable=ensureContrast(raw.dimensionEditable,raw.dimensionBg,4.5);
  raw.measureLabel=ensureContrast(raw.measureLabel,raw.viewportBg,4.5);
@@ -147,7 +156,7 @@ export function themeColor(role){return normalized(current)[role]||'#ff00ff';}
 export function themeDiagnostics(){
  const t=normalized(current),pairs=[
   ['textPrimary','surface1',7],['textSecondary','surface1',4.5],['textMuted','surface1',4.5],
-  ['textPrimary','surface2',7],['textSecondary','surface2',4.5],['textOnAccent','accent',4.5],
+  ['textPrimary','surface2',7],['textSecondary','surface2',4.5],['textDisabled','surface2',4.5],['textOnAccent','accent',4.5],['textOnAccent','accentHover',4.5],
   ['dimensionText','dimensionBg',7],['dimensionEditable','dimensionBg',4.5],['measureLabel','viewportBg',4.5],
   ['sketchTextPrimary','sketchBg',7],['sketchTextSecondary','sketchBg',4.5],['sketchTextMuted','sketchBg',4.5],
   ['sketchDimension','sketchBg',7],['sketchDimensionDriven','sketchBg',4.5],['sketchLiveDimension','sketchBg',4.5],['sketchConstraintText','sketchBg',4.5]
