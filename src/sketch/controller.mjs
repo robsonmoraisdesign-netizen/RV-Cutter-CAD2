@@ -21,8 +21,14 @@ export function createSketchController(api){
  function create(type,a,b,c,options={}){return transact(s=>{
   if(type==='rectangle'){
    selected=rectangle(s,a,b);
-   if(options.startRef)addConstraint(s,'coincident',{a:{entity:selected[0],point:'start'},b:options.startRef});
-   if(options.endRef)addConstraint(s,'coincident',{a:{entity:selected[1],point:'end'},b:options.endRef});
+   const applyRectangleRelation=(entity,point,rel)=>{
+    if(!rel)return;
+    if(rel.type==='coincident')addConstraint(s,'coincident',{a:{entity,point},b:rel.ref});
+    if(rel.type==='origin')addConstraint(s,'coincidentOrigin',{point:{entity,point}});
+    if(rel.type==='axis')addConstraint(s,'pointOnAxis',{point:{entity,point},axis:rel.axis});
+   };
+   applyRectangleRelation(selected[0],'start',options.startRelation||(options.startRef?{type:'coincident',ref:options.startRef}:null));
+   applyRectangleRelation(selected[1],'end',options.endRelation||(options.endRef?{type:'coincident',ref:options.endRef}:null));
   }else{let e;
    if(type==='point')e=sketchPoint(a);
    if(type==='line')e=line(a,b);
@@ -61,6 +67,14 @@ export function createSketchController(api){
     if(rel?.type==='midpoint')addConstraint(s,'midpoint',{point:{entity:e.id,point:'center'},line:rel.line});
     if(rel?.type==='origin')addConstraint(s,'coincidentOrigin',{point:{entity:e.id,point:'center'}});
     if(rel?.type==='axis')addConstraint(s,'pointOnAxis',{point:{entity:e.id,point:'center'},axis:rel.axis});
+   }else if(e.type==='arc'){
+    for(const [which,rel] of [['start',options.startRelation],['end',options.endRelation]]){
+     if(!rel)continue;
+     const point={entity:e.id,point:which};
+     if(rel.type==='coincident')addConstraint(s,'coincident',{a:point,b:rel.ref});
+     if(rel.type==='origin')addConstraint(s,'coincidentOrigin',{point});
+     if(rel.type==='axis')addConstraint(s,'pointOnAxis',{point,axis:rel.axis});
+    }
    }else if(e.type==='bezier'){
     for(const [i,rel] of (options.controlRelations||[]).entries()){
       if(!rel)continue;
@@ -104,7 +118,7 @@ export function createSketchController(api){
   const old=s.dimensions.find(d=>d.entity===e.id&&d.type===type);
   if(old){old.value=v;old.driving=driving;}else addDimension(s,type,{entity:e.id,value:v,driving});
  },selected);}
- function movePoint(entity,which,p){return transact(s=>{
+ function movePoint(entity,which,p,relation=null){return transact(s=>{
   const e=getEntity(s,entity);
   if(s.constraints.some(c=>c.type==='fixed'&&c.entity===entity))throw Error('Entidade fixada: remova Fixar antes de mover.');
   if(e.type==='point')e.position=[...p];
@@ -115,6 +129,15 @@ export function createSketchController(api){
   }else if(which==='center')e.center=[...p];
   else if(which==='radius')e.radius=Math.hypot(p[0]-e.center[0],p[1]-e.center[1]);
   else if(e.type==='arc'){e[which==='start'?'startAngle':'endAngle']=Math.atan2(p[1]-e.center[1],p[0]-e.center[0]);}
+  if(relation&&which!=='radius'){
+   const point={entity,point:e.type==='point'?'point':which};
+   const duplicate=s.constraints.some(c=>(c.type==='coincidentOrigin'||c.type==='pointOnAxis')&&c.point?.entity===point.entity&&c.point?.point===point.point);
+   if(!duplicate){
+    if(relation.type==='origin')addConstraint(s,'coincidentOrigin',{point});
+    if(relation.type==='axis')addConstraint(s,'pointOnAxis',{point,axis:relation.axis});
+    if(relation.type==='coincident')addConstraint(s,'coincident',{a:point,b:relation.ref});
+   }
+  }
  },[entity]);}
  function select(entity,point,extend=false){
   if(!extend){selected=[];points=[];}
