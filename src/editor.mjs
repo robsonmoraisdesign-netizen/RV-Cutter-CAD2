@@ -199,6 +199,7 @@ export function createEditor(svg,api){
    if(c.entity)entities=[n.entities.find(e=>e.id===c.entity)].filter(Boolean);
    else if(c.type==='coincident')entities=[n.entities.find(e=>e.id===c.a.entity),n.entities.find(e=>e.id===c.b.entity)].filter(Boolean);
    else if(c.type==='midpoint')entities=[n.entities.find(e=>e.id===c.point.entity),n.entities.find(e=>e.id===c.line)].filter(Boolean);
+   else if(c.type==='coincidentOrigin'||c.type==='pointOnAxis')entities=[n.entities.find(e=>e.id===c.point.entity)].filter(Boolean);
    else entities=[n.entities.find(e=>e.id===c.first),n.entities.find(e=>e.id===c.second)].filter(Boolean);
    if(!entities.length)continue;
    const centers=entities.map(entityMid),p=[centers.reduce((s,q)=>s+q[0],0)/centers.length,centers.reduce((s,q)=>s+q[1],0)/centers.length],q=localPoint(p,n);
@@ -290,7 +291,6 @@ export function createEditor(svg,api){
   const o=api.object();svg.replaceChildren();svg.setAttribute('viewBox',view.join(' '));if(!o)return;
   const n=sketch.native();renderAxes(n);
   const nativeCount=n?.entities?.length||0,stateMap=sketch.states();
-  //,nativeCount=n?.entities?.length||0,stateMap=sketch.states();
   if(o.result?.bladeProfile?.length&&!nativeCount)svg.appendChild(el('path',{class:'blade-preview',d:o.result.bladeProfile.map(p=>path(p.map(([x,y])=>[x/o.result.params.size*(o.result.params.mirror?-1:1),y/o.result.params.size]))+'Z').join(' '),fill:themeColor('sketchBlade'),'fill-opacity':.42,'fill-rule':'evenodd','pointer-events':'none'}));
   if(o.loops.length)svg.appendChild(el('path',{d:o.loops.map(p=>path(p)+'Z').join(' '),class:nativeCount?'sketch-derived-profile':'legacy-profile',fill:themeColor('sketchUnder'),'fill-rule':'evenodd','fill-opacity':nativeCount?.045:.42,'pointer-events':'none'}));
   if(!nativeCount)o.loops.forEach((p,i)=>svg.appendChild(el('path',{d:path(p)+'Z',fill:'none',stroke:i===selected?themeColor('sketchSelected'):i===hoveredLoop?themeColor('sketchHover'):i===0?themeColor('sketchEntity'):themeColor('sketchConstruction'),'stroke-width':i===selected?2:1.1,'vector-effect':'non-scaling-stroke','pointer-events':'stroke','data-loop':i})));
