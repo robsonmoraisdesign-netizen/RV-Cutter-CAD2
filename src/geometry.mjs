@@ -108,6 +108,22 @@ function edgeLogoPlacement(poly,p,profile){
  const textLoops=profile.loops.map(loop=>loop.map(q=>localToWorld(q)));
  return {textLoops,plaque,connector,anchor:hit,tangent,normal,angle:Math.atan2(tangent[1],tangent[0])*180/Math.PI,position:p.logoPosition};
 }
+export function edgePositionFromPoint(poly,point){
+ if(!Array.isArray(poly)||poly.length<3||!Array.isArray(point)||point.length<2)return null;
+ let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+ for(const [x,y] of poly){minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);}
+ const center=[(minX+maxX)/2,(minY+maxY)/2],cross=(a,b)=>a[0]*b[1]-a[1]*b[0],n=poly.length,ray=[0,-1];
+ let anchor=null,segment=0,bestRay=-Infinity;
+ for(let i=0;i<n;i++){const a=poly[i],b=poly[(i+1)%n],e=[b[0]-a[0],b[1]-a[1]],den=cross(ray,e);if(Math.abs(den)<1e-9)continue;const ac=[a[0]-center[0],a[1]-center[1]],t=cross(ac,e)/den,u=cross(ac,ray)/den;if(t>=0&&u>=-1e-7&&u<=1+1e-7&&t>bestRay){bestRay=t;anchor=[center[0],center[1]-t];segment=i;}}
+ if(!anchor){let idx=0;for(let i=1;i<n;i++)if(poly[i][1]<poly[idx][1]||Math.abs(poly[i][1]-poly[idx][1])<1e-7&&Math.abs(poly[i][0]-center[0])<Math.abs(poly[idx][0]-center[0]))idx=i;anchor=poly[idx].slice();segment=(idx+n-1)%n;}
+ const forward=[anchor];for(let step=1;step<=n;step++)forward.push(poly[(segment+step)%n].slice());forward.push(anchor);
+ const first=(()=>{for(let i=1;i<forward.length;i++){const dx=forward[i][0]-forward[0][0],dy=forward[i][1]-forward[0][1],l=Math.hypot(dx,dy);if(l>1e-8)return [dx/l,dy/l];}return [1,0];})();
+ const path=first[0]<-1e-6?forward.slice().reverse():forward,lengths=[0];
+ for(let i=1;i<path.length;i++)lengths.push(lengths.at(-1)+Math.hypot(path[i][0]-path[i-1][0],path[i][1]-path[i-1][1]));
+ const perimeter=lengths.at(-1)||1;let best={distance:Infinity,arc:0,point:path[0]};
+ for(let i=1;i<path.length;i++){const a=path[i-1],b=path[i],dx=b[0]-a[0],dy=b[1]-a[1],len2=dx*dx+dy*dy;if(len2<1e-12)continue;const t=Math.max(0,Math.min(1,((point[0]-a[0])*dx+(point[1]-a[1])*dy)/len2)),q=[a[0]+dx*t,a[1]+dy*t],d=(point[0]-q[0])**2+(point[1]-q[1])**2;if(d<best.distance)best={distance:d,arc:lengths[i-1]+Math.sqrt(len2)*t,point:q};}
+ return {position:Math.max(0,Math.min(100,best.arc/perimeter*100)),point:best.point,distance:Math.sqrt(best.distance)};
+}
 export function loft(m,lower,upper,z0,z1,floor=z0-1,intermediate=[]){
  const ccw=p=>area(p)>0?p.map(v=>v.slice()):p.slice().reverse().map(v=>v.slice());
  const profiles=[{poly:lower,z:floor},{poly:lower,z:z0},...intermediate,{poly:upper,z:z1}].map(r=>({...r,poly:ccw(r.poly)}));
@@ -161,7 +177,7 @@ export function build(m,loops,params,ctx=null,options={}){const started=performa
  const silhouette=section=>{const polys=section.toPolygons().sort((a,b)=>Math.abs(area(b))-Math.abs(area(a)));if(!polys.length)throw Error('O recuo eliminou o contorno. Reduza o valor.');return hold(new C([polys[0]],'EvenOdd'));};
  const linkedCutterExpansion=p.mode==='separate'?p.stampExpansion:0;
  let original=hold(new C([src[0]],'EvenOdd')),outer=hold(new C(memo('outer',()=>silhouette(hold(hold(original.offset(p.outlineOffset+linkedCutterExpansion,'Round',2,roundSegments)).simplify(.002))).toPolygons()),'EvenOdd'));
- let bladeSolid,rimOuter,cutterBaseSection,logoTextSolid,inner,cutter,relief,stamp,stampBaseSolid,reliefPart,bladeProfile=[],reliefOutline=[],logoOutline=cachedCutter?.logoOutline||[],logoPlacement=cachedCutter?.logoPlacement||null,reinforcementRootOutline=[],reinforcementTransitionOutline=[];
+ let bladeSolid,rimOuter,cutterBaseSection,logoTextSolid,inner,cutter,relief,stamp,stampBaseSolid,reliefPart,bladeProfile=[],reliefOutline=[],logoOutline=cachedCutter?.logoOutline||[],logoPlacement=cachedCutter?.logoPlacement||null,logoPathOutline=cachedCutter?.logoPathOutline||[],reinforcementRootOutline=[],reinforcementTransitionOutline=[];
  if(p.mode!=='stamp'&&!cachedCutter){
   const innerPolys=memo('inner',()=>{
   inner=silhouette(hold(outer.offset(p.clearance,'Round',2,roundSegments)));
@@ -198,6 +214,7 @@ export function build(m,loops,params,ctx=null,options={}){const started=performa
    return {outer:bladeOuter.toPolygons(),tip:tipOuter.toPolygons(),rings};});
   const bladeOuter=hold(new C(profiles.outer,'EvenOdd'));
   rimOuter=hold(new C(memo('rim',()=>silhouette(hold(C.union([hold(inner.offset(Math.max(p.rim,p.wall),'Round',2,roundSegments)),bladeOuter]))).toPolygons()),'EvenOdd'));
+  logoPathOutline=rimOuter.toPolygons()[0]||[];
   cutterBaseSection=rimOuter;
   if(p.logoEnabled&&p.mode!=='stamp'){
    const logo=edgeLogoPlacement(rimOuter.toPolygons()[0],p,options.logoProfile);
@@ -309,7 +326,7 @@ export function build(m,loops,params,ctx=null,options={}){const started=performa
  else if(p.mode==='separate')parts=p.reliefSeparate?[{name:'Cortador',solid:cutter},{name:'Base do carimbo',solid:stampBaseSolid},{name:'Relevo',solid:reliefPart}]:[{name:'Cortador',solid:cutter},{name:'Carimbo',solid:stamp}];
  else if(p.mode==='stamp')parts=p.reliefSeparate?[{name:'Base do carimbo',solid:stampBaseSolid},{name:'Relevo',solid:reliefPart}]:[{name:'Carimbo',solid:stamp}];
  else parts=[{name:'Cortador',solid:cutter}];
- const result={parts:parts.map(({name,solid})=>{if(name==='Cortador'&&cachedCutter)return cachedCutter.part;if(name==='Carimbo'&&cachedStamp)return cachedStamp.part;solid=hold(solid.setTolerance(.001));if(solid.status()!=='NoError'||solid.isEmpty())throw Error(`${name}: falha na construção do sólido (${solid.status()}).`);const mesh=cleanExportMesh(solid.getMesh()),stats=checkMesh(mesh);if(stats.open||stats.nonmanifold||!stats.finite)throw Error(`${name}: malha inválida (${JSON.stringify(stats)}), exportação bloqueada.`);const components=solid.decompose();const bodies=components.length;components.forEach(s=>s.delete());return {name,positions:Float32Array.from(mesh.vertProperties),indices:Uint32Array.from(mesh.triVerts),stride:mesh.numProp,volume:solid.volume(),bounds:solid.boundingBox(),stats,bodies};}),outline:outer.toPolygons(),reliefOutline:cachedStamp?.reliefOutline||reliefOutline,cuttingOutline:cachedCutter?.cuttingOutline||inner?.toPolygons()||[],bladeProfile:cachedCutter?.bladeProfile||bladeProfile,reinforcementRootOutline:cachedCutter?.reinforcementRootOutline||reinforcementRootOutline,reinforcementTransitionOutline:cachedCutter?.reinforcementTransitionOutline||reinforcementTransitionOutline,logoOutline,logoPlacement,params:p,buildProfile,sourcePoints};for(const part of result.parts){if(part.name==='Cortador'&&!cachedCutter)ctx?.set('cutter',{part,cuttingOutline:result.cuttingOutline,bladeProfile:result.bladeProfile,reinforcementRootOutline:result.reinforcementRootOutline,reinforcementTransitionOutline:result.reinforcementTransitionOutline,logoOutline:result.logoOutline,logoPlacement:result.logoPlacement});if(part.name==='Carimbo'&&!cachedStamp)ctx?.set('stamp',{part,reliefOutline:result.reliefOutline});}result.elapsed=performance.now()-started;return result;
+ const result={parts:parts.map(({name,solid})=>{if(name==='Cortador'&&cachedCutter)return cachedCutter.part;if(name==='Carimbo'&&cachedStamp)return cachedStamp.part;solid=hold(solid.setTolerance(.001));if(solid.status()!=='NoError'||solid.isEmpty())throw Error(`${name}: falha na construção do sólido (${solid.status()}).`);const mesh=cleanExportMesh(solid.getMesh()),stats=checkMesh(mesh);if(stats.open||stats.nonmanifold||!stats.finite)throw Error(`${name}: malha inválida (${JSON.stringify(stats)}), exportação bloqueada.`);const components=solid.decompose();const bodies=components.length;components.forEach(s=>s.delete());return {name,positions:Float32Array.from(mesh.vertProperties),indices:Uint32Array.from(mesh.triVerts),stride:mesh.numProp,volume:solid.volume(),bounds:solid.boundingBox(),stats,bodies};}),outline:outer.toPolygons(),reliefOutline:cachedStamp?.reliefOutline||reliefOutline,cuttingOutline:cachedCutter?.cuttingOutline||inner?.toPolygons()||[],bladeProfile:cachedCutter?.bladeProfile||bladeProfile,reinforcementRootOutline:cachedCutter?.reinforcementRootOutline||reinforcementRootOutline,reinforcementTransitionOutline:cachedCutter?.reinforcementTransitionOutline||reinforcementTransitionOutline,logoOutline,logoPlacement,logoPathOutline,params:p,buildProfile,sourcePoints};for(const part of result.parts){if(part.name==='Cortador'&&!cachedCutter)ctx?.set('cutter',{part,cuttingOutline:result.cuttingOutline,bladeProfile:result.bladeProfile,reinforcementRootOutline:result.reinforcementRootOutline,reinforcementTransitionOutline:result.reinforcementTransitionOutline,logoOutline:result.logoOutline,logoPlacement:result.logoPlacement,logoPathOutline:result.logoPathOutline});if(part.name==='Carimbo'&&!cachedStamp)ctx?.set('stamp',{part,reliefOutline:result.reliefOutline});}result.elapsed=performance.now()-started;return result;
  }finally{keep.reverse().forEach(o=>o.delete());}}
 
 // Boolean editing preserves filled-region topology. Brush paths are widened to real areas.
