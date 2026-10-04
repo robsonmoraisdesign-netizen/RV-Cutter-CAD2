@@ -25,7 +25,7 @@ const SELECTOR_ROLES=[
 
 function matchesAny(el,selector){try{return el.matches(selector);}catch{return false;}}
 function inferredRole(el){
- if(el.dataset?.rvRole)return {role:el.dataset.rvRole,source:'explicit'};
+ if(el.dataset?.rvRole&&!el.dataset.rvRoleSource)return {role:el.dataset.rvRole,source:'explicit'};
  for(const [selector,role] of SELECTOR_ROLES)if(matchesAny(el,selector))return {role,source:'selector'};
  if(el.closest?.('#editor'))return {role:'sketch-ui',source:'sketch'};
  const tag=el.tagName?.toLowerCase();
@@ -63,11 +63,11 @@ function descriptor(el){
  };
 }
 export function applyAppearanceRoles(root=document){
- const nodes=[...(root===document?document.querySelectorAll('*'):root.querySelectorAll('*'))];
+ const nodes=[...(root===document?[]:[root]),...root.querySelectorAll('*')];
  let controlled=0,uncontrolled=0;
  const unresolved=[];
  for(const el of nodes){
-  if(!colorBearing(el))continue;
+  if(el.namespaceURI!=='http://www.w3.org/1999/xhtml'||!colorBearing(el))continue;
   const result=inferredRole(el);
   if(result){
    el.dataset.rvRole=result.role;
@@ -106,12 +106,15 @@ export function installAppearanceController(){
   observer=new MutationObserver(records=>{
    let changed=false;
    for(const r of records){
-    for(const n of r.addedNodes||[])if(n.nodeType===1){applyAppearanceRoles(n);changed=true;}
-    if(r.type==='attributes')changed=true;
+    for(const n of r.addedNodes||[])if(n.nodeType===1&&n.namespaceURI==='http://www.w3.org/1999/xhtml'){changed=true;}
+    if(r.type==='attributes'&&r.target.namespaceURI==='http://www.w3.org/1999/xhtml'){
+     const clean=v=>String(v||'').split(/\s+/).filter(x=>x&&x!=='rv-contrast-guard').sort().join(' ');
+     if(r.attributeName!=='class'||clean(r.oldValue)!==clean(r.target.getAttribute('class')))changed=true;
+    }
    }
    if(changed)schedule();
   });
-  observer.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['class','disabled','hidden','data-state']});
+  observer.observe(document.body,{subtree:true,childList:true,attributes:true,attributeOldValue:true,attributeFilter:['class','disabled','hidden','data-state']});
  }
  window.addEventListener('rv-theme-change',schedule);
  window.RVAppearance={version:APPEARANCE_ENGINE_VERSION,audit:appearanceAudit,apply:applyAppearanceRoles,last:()=>{try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||'null');}catch{return null;}}};

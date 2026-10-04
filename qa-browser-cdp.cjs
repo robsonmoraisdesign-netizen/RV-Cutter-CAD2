@@ -54,6 +54,7 @@ async function cdp(url){
   assert(await evalv("document.querySelectorAll('.v4-menu-group').length>=4"),'Sketch must expose grouped Create/Modify/Constrain/Reference menus');
   assert(await evalv("document.querySelector('#inspectorLevels') && !!document.querySelector('[data-inspector-level=\"essential\"]')"),'Inspector levels must exist');
   assert(await evalv("!!document.querySelector('[data-tool=\"trim\"]') && !!document.querySelector('[data-tool=\"extend\"]') && !!document.querySelector('[data-tool=\"bezier\"]')"),'Phase 2 CAD tools must be present');
+  assert(await evalv("RVTest.active().params.mirror && document.querySelector('#mirror').checked"),'New art must default to mirrored');
   assert.equal(await evalv("RVTest.active().features.length"),0,'New Sketch must not auto-create a cutter feature');
 
   await evalv("document.querySelector('[data-tool=\"circle\"]').click(); true");
@@ -193,6 +194,15 @@ async function cdp(url){
   const lightShot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync('audit-theme-light-14.28.11.png',Buffer.from(lightShot.data,'base64'));
   await evalv("RVTheme.set('dark');true");await sleep(120);
   assert((await evalv("RVTheme.diagnostics().pairs.every(x=>x.pass)")),'Dark theme contrast must remain valid after round-trip');
+  const guardStability=await evalv(`(async()=>{
+    const node=document.createElement('button');node.textContent='Contrast regression';node.style.cssText='color:rgb(245,245,245)!important;background:rgb(250,250,250)!important;position:fixed;top:400px;left:400px;z-index:9999';document.body.appendChild(node);
+    RVAppearance.audit();await new Promise(r=>setTimeout(r,150));
+    const first=getComputedStyle(node).color;RVAppearance.audit();const second=getComputedStyle(node).color;
+    const before=RVAppearance.last().timestamp;await new Promise(r=>setTimeout(r,300));const after=RVAppearance.last().timestamp;
+    node.remove();return {first,second,before,after};
+  })()`);
+  assert.equal(guardStability.first,guardStability.second,'Contrast correction must remain stable');
+  assert.equal(guardStability.before,guardStability.after,'Audit must settle without self-triggering loops');
   const chromeRects=await evalv("(()=>{const a=document.querySelector('#pieceModeHost .mode-block')?.getBoundingClientRect(),b=document.querySelector('.viewport-title')?.getBoundingClientRect();return a&&b?{a:{l:a.left,r:a.right,t:a.top,b:a.bottom},b:{l:b.left,r:b.right,t:b.top,b:b.bottom}}:null})()");
   assert(chromeRects&&!(chromeRects.a.l<chromeRects.b.r&&chromeRects.a.r>chromeRects.b.l&&chromeRects.a.t<chromeRects.b.b&&chromeRects.a.b>chromeRects.b.t),'Piece selector and object title must never overlap');
   console.log('Multi-object regression: Outliner + persistent Sketch references + bulk 3D conversion PASS');
@@ -249,6 +259,8 @@ async function cdp(url){
   assert(await evalv("RVTest.state.objects.some(o=>/Arte A/i.test(o.name))&&RVTest.state.objects.some(o=>/Arte B/i.test(o.name))"),'Multiple image import must preserve per-file object naming');
   assert.equal(await evalv("document.querySelectorAll('#viewport').length"),1,'Viewport ID must be unique');
 
+  await evalv("(()=>{const p=RVTest.project();p.version='14.28.11';p.view.material='pla';RVTest.applyProject(p);return true;})()");
+  assert.equal(await evalv("RVTest.state.view.material"),'pla','Opening older project must retain PLA selection');
   const exceptions=dev.events.filter(e=>e.method==='Runtime.exceptionThrown');
   const severe=dev.events.filter(e=>e.method==='Log.entryAdded'&&['error'].includes(e.params?.entry?.level));
   assert.deepEqual(exceptions.map(e=>e.params?.exceptionDetails?.text),[]);

@@ -7,7 +7,7 @@ import {buildCadEdgePositions} from './cad-display.mjs';
 export function prepareDisplay(result){
  for(const part of result.parts){
   if(!part.renderData){
-   const roles={cutterBase:[],blade:[],stampBase:[],relief:[]},p=result.params;
+   const roles={cutterBase:[],blade:[],reinforcement:[],stampBase:[],relief:[]},p=result.params;
    for(let i=0;i<part.indices.length;i+=3){
     const ids=[part.indices[i],part.indices[i+1],part.indices[i+2]],role=classifyDisplayRole(part,result,ids);
     roles[role].push(...ids);

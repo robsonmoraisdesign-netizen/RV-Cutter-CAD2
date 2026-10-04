@@ -35,33 +35,6 @@ export function createViewer(host,onCameraChange=()=>{},onInteraction=()=>{}){le
  renderer.domElement.addEventListener('dblclick',e=>{const hit=pick(e.clientX,e.clientY,false);if(hit?.id){onInteraction({type:'focus',id:hit.id});focus(hit.id);}});
  function style(material,role){if(material.userData.cadEdge){material.visible=!settings.presentationMode&&settings.material==='cad'&&!settings.wire&&!settings.sliceEnabled;if(material.uniforms?.ink){material.uniforms.ink.value.set(CAD_DISPLAY.edgeColor);material.uniforms.width.value=CAD_DISPLAY.edgeWidth;material.uniforms.depthBias.value=CAD_DISPLAY.edgeDepthBias;material.uniforms.resolution.value.set(Math.max(1,host.clientWidth),Math.max(1,host.clientHeight));}return;}if(material.userData.presentationEdge){material.visible=!settings.presentationMode||pres().lineWidth>0;if(settings.presentationMode){const p=pres();material.uniforms.ink.value.set(p.lineColor);material.uniforms.width.value=p.lineWidth;material.uniforms.resolution.value.set(Math.max(1,host.clientWidth),Math.max(1,host.clientHeight));}return;}if(material.userData.presentationLine){if(settings.presentationMode)material.color.set(pres().lineColor);return;}if(material.userData.reinforcementLine){material.visible=settings.presentationMode?pres().lineWidth>0:!settings.wire;material.color.set(settings.presentationMode?pres().lineColor:(settings.material==='cad'?CAD_DISPLAY.edgeColor:themeColor('textPrimary')));material.clippingPlanes=!settings.presentationMode&&settings.sliceEnabled?[new T.Plane(new T.Vector3(0,0,-1),settings.sliceHeight)]:[];return;}if(material.userData.chamferLine){material.visible=settings.presentationMode?pres().lineWidth>0:settings.material!=='cad';material.color.set(settings.presentationMode?pres().lineColor:themeColor('textSecondary'));material.clippingPlanes=!settings.presentationMode&&settings.sliceEnabled?[new T.Plane(new T.Vector3(0,0,-1),settings.sliceHeight)]:[];return;}if(settings.presentationMode){const p=pres();if(material.gradientMap&&material.userData.softness!==p.shadeSoftness){updateGradient(material,p.shadeSoftness);material.userData.softness=p.shadeSoftness;}if(material.uniforms?.ink){material.visible=p.lineWidth>0;material.uniforms.ink.value.set(p.lineColor);material.uniforms.width.value=p.lineWidth;material.uniforms.resolution.value=host.clientHeight;return;}material.color?.set(role?p.componentColors?p.colors[role]:p.modelColor:p.lineColor);syncPresentationMaterial(material,p,role);return;}material.transparent=false;material.opacity=1;material.depthTest=true;material.depthWrite=true;material.side=T.FrontSide;material.blending=T.NormalBlending;if(settings.material==='cad'){material.color.set(settings.componentColors&&settings.colors?.[role]?settings.colors[role]:CAD_DISPLAY.faceColor);material.roughness=role==='relief'?.48:role==='blade'?.56:CAD_DISPLAY.roughness;material.metalness=CAD_DISPLAY.metalness;material.flatShading=false;}else{const kinds={pla:[.65,.02],matte:[.98,0],silk:[.22,.3]},v=kinds[settings.material]||kinds.pla;material.color.set(settings.componentColors?settings.colors[role]:settings.colors.blade);material.roughness=v[0];material.metalness=v[1];}material.wireframe=!!settings.wire;const previousClip=material.clippingPlanes?.length||0;material.clippingPlanes=settings.sliceEnabled?[new T.Plane(new T.Vector3(0,0,-1),settings.sliceHeight)]:[];material.userData.stripes=!!settings.layerLines;if(material.userData.shader)material.userData.shader.uniforms.rvStripes.value=settings.layerLines?1:0;if(previousClip!==material.clippingPlanes.length)material.needsUpdate=true;}
  function material(role){if(settings.presentationMode)return presentationMaterial(pres(),role);const mat=new T.MeshStandardMaterial();mat.userData.role=role;mat.onBeforeCompile=shader=>{shader.uniforms.rvStripes={value:settings.layerLines?1:0};shader.vertexShader='varying float rvZ; varying float rvVertical;\n'+shader.vertexShader;shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nrvZ=position.z; rvVertical=1.0-abs(normal.z);');shader.fragmentShader='varying float rvZ; varying float rvVertical; uniform float rvStripes;\n'+shader.fragmentShader;shader.fragmentShader=shader.fragmentShader.replace('#include <dithering_fragment>','float rvPhase=mod(rvZ,0.2); float rvAA=max(fwidth(rvZ),0.002); float rvLine=1.0-smoothstep(0.015-rvAA,0.015+rvAA,abs(rvPhase-0.025)); gl_FragColor.rgb *= 1.0-0.15*rvLine*rvStripes*rvVertical;\n#include <dithering_fragment>');mat.userData.shader=shader;};style(mat,role);return mat;}
- function resampleClosedLoop(poly,count){
-  if(!poly?.length||count<3)return [];
-  let p=poly.slice();
-  if(polyArea(p)<0)p=p.slice().reverse();
-  let anchor=0;
-  for(let i=1;i<p.length;i++)if(p[i][0]>p[anchor][0]+1e-9||(Math.abs(p[i][0]-p[anchor][0])<=1e-9&&p[i][1]<p[anchor][1]))anchor=i;
-  p=[...p.slice(anchor),...p.slice(0,anchor)];
-  const seg=[],cum=[0];let total=0;
-  for(let i=0;i<p.length;i++){const a=p[i],b=p[(i+1)%p.length],d=Math.hypot(b[0]-a[0],b[1]-a[1]);seg.push(d);total+=d;cum.push(total);}
-  if(!(total>1e-9))return [];
-  const out=[];let j=0;
-  for(let k=0;k<count;k++){const target=total*k/count;while(j<seg.length-1&&cum[j+1]<target)j++;const a=p[j],b=p[(j+1)%p.length],d=seg[j]||1,t=(target-cum[j])/d;out.push([a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t]);}
-  return out;
- }
- function reinforcementOverlay(result,p){
-  const root=result.reinforcementRootOutline||[],top=result.reinforcementTransitionOutline||[];
-  if(!p.bladeReinforcement||root.length<3||top.length<3)return null;
-  const count=Math.max(96,Math.min(1024,Math.ceil(Math.max(root.length,top.length)*.65)));
-  const a=resampleClosedLoop(root,count),b=resampleClosedLoop(top,count);if(!a.length||!b.length)return null;
-  const positions=[],indices=[],z0=p.base+.002,z1=p.base+p.reinforcementHeight;
-  for(const [x,y] of a)positions.push(x,y,z0);
-  for(const [x,y] of b)positions.push(x,y,z1);
-  for(let i=0;i<count;i++){const j=(i+1)%count;indices.push(i,j,count+j,i,count+j,count+i);}
-  const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(positions,3));g.setIndex(indices);g.computeVertexNormals();
-  const mat=material('reinforcement');mat.polygonOffset=true;mat.polygonOffsetFactor=-1;mat.polygonOffsetUnits=-1;
-  const mesh=new T.Mesh(g,mat);mesh.userData.role='reinforcement';mesh.userData.reinforcementOverlay=true;mesh.castShadow=true;mesh.receiveShadow=true;mesh.renderOrder=2;return mesh;
- }
  function filterReinforcementCadEdges(positions,p){
   if(!p.bladeReinforcement||!positions?.length)return positions;
   const low=p.base-.03,high=p.base+p.reinforcementHeight+.03,out=[];

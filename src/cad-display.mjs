@@ -1,6 +1,6 @@
 import * as T from 'three';
 
-export const DISPLAY_VERSION='14.28.8-cad-3';
+export const DISPLAY_VERSION='14.28.15-cad-4';
 export const CAD_DISPLAY=Object.freeze({
   faceColor:'#45aaf2',
   edgeColor:'#182934',

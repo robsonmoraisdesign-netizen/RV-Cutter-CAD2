@@ -33,3 +33,8 @@ Este arquivo é permanente. Um problema corrigido não deve ser apagado; deve ga
 | R-027 | Inferências eram apenas H/V e não mostravam o estado geométrico com clareza | Inferências persistentes incluem coincidência, ponto médio e paralela; Shift suprime inferência; entidades mostram subdefinida/definida/conflito por estado do solver. |
 | R-028 | Trim/Extend poderiam ser simulados como edição de pontos e destruir semântica | trimEntity/extendLine atuam nas entidades do Sketch, calculam interseções e geram nova topologia sem converter o Sketch inteiro em loops. |
 | R-029 | Curva Bézier apareceria como botão sem entidade real | Bézier é entidade semântica persistente com pontos de controle, perfil resolvido, escala paramétrica, edição e QA antes de ser exposta na toolbar. |
+| R-030 | Auditoria de aparência se realimentava por suas próprias classes de contraste | Ignorar mutações de guardas e SVG; medir estilo original antes de corrigir. QA navegador verifica estabilização. |
+| R-031 | Cache perdia metadados de reforço e relevo invertido | Salvar contornos junto à peça e restaurá-los também ao reutilizar sólidos; comparar cálculo frio e aquecido. |
+| R-032 | Reforço sem categoria real no render | Classificar triângulos do próprio sólido; somatório de áreas deve corresponder à fabricação. |
+| R-033 | Migração sobrescrevia PLA escolhido | Material explícito persistido deve sobreviver a mudanças de versão. |
+| R-034 | Base mínima produzia Z negativo; altura de cortador bloqueava carimbo | Limitar sobreposição ao chão e validar relação de alturas apenas no modo aplicável. |
