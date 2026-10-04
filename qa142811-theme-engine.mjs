@@ -38,6 +38,6 @@ assert.equal((editor.match(/#[0-9a-fA-F]{3,8}\b|rgba?\(/g)||[]).length,0,'Sketch
 assert.equal((measure.match(/#[0-9a-fA-F]{3,8}\b|rgba?\(/g)||[]).length,0,'Measure tool must not hardcode runtime colors');
 assert.equal((engine.match(/#[0-9a-fA-F]{3,8}\b|rgba?\(/g)||[]).length,0,'Theme engine stylesheet must use semantic variables only');
 assert.ok(build.includes("copyFileSync('src/measure-tool.js','app/measure-tool.js')"),'build must synchronize measure source');
-assert.deepEqual(Object.keys(MODEL_COLORS).sort(),Object.keys(LEGACY_MODEL_COLORS).sort(),'model color migrations must stay centralized');
+assert.deepEqual(Object.keys(MODEL_COLORS).sort(),[...Object.keys(LEGACY_MODEL_COLORS),'reinforcement'].sort(),'model color migrations must stay centralized');
 
 console.log('PASS 14.28.11 universal theme engine: semantic tokens, contrast and runtime consumers');

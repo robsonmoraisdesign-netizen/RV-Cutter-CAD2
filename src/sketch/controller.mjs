@@ -13,7 +13,9 @@ export function createSketchController(api){
  function native(){const o=api.object();if(!o)return null;const key=[o,o.sketch,o.loops,o.params.size,o.contourVersion];if(cache&&key.every((v,i)=>v===cache.key[i]))return cache.value;cache={key,value:sketchFromObject(o)};return cache.value;}
  function invalidate(){cache=null;statusCache=null;statesCache=null;}
  function transact(edit,changedIds=null){const o=api.object();if(!o)return false;try{
-  const s=cloneSketch(native());edit(s);const r=resolveDocument(s,changedIds);
+  const s=cloneSketch(native()),existing=new Set(s.entities.map(e=>e.id));edit(s);
+  const affected=changedIds===null?null:[...new Set([...changedIds,...s.entities.filter(e=>!existing.has(e.id)).map(e=>e.id)])];
+  const r=resolveDocument(s,affected);
   const geometryChanged=o.params.size!==r.size||JSON.stringify(o.loops)!==JSON.stringify(r.loops);api.history();o.sketch=r.sketch;o.loops=r.loops;o.params.size=r.size;
   lastSolution=r.solution;selected=selected.filter(id=>s.entities.some(e=>e.id===id));points=points.filter(p=>selected.includes(p.entity));invalidate();
   api.changed({geometryChanged});return true;

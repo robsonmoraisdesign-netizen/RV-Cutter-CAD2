@@ -4,6 +4,8 @@ Base: 14.28.14, commit ae98c715365d44fd96b78122a4bde93aee4ef0a1. Aplicativo desk
 
 ## Correções
 
+- Solver incremental inclui entidades recém-criadas, mesmo quando outra entidade estava selecionada; elimina falsos conflitos de origem/eixos.
+
 - Espelhar arte ativado em novos objetos; projetos com escolha explícita mantêm seu valor.
 - Auditoria de contraste mede o estilo original e mantém a correção estável. O observador ignora suas próprias correções e mutações SVG do Sketch, evitando auditorias repetidas durante desenho e seleção.
 - Contraste do botão de ação no tema claro corrigido. Papéis visuais são reavaliados quando classes/contextos mudam, inclusive em elementos adicionados dinamicamente.
@@ -16,7 +18,7 @@ Base: 14.28.14, commit ae98c715365d44fd96b78122a4bde93aee4ef0a1. Aplicativo desk
 
 ## Validação
 
-Novas regressões cobrem cache aquecido versus cálculo novo, malhas fechadas, áreas de superfície de renderização versus fabricação, reforço e relevo com cores corretas, espelhamento, bases finas e restrições persistentes de origem/eixo. Testes do navegador cobrem estabilidade da auditoria, material salvo, importação múltipla, seleção por proximidade, desfazer/refazer, presets e STL. O pipeline executa a suíte completa em Linux e Windows; o ZIP só é publicado após abrir o EXE empacotado e salvar um STL com reforço e chanfro via IPC nativo.
+Novas regressões cobrem cache aquecido versus cálculo novo, malhas fechadas, áreas de superfície de renderização versus fabricação, reforço e relevo com cores corretas, espelhamento, bases finas e restrições persistentes de origem/eixo. Testes do navegador cobrem estabilidade da auditoria, material salvo, importação múltipla, seleção por proximidade, desfazer/refazer, presets e STL. O pipeline está configurado para executar a suíte completa em Linux e Windows e publicar uma release somente após abrir o EXE empacotado e salvar STL via IPC. Nesta entrega, os runners falharam antes de iniciar qualquer etapa (run 37214834228), sem logs: a validação nativa Windows está pendente. O pacote entregue separadamente foi montado em Linux com o runtime oficial Electron Windows x64, cuja arquitetura PE foi verificada. Os testes locais do navegador e as regressões novas passaram.
 
 ## Uso
 

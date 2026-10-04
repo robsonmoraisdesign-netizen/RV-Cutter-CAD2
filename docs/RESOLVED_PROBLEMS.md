@@ -38,3 +38,4 @@ Este arquivo é permanente. Um problema corrigido não deve ser apagado; deve ga
 | R-032 | Reforço sem categoria real no render | Classificar triângulos do próprio sólido; somatório de áreas deve corresponder à fabricação. |
 | R-033 | Migração sobrescrevia PLA escolhido | Material explícito persistido deve sobreviver a mudanças de versão. |
 | R-034 | Base mínima produzia Z negativo; altura de cortador bloqueava carimbo | Limitar sobreposição ao chão e validar relação de alturas apenas no modo aplicável. |
+| R-035 | Criação resolvia a seleção anterior e ignorava entidade nova | Transação inclui IDs recém-criados na região afetada antes de resolver; QA snapping cobre pontos na origem/eixos. |
