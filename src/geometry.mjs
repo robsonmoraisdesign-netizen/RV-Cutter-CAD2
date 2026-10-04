@@ -83,10 +83,14 @@ function edgeLogoPlacement(poly,p,profile){
  const hit=[a[0]+(b[0]-a[0])*u,a[1]+(b[1]-a[1])*u],raw=[(b[0]-a[0])/segLen,(b[1]-a[1])/segLen];
  let tangent=raw.slice();if(tangent[0]<0)tangent=[-tangent[0],-tangent[1]];
  const left=[-tangent[1],tangent[0]],radial=[hit[0]-center[0],hit[1]-center[1]],rl=Math.hypot(...radial)||1;
- let normal=[radial[0]/rl,radial[1]/rl];
- // At concave points prefer the local normal that faces the same radial half-plane.
- const localLeft=[-raw[1],raw[0]],localRight=[raw[1],-raw[0]];
- normal=(localLeft[0]*normal[0]+localLeft[1]*normal[1])>(localRight[0]*normal[0]+localRight[1]*normal[1])?localLeft:localRight;
+ const radialNormal=[radial[0]/rl,radial[1]/rl],localLeft=[-raw[1],raw[0]],localRight=[raw[1],-raw[0]],probe=Math.max(.03,(p.size||75)*.0008);
+ const leftInside=contains(poly,[hit[0]+localLeft[0]*probe,hit[1]+localLeft[1]*probe]);
+ const rightInside=contains(poly,[hit[0]+localRight[0]*probe,hit[1]+localRight[1]*probe]);
+ // Prefer the side that is geometrically outside the actual contour; radial direction
+ // is only a tie-breaker for degenerate/very tight corners.
+ let normal;
+ if(leftInside!==rightInside)normal=leftInside?localRight:localLeft;
+ else normal=(localLeft[0]*radialNormal[0]+localLeft[1]*radialNormal[1])>(localRight[0]*radialNormal[0]+localRight[1]*radialNormal[1])?localLeft:localRight;
  const pad=Math.max(1,Math.min(2.5,p.logoSize*.16)),plaqueW=Math.max(6,profile.width+pad*2),plaqueD=Math.max(5,profile.height+pad*2);
  const overlap=Math.min(1.6,plaqueD*.34),offset=p.logoOffset;
  const plaqueCenter=[hit[0]+normal[0]*(plaqueD/2-overlap+offset),hit[1]+normal[1]*(plaqueD/2-overlap+offset)];
