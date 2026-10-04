@@ -7,7 +7,7 @@ OBJETIVO
 PARÂMETROS
 - Ativar/desativar logo.
 - Texto.
-- Tipo da fonte.
+- Tipo da fonte (Helvetiker, Helvetiker Bold, Optimer e Gentilis).
 - Tamanho da fonte em XY.
 - Altura 3D da fonte.
 - Posição ao longo da borda em porcentagem.
@@ -17,13 +17,14 @@ COMPORTAMENTO INTELIGENTE
 - 0% começa no centro inferior do cortador.
 - O avanço percorre o comprimento real da borda, começando pela lateral direita.
 - A orientação vem da tangente local da borda.
+- O lado externo é identificado testando os dois lados do contorno real, inclusive em reentrâncias.
 - Quando necessário, o texto gira 180° automaticamente para permanecer legível.
 - A aba arredondada e o conector são gerados parametricamente e unidos à base.
 - O texto é geometria real elevada e entra no STL.
 
 ARQUITETURA
-- Novo módulo: src/logo-text.mjs
-- Geometria: src/geometry.mjs
+- Novo módulo: src/logo-text.mjs (fontes e conversão texto → perfil, carregado no worker)
+- Geometria: src/geometry.mjs (recebe somente o perfil vetorial preparado)
 - Cache/dependências: src/dependencies.mjs
 - Classificação visual: src/role-classifier.mjs
 - Inspector/controles: src/ui.mjs + app/index.html
@@ -37,6 +38,9 @@ REFERÊNCIA OBSERVADA
 
 VALIDAÇÃO PROGRAMADA
 - Perfil vetorial válido para todas as fontes embarcadas.
+- Texto vazio, fonte inválida e posição fora da faixa são normalizados com segurança.
+- A geometria do carimbo permanece idêntica quando apenas a logo da base muda.
+- Os JSONs de fonte ficam fora do bundle principal da UI; a vetorização ocorre no worker com cache de perfis.
 - Logo inferior permanece horizontal.
 - Logo lateral gira automaticamente para orientação vertical.
 - A aba aumenta o envelope no lado esperado.
