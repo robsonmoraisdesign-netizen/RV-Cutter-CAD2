@@ -12,12 +12,14 @@ PARÂMETROS
 - Altura 3D da fonte.
 - Posição ao longo da borda em porcentagem.
 - Afastamento em relação à borda.
+- Posicionamento direto no modelo 3D: botão “Escolher posição no modelo”, seguido de clique sobre o cortador.
 
 COMPORTAMENTO INTELIGENTE
 - 0% começa no centro inferior do cortador.
 - O avanço percorre o comprimento real da borda, começando pela lateral direita.
 - A orientação vem da tangente local da borda.
 - O lado externo é identificado testando os dois lados do contorno real, inclusive em reentrâncias.
+- O clique no corpo do cortador é projetado para o ponto mais próximo da borda e convertido para a mesma posição percentual usada pelo slider.
 - Quando necessário, o texto gira 180° automaticamente para permanecer legível.
 - A aba arredondada e o conector são gerados parametricamente e unidos à base.
 - O texto é geometria real elevada e entra no STL.
@@ -40,6 +42,7 @@ VALIDAÇÃO PROGRAMADA
 - Perfil vetorial válido para todas as fontes embarcadas.
 - Texto vazio, fonte inválida e posição fora da faixa são normalizados com segurança.
 - A geometria do carimbo permanece idêntica quando apenas a logo da base muda.
+- Mapeamento do clique 3D: centro inferior=0%, lateral direita=25%, topo=50%, lateral esquerda=75% em perfil retangular de controle.
 - Os JSONs de fonte ficam fora do bundle principal da UI; a vetorização ocorre no worker com cache de perfis.
 - Logo inferior permanece horizontal.
 - Logo lateral gira automaticamente para orientação vertical.
