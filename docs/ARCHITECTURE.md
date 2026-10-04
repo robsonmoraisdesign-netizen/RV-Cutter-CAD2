@@ -141,3 +141,5 @@ borda real da base → posição por comprimento de arco
 ```
 
 A posição 0% é ancorada no centro inferior da borda externa; o avanço percorre a borda continuamente, começando pela lateral direita. A rotação é derivada da tangente local e é invertida em 180° quando necessário para impedir texto de cabeça para baixo. Alterações de logo invalidam apenas o nó de cortador/integrado; lâmina e perfis independentes permanecem reutilizáveis pelo grafo paramétrico.
+
+Os arquivos de fonte e a conversão texto→perfil ficam no `worker` (`src/logo-text.mjs`). `src/geometry.mjs` recebe somente o perfil vetorial já preparado por `options.logoProfile`, evitando carregar os JSONs de fonte no bundle principal da interface. O worker mantém um cache pequeno dos perfis por texto/fonte/tamanho.
