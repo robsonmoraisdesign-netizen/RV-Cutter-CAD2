@@ -1,15 +1,22 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {kernel,build,defaults,migrateParams} from './src/geometry.mjs';
+import {kernel,build,defaults,migrateParams,edgePositionFromPoint} from './src/geometry.mjs';
 import {createLogoTextProfile,LOGO_FONT_IDS} from './src/logo-text.mjs';
 
+const pickerBorder=[[-25,-20],[25,-20],[25,20],[-25,20]];
+assert.ok(Math.abs(edgePositionFromPoint(pickerBorder,[0,-30]).position-0)<.01,'bottom click must resolve to 0%');
+assert.ok(Math.abs(edgePositionFromPoint(pickerBorder,[30,0]).position-25)<.01,'right click must resolve to 25%');
+assert.ok(Math.abs(edgePositionFromPoint(pickerBorder,[0,30]).position-50)<.01,'top click must resolve to 50%');
+assert.ok(Math.abs(edgePositionFromPoint(pickerBorder,[-30,0]).position-75)<.01,'left click must resolve to 75%');
 const migrated=migrateParams({logoEnabled:true,logoText:'   ',logoFont:'missing',logoPosition:140});
 assert.equal(migrated.logoText,defaults.logoText,'empty logo text must fall back predictably');
 assert.equal(migrated.logoFont,defaults.logoFont,'unknown font must migrate safely');
 assert.equal(migrated.logoPosition,100,'perimeter position must be clamped');
-const geometrySource=fs.readFileSync('src/geometry.mjs','utf8'),workerSource=fs.readFileSync('src/worker.mjs','utf8');
+const geometrySource=fs.readFileSync('src/geometry.mjs','utf8'),workerSource=fs.readFileSync('src/worker.mjs','utf8'),viewerSource=fs.readFileSync('src/viewer.mjs','utf8'),uiSource=fs.readFileSync('src/ui.mjs','utf8'),htmlSource=fs.readFileSync('app/index.html','utf8');
 assert(!geometrySource.includes("from './logo-text.mjs'"),'font payload must not leak into shared geometry/UI bundle');
 assert(workerSource.includes("from './logo-text.mjs'")&&workerSource.includes('preparedLogoProfile'),'font vectorization must stay in the worker');
+assert(viewerSource.includes('setPlacementMode')&&viewerSource.includes("point:hit?.point"),'viewer must expose model hit points for direct positioning');
+assert(uiSource.includes('edgePositionFromPoint')&&htmlSource.includes('pickLogoPosition'),'3D border picker wiring must remain available');
 
 for(const font of LOGO_FONT_IDS){
  const profile=createLogoTextProfile('RV',font,6);
