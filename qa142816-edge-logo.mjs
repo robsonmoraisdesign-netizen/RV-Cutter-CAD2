@@ -11,9 +11,10 @@ for(const font of LOGO_FONT_IDS){
 const m=await kernel();
 const loops=[[[-.5,-.4],[.5,-.4],[.5,.4],[-.5,.4]]];
 const common={...defaults,mode:'cutter',size:50,mirror:false,logoText:'FIORI',logoFont:'helvetiker-bold',logoSize:6,logoHeight:.6,logoOffset:0};
-const plain=build(m,loops,{...common,logoEnabled:false});
-const bottom=build(m,loops,{...common,logoEnabled:true,logoPosition:0});
-const right=build(m,loops,{...common,logoEnabled:true,logoPosition:25});
+const run=params=>build(m,loops,params,null,{logoProfile:params.logoEnabled?createLogoTextProfile(params.logoText,params.logoFont,params.logoSize,10):null});
+const plain=run({...common,logoEnabled:false});
+const bottom=run({...common,logoEnabled:true,logoPosition:0});
+const right=run({...common,logoEnabled:true,logoPosition:25});
 
 for(const [name,result] of [['bottom',bottom],['right',right]]){
  const part=result.parts[0];
