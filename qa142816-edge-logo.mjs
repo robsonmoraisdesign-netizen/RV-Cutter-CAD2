@@ -25,6 +25,8 @@ for(const [name,result] of [['bottom',bottom],['right',right]]){
 }
 assert.ok(bottom.parts[0].bounds.min[1]<plain.parts[0].bounds.min[1]-1,'270° must place logo on lower border');
 assert.ok(right.parts[0].bounds.max[0]>plain.parts[0].bounds.max[0]+1,'0° must place logo on right border');
+assert.ok(Math.abs(bottom.logoPlacement.angle)<5,'bottom logo must auto-align horizontally');
+assert.ok(Math.abs(Math.abs(right.logoPlacement.angle)-90)<5,'side logo must auto-rotate vertically with the border tangent');
 assert.ok(Math.abs(bottom.parts[0].bounds.max[2]-plain.parts[0].bounds.max[2])<1e-6,'logo height must stay below cutting edge');
 
 console.log('PASS 14.28.16: edge logo is parametric, attached, printable and follows border position.');
