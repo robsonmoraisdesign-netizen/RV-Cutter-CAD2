@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict';
-import {kernel,build,defaults} from './src/geometry.mjs';
+import fs from 'node:fs';
+import {kernel,build,defaults,migrateParams} from './src/geometry.mjs';
 import {createLogoTextProfile,LOGO_FONT_IDS} from './src/logo-text.mjs';
+
+const migrated=migrateParams({logoEnabled:true,logoText:'   ',logoFont:'missing',logoPosition:140});
+assert.equal(migrated.logoText,defaults.logoText,'empty logo text must fall back predictably');
+assert.equal(migrated.logoFont,defaults.logoFont,'unknown font must migrate safely');
+assert.equal(migrated.logoPosition,100,'perimeter position must be clamped');
+const geometrySource=fs.readFileSync('src/geometry.mjs','utf8'),workerSource=fs.readFileSync('src/worker.mjs','utf8');
+assert(!geometrySource.includes("from './logo-text.mjs'"),'font payload must not leak into shared geometry/UI bundle');
+assert(workerSource.includes("from './logo-text.mjs'")&&workerSource.includes('preparedLogoProfile'),'font vectorization must stay in the worker');
 
 for(const font of LOGO_FONT_IDS){
  const profile=createLogoTextProfile('RV',font,6);
@@ -15,6 +24,8 @@ const run=params=>build(m,loops,params,null,{logoProfile:params.logoEnabled?crea
 const plain=run({...common,logoEnabled:false});
 const bottom=run({...common,logoEnabled:true,logoPosition:0});
 const right=run({...common,logoEnabled:true,logoPosition:25});
+const separatePlain=run({...common,mode:'separate',logoEnabled:false});
+const separateLogo=run({...common,mode:'separate',logoEnabled:true,logoPosition:0});
 
 for(const [name,result] of [['bottom',bottom],['right',right]]){
  const part=result.parts[0];
@@ -29,5 +40,9 @@ assert.ok(right.parts[0].bounds.max[0]>plain.parts[0].bounds.max[0]+1,'25% must 
 assert.ok(Math.abs(bottom.logoPlacement.angle)<5,'bottom logo must auto-align horizontally');
 assert.ok(Math.abs(Math.abs(right.logoPlacement.angle)-90)<5,'side logo must auto-rotate vertically with the border tangent');
 assert.ok(Math.abs(bottom.parts[0].bounds.max[2]-plain.parts[0].bounds.max[2])<1e-6,'logo height must stay below cutting edge');
+assert.equal(separatePlain.parts.length,2);
+assert.equal(separateLogo.parts.length,2);
+assert.ok(Math.abs(separatePlain.parts[1].volume-separateLogo.parts[1].volume)<1e-6,'base logo must never change stamp geometry');
+assert.deepEqual(separatePlain.parts[1].bounds,separateLogo.parts[1].bounds,'stamp bounds must remain independent from base logo');
 
 console.log('PASS 14.28.16: edge logo is parametric, attached, printable and follows border position.');
