@@ -1,0 +1,30 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import {pathToFileURL} from 'node:url';
+import path from 'node:path';
+import {defaults,migrateParams} from './src/geometry.mjs';
+assert.equal(defaults.reliefSeparate,false);
+assert.equal(migrateParams({reliefSeparate:1}).reliefSeparate,true);
+const ui=fs.readFileSync(new URL('./src/ui.mjs',import.meta.url),'utf8');
+assert.match(ui,/Separar relevo da base/);
+const workerPath=path.resolve('app/worker.js');let reply;
+globalThis.self={location:{href:pathToFileURL(workerPath).href},postMessage:m=>reply?.(m)};
+await import(pathToFileURL(workerPath).href+'?qa14282='+Date.now());
+const loops=[[[-.5,-.5],[.5,-.5],[.5,.5],[-.5,.5]],[[-.20,-.30],[-.20,.30],[.20,.30],[.20,-.30]]];
+const base={...defaults,size:40,wall:.8,height:14,rim:4,base:2.5,relief:3,reliefOut:3,reliefIn:3,clearance:.9,detailOffset:0,outlineOffset:0,mode:'stamp',stampBase:2.5,stampInset:0,stampExpansion:0,tolerance:.04,cornerRadius:2};
+let seq=0;const build=params=>new Promise((resolve,reject)=>{reply=m=>m.error?reject(Error(m.error)):resolve(m.result);self.onmessage({data:{id:++seq,loops,params}})});
+const byName=(r,n)=>r.parts.find(p=>p.name===n),near=(a,b,t=.04)=>Math.abs(a-b)<=t;
+const merged=await build({...base,reliefSeparate:false,reliefInverted:false});assert.deepEqual(merged.parts.map(p=>p.name),['Carimbo']);
+const positive=await build({...base,reliefSeparate:true,reliefInverted:false});assert.deepEqual(positive.parts.map(p=>p.name),['Base do carimbo','Relevo']);
+const pb=byName(positive,'Base do carimbo'),pr=byName(positive,'Relevo');
+assert.ok(near(pb.bounds.min[2],0)&&near(pb.bounds.max[2],2.5));assert.ok(near(pr.bounds.min[2],2.5)&&near(pr.bounds.max[2],5.5));
+for(const p of positive.parts){assert.equal(p.stats.open,0);assert.equal(p.stats.nonmanifold,0);}
+assert.ok(near((pb.bounds.min[0]+pb.bounds.max[0])/2,(pr.bounds.min[0]+pr.bounds.max[0])/2,.02));
+assert.ok(near((pb.bounds.min[1]+pb.bounds.max[1])/2,(pr.bounds.min[1]+pr.bounds.max[1])/2,.02));
+const inverted=await build({...base,reliefSeparate:true,reliefInverted:true});assert.deepEqual(inverted.parts.map(p=>p.name),['Base do carimbo','Relevo']);
+const ib=byName(inverted,'Base do carimbo'),ir=byName(inverted,'Relevo');
+assert.ok(near(ib.bounds.min[2],0)&&near(ib.bounds.max[2],2.5));assert.ok(near(ir.bounds.min[2],2.5)&&near(ir.bounds.max[2],5.5));assert.ok(near(ib.volume,pb.volume,.05));
+for(const p of inverted.parts){assert.equal(p.stats.open,0);assert.equal(p.stats.nonmanifold,0);}
+const separate=await build({...base,mode:'separate',reliefSeparate:true,reliefInverted:false});assert.deepEqual(separate.parts.map(p=>p.name),['Cortador','Base do carimbo','Relevo']);
+const integrated=await build({...base,mode:'integrated',base:2.5,height:14,reliefSeparate:true,reliefInverted:false});assert.deepEqual(integrated.parts.map(p=>p.name),['Cortador integrado']);
+console.log('PASS 14.28.2: relevo separado da base, alinhado e exportável');

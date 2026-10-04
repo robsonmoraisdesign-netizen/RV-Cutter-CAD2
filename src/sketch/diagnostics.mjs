@@ -23,6 +23,10 @@ function equations(s){
    const a=entityEndpoint(byId.get(c.a.entity),c.a.point),b=entityEndpoint(byId.get(c.b.entity),c.b.point);v.push(a[0]-b[0],a[1]-b[1]);
   }else if(c.type==='midpoint'){
    const p=entityEndpoint(byId.get(c.point.entity),c.point.point),m=mid(byId.get(c.line));v.push(p[0]-m[0],p[1]-m[1]);
+  }else if(c.type==='coincidentOrigin'){
+   const p=entityEndpoint(byId.get(c.point.entity),c.point.point);v.push(p[0],p[1]);
+  }else if(c.type==='pointOnAxis'){
+   const p=entityEndpoint(byId.get(c.point.entity),c.point.point);v.push(c.axis==='x'?p[1]:p[0]);
   }else if(c.type==='parallel'){const [a,b]=pair(byId,c);v.push(crossNorm(lineVec(a),lineVec(b)));}
   else if(c.type==='perpendicular'){const [a,b]=pair(byId,c);v.push(dotNorm(lineVec(a),lineVec(b)));}
   else if(c.type==='equal'){const [a,b]=pair(byId,c);v.push(a.type==='line'?lineLen(a)-lineLen(b):a.radius-b.radius);}
@@ -47,6 +51,7 @@ function rank(rows){
 function links(c){
  if(c.type==='coincident')return [c.a.entity,c.b.entity];
  if(c.type==='midpoint')return [c.point.entity,c.line];
+ if(c.type==='coincidentOrigin'||c.type==='pointOnAxis')return [c.point.entity];
  if(c.first||c.second)return [c.first,c.second].filter(Boolean);
  return c.entity?[c.entity]:[];
 }

@@ -15,4 +15,19 @@ const coincident=o.sketch.constraints.find(x=>x.type==='coincident'&&x.a.entity=
 assert(coincident,'endpoint snap must become a persistent coincidence constraint');
 assert.deepEqual(coincident.b,{entity:first.id,point:'end'});
 assert.deepEqual(second.start,first.end);
-console.log('Sketch snap inference persists as semantic constraints: PASS');
+assert.equal(c.create('point',[5,6],null,null,{pointRelation:{type:'origin'}}),true);
+const originPoint=o.sketch.entities.at(-1);
+assert.deepEqual(originPoint.position,[0,0]);
+assert(o.sketch.constraints.some(x=>x.type==='coincidentOrigin'&&x.point.entity===originPoint.id));
+
+assert.equal(c.create('point',[12,4],null,null,{pointRelation:{type:'axis',axis:'x'}}),true);
+const onX=o.sketch.entities.at(-1);
+assert.equal(onX.position[1],0);
+assert(o.sketch.constraints.some(x=>x.type==='pointOnAxis'&&x.axis==='x'&&x.point.entity===onX.id));
+
+assert.equal(c.create('point',[7,9],null,null,{pointRelation:{type:'axis',axis:'y'}}),true);
+const onY=o.sketch.entities.at(-1);
+assert.equal(onY.position[0],0);
+assert(o.sketch.constraints.some(x=>x.type==='pointOnAxis'&&x.axis==='y'&&x.point.entity===onY.id));
+
+console.log('Sketch snap inference persists for entities, origin and X/Y axes: PASS');

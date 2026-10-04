@@ -1,8 +1,10 @@
 import {BufferGeometry,Vector3,MathUtils,BufferAttribute,DataTexture,RedFormat,NearestFilter,LinearFilter,Color,MeshBasicMaterial,MeshToonMaterial,MeshStandardMaterial,ShaderMaterial,BackSide} from "three";
+import {CAD_DISPLAY} from './cad-display.mjs';
 
   var defaultHatchProfiles={
    cutterBase:{enabled:false,type:'parallel',mode:'overlay',rotation:28,color:'#65584d',thickness:.12,scale:4.8,intensity:.42},
    blade:{enabled:false,type:'parallel',mode:'overlay',rotation:-28,color:'#65584d',thickness:.11,scale:4.0,intensity:.38},
+   reinforcement:{enabled:false,type:'parallel',mode:'overlay',rotation:18,color:'#65584d',thickness:.11,scale:4.2,intensity:.38},
    stampBase:{enabled:false,type:'cross',mode:'overlay',rotation:42,color:'#65584d',thickness:.10,scale:5.2,intensity:.38},
    relief:{enabled:false,type:'double45',mode:'overlay',rotation:18,color:'#65584d',thickness:.09,scale:3.6,intensity:.34},
    shadow:{enabled:false,type:'cross',mode:'replace',rotation:45,color:'#4d443e',thickness:.10,scale:4.4,intensity:.44}
@@ -10,7 +12,7 @@ import {BufferGeometry,Vector3,MathUtils,BufferAttribute,DataTexture,RedFormat,N
 
   var presentationDefaults={
    style:'illustrated',shadeSoftness:.65,background:'#a9eaf8',modelColor:'#ffba24',componentColors:true,
-   colors:{cutterBase:'#e18e25',blade:'#ffbf28',stampBase:'#38bfb8',relief:'#f07891'},
+   colors:{cutterBase:'#e18e25',blade:'#ffbf28',reinforcement:'#a75cff',stampBase:'#38bfb8',relief:'#f07891'},
    lightAzimuth:-40,lightElevation:55,lightIntensity:2.4,ambient:.8,
    shadows:true,groundDistance:4,projectedShadows:true,modelShadows:true,modelShadowMode:'soft',
    aoIntensity:.32,aoRadius:1.4,shadowOpacity:.3,shadowSoftness:3,
@@ -32,13 +34,27 @@ import {BufferGeometry,Vector3,MathUtils,BufferAttribute,DataTexture,RedFormat,N
    return out;
   }
 
-  // Corner-angle weighting is invariant to long/short triangulation diagonals.
-  // Separate planar caps, vertical walls and bevel surfaces at physical creases.
-  function weightedNormals(g,params={}){
+  // CAD display normals: weld coincident tessellation vertices for shading,
+  // but keep real cap/wall/bevel creases split. The manufacturing mesh is untouched.
+  function weightedNormals(g,params={},role=null){
    const a=g.attributes.position.array,idx=g.index?.array||Uint32Array.from({length:a.length/3},(_,i)=>i),positions=[],normals=[],faces=[],groups=new Map();
-   const shoulder=params.height-params.chamferHeight;
-   for(let i=0;i<idx.length;i+=3){const ids=[idx[i],idx[i+1],idx[i+2]],p=ids.map(j=>[a[j*3],a[j*3+1],a[j*3+2]]),u=p[1].map((v,k)=>v-p[0][k]),v=p[2].map((v,k)=>v-p[0][k]);let n=[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]],len=Math.hypot(...n);if(len<1e-15)continue;n=n.map(x=>x/len);const zs=p.map(x=>x[2]),region=Math.abs(n[2])>.9999?'cap:'+Math.round(zs[0]*1e4):params.chamfer&&Math.min(...zs)>=shoulder-1e-4&&Math.max(...zs)>shoulder+1e-4&&n[2]>.001?'bevel':'wall';
-    for(let j=0;j<3;j++){const key=region+':'+ids[j];let list=groups.get(key);if(!list){list=[];groups.set(key,list);}let group=list.find(x=>x.n[0]*n[0]+x.n[1]*n[1]+x.n[2]*n[2]>.20);if(!group){group={n,id:positions.length/3};list.push(group);positions.push(...p[j]);normals.push(0,0,0);}const u=p[(j+1)%3].map((v,k)=>v-p[j][k]),v=p[(j+2)%3].map((v,k)=>v-p[j][k]),angle=Math.acos(Math.max(-1,Math.min(1,(u[0]*v[0]+u[1]*v[1]+u[2]*v[2])/(Math.hypot(...u)*Math.hypot(...v)||1))));for(let k=0;k<3;k++)normals[group.id*3+k]+=n[k]*angle;faces.push(group.id);}
+   const shoulder=(params.height??0)-(params.chamferHeight??0),creaseCos=Math.cos(MathUtils.degToRad(CAD_DISPLAY.smoothAngle));
+   const weldScale=1e5;
+   for(let i=0;i<idx.length;i+=3){
+    const ids=[idx[i],idx[i+1],idx[i+2]],p=ids.map(j=>[a[j*3],a[j*3+1],a[j*3+2]]),u=p[1].map((v,k)=>v-p[0][k]),v=p[2].map((q,k)=>q-p[0][k]);
+    let n=[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]],len=Math.hypot(...n);if(len<1e-15)continue;n=n.map(x=>x/len);
+    const zs=p.map(x=>x[2]),minZ=Math.min(...zs),maxZ=Math.max(...zs),cap=Math.abs(n[2])>.9999;
+    const bevel=role==='blade'&&params.chamfer&&minZ>=shoulder-1e-4&&maxZ>shoulder+1e-4&&!cap;
+    const region=cap?'cap:'+Math.round(zs[0]*1e4):bevel?'bevel':'wall';
+    for(let j=0;j<3;j++){
+     const welded=p[j].map(x=>Math.round(x*weldScale)).join(','),key=region+':'+welded;
+     let list=groups.get(key);if(!list){list=[];groups.set(key,list);}
+     let group=list.find(x=>x.n[0]*n[0]+x.n[1]*n[1]+x.n[2]*n[2]>=creaseCos);
+     if(!group){group={n:[...n],id:positions.length/3};list.push(group);positions.push(...p[j]);normals.push(0,0,0);}
+     const uu=p[(j+1)%3].map((q,k)=>q-p[j][k]),vv=p[(j+2)%3].map((q,k)=>q-p[j][k]),angle=Math.acos(Math.max(-1,Math.min(1,(uu[0]*vv[0]+uu[1]*vv[1]+uu[2]*vv[2])/(Math.hypot(...uu)*Math.hypot(...vv)||1))));
+     for(let k=0;k<3;k++)normals[group.id*3+k]+=n[k]*angle;
+     faces.push(group.id);
+    }
    }
    for(let i=0;i<normals.length;i+=3){const len=Math.hypot(normals[i],normals[i+1],normals[i+2])||1;for(let k=0;k<3;k++)normals[i+k]/=len;}
    const out=new BufferGeometry();out.setAttribute('position',new BufferAttribute(new Float32Array(positions),3));out.setAttribute('normal',new BufferAttribute(new Float32Array(normals),3));out.setIndex(faces);return out;

@@ -1,7 +1,7 @@
 import {validateSketch} from './sketch/model.mjs';
 import Module from 'manifold-3d';
 export async function kernel(options={}){const m=await Module(options);m.setup();return m;}
-export const defaults={size:75,wall:0.8,height:12.5,rim:4,base:2.5,relief:4.5,reliefInverted:false,reliefOut:4.5,reliefIn:1,clearance:0.9,detailOffset:0,outlineOffset:0,mode:'integrated',mirror:false,threshold:160,tolerance:0.04,stampBase:2.5,stampInset:0,stampExpansion:0,removeOutline:false,outlineBand:0.8,chamfer:false,tip:0.4,chamferHeight:2,wallEdits:[],cornerRadius:2};
+export const defaults={size:75,wall:0.8,height:12.5,rim:4,base:2.5,relief:4.5,reliefInverted:false,reliefSeparate:false,reliefOut:4.5,reliefIn:1,clearance:0.9,detailOffset:0,outlineOffset:0,mode:'integrated',mirror:true,threshold:160,tolerance:0.04,stampBase:2.5,stampInset:0,stampExpansion:0,removeOutline:false,outlineBand:0.8,chamfer:false,tip:0.4,chamferHeight:2,bladeReinforcement:false,reinforcementHeight:2,reinforcementWidth:1.5,wallEdits:[],cornerRadius:2};
 export function area(p){return p.reduce((a,v,i)=>{const q=p[(i+1)%p.length];return a+v[0]*q[1]-q[0]*v[1]},0)/2;}
 export function simplify(p,eps){if(p.length<5)return p;const seg=(p,a,b)=>{let dx=b[0]-a[0],dy=b[1]-a[1],t=Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/(dx*dx+dy*dy||1)));return Math.hypot(p[0]-a[0]-t*dx,p[1]-a[1]-t*dy)};const rdp=a=>{let d=0,k=0;for(let i=1;i<a.length-1;i++){let v=seg(a[i],a[0],a.at(-1));if(v>d){d=v;k=i}}return d>eps?[...rdp(a.slice(0,k+1)).slice(0,-1),...rdp(a.slice(k))]:[a[0],a.at(-1)];};let k=1,d=0;for(let i=1;i<p.length;i++){const v=Math.hypot(p[i][0]-p[0][0],p[i][1]-p[0][1]);if(v>d){d=v;k=i}}return [...rdp(p.slice(0,k+1)).slice(0,-1),...rdp([...p.slice(k),p[0]]).slice(0,-1)];}
 export function normalize(loops){const all=loops.flat();if(!all.length)throw Error('Nenhum contorno fechado encontrado.');let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;for(const [x,y]of all){minX=Math.min(x,minX);maxX=Math.max(x,maxX);minY=Math.min(y,minY);maxY=Math.max(y,maxY)}const scale=Math.max(maxX-minX,maxY-minY);if(!(scale>0))throw Error('Arte sem dimensão.');return loops.map(p=>p.map(([x,y])=>[(x-(minX+maxX)/2)/scale,(y-(minY+maxY)/2)/scale]));}
@@ -38,6 +38,15 @@ function bandTriangles(m,polys){
  if(!changed)break;
  }return tri;
 }
+function densifyLoop(poly,maxLength=.6){
+ const out=[];
+ for(let i=0;i<poly.length;i++){
+  const a=poly[i],b=poly[(i+1)%poly.length],length=Math.hypot(b[0]-a[0],b[1]-a[1]);
+  const steps=Math.max(1,Math.ceil(length/maxLength));
+  for(let j=0;j<steps;j++){const t=j/steps;out.push([a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t]);}
+ }
+ return out;
+}
 export function loft(m,lower,upper,z0,z1,floor=z0-1,intermediate=[]){
  const ccw=p=>area(p)>0?p.map(v=>v.slice()):p.slice().reverse().map(v=>v.slice());
  const profiles=[{poly:lower,z:floor},{poly:lower,z:z0},...intermediate,{poly:upper,z:z1}].map(r=>({...r,poly:ccw(r.poly)}));
@@ -55,78 +64,145 @@ export function loft(m,lower,upper,z0,z1,floor=z0-1,intermediate=[]){
  return new m.Manifold(new m.Mesh({numProp:3,vertProperties:new Float32Array(verts),triVerts:new Uint32Array(faces)}));
 }
 export function migrateParams(params={}){const p={...defaults,...params,stampBase:params.stampBase??params.base??defaults.stampBase};
+ p.reliefSeparate=!!p.reliefSeparate;
  if(!Number.isFinite(p.reliefOut))p.reliefOut=p.reliefInverted?defaults.relief:p.relief;
  if(!Number.isFinite(p.reliefIn))p.reliefIn=p.reliefInverted?p.relief:Math.min(1,Math.max(.1,(p.mode==='integrated'?p.base:p.stampBase)*.4));
  return p;}
-export function build(m,loops,params,ctx=null){const started=performance.now(),p=migrateParams(params),keep=[];const hold=x=>(keep.push(x),x);const C=m.CrossSection,M=m.Manifold;
- const finite=['size','wall','height','rim','base','stampBase','stampInset','stampExpansion','outlineBand','tip','chamferHeight','clearance','detailOffset','outlineOffset','tolerance','cornerRadius','relief'];
+export function build(m,loops,params,ctx=null,options={}){const started=performance.now(),p=migrateParams(params),keep=[];const hold=x=>(keep.push(x),x);const C=m.CrossSection,M=m.Manifold;
+ const finite=['size','wall','height','rim','base','stampBase','stampInset','stampExpansion','outlineBand','tip','chamferHeight','reinforcementHeight','reinforcementWidth','clearance','detailOffset','outlineOffset','tolerance','cornerRadius','relief'];
  for(const k of finite)if(!Number.isFinite(p[k]))throw Error(`Valor inválido em ${k}: informe um número finito.`);
- const positive=[['size',.1],['wall',.01],['height',.05],['base',.01],['stampBase',.01],['outlineBand',.001],['tip',.001],['chamferHeight',.001],['tolerance',.0001],['relief',.001]];
+ const positive=[['size',.1],['wall',.01],['height',.05],['base',.01],['stampBase',.01],['outlineBand',.001],['tip',.001],['chamferHeight',.001],['reinforcementHeight',.001],['reinforcementWidth',.001],['tolerance',.0001],['relief',.001]];
  for(const [k,lo]of positive)if(p[k]<lo)throw Error(`Valor inválido em ${k}: use um valor maior ou igual a ${lo}.`);
  if(p.rim<0||p.cornerRadius<0||p.clearance<0)throw Error('Base de apoio, proteção de cantos e folga não podem ser negativas.');
  const reliefBase=p.mode==='integrated'?p.base:p.stampBase;
- if(p.base>=p.height)throw Error('A base do cortador deve ser menor que a altura total.');
+ if(p.mode!=='stamp'&&p.base>=p.height)throw Error('A base do cortador deve ser menor que a altura total.');
  if(p.mode==='integrated'&&p.base+p.relief>=p.height)throw Error('Base + relevo precisam ficar abaixo da borda de corte.');
  if(p.chamfer&&p.mode!=='stamp'&&(p.tip>p.wall||p.chamferHeight>p.height-p.base))throw Error('O chanfro deve caber acima da base; a ponta não pode superar a espessura da lâmina.');
+ if(p.bladeReinforcement&&p.mode!=='stamp'){
+  const availableWidth=Math.max(0,Math.max(p.rim,p.wall)-p.wall);
+  if(p.reinforcementWidth>availableWidth+1e-6)throw Error('A largura do reforço deve caber dentro da base de apoio. Aumente a base de apoio ou reduza a largura do reforço.');
+  const availableHeight=p.height-p.base-(p.chamfer?p.chamferHeight:0);
+  if(p.reinforcementHeight>availableHeight+1e-6)throw Error('A altura do reforço deve terminar antes do chanfro da ponta.');
+ }
  if(!['integrated','separate','cutter','stamp'].includes(p.mode))throw Error('Modo de peça inválido.');
  try{
  const memo=(node,fn)=>ctx?ctx.memo(node,fn):fn();
- const cachedCutter=p.mode==='separate'||p.mode==='cutter'?ctx?.get('cutter'):null,cachedStamp=p.mode==='separate'||p.mode==='stamp'?ctx?.get('stamp'):null;
+ const cachedCutter=p.mode==='separate'||p.mode==='cutter'?ctx?.get('cutter'):null,cachedStamp=(p.mode==='separate'||p.mode==='stamp')&&!p.reliefSeparate?ctx?.get('stamp'):null;
  const src=memo('source',()=>loops.map(l=>simplify(l,p.tolerance/p.size).map(([x,y])=>[x*p.size*(p.mirror?-1:1),y*p.size])).sort((a,b)=>Math.abs(area(b))-Math.abs(area(a))));
+ const sourcePoints=src.reduce((n,loop)=>n+loop.length,0),requestedProfile=options.buildProfile||'normal',automaticSafe=requestedProfile==='normal'&&(sourcePoints>1400||src.length>48),buildProfile=requestedProfile==='recovery'?'recovery':requestedProfile==='safe'||automaticSafe?'safe':'normal';
+ const roundSegments=buildProfile==='recovery'?64:buildProfile==='safe'?112:256,detailSegments=buildProfile==='recovery'?48:buildProfile==='safe'?80:128,maxChamferProfiles=buildProfile==='recovery'?12:buildProfile==='safe'?24:64;
  const silhouette=section=>{const polys=section.toPolygons().sort((a,b)=>Math.abs(area(b))-Math.abs(area(a)));if(!polys.length)throw Error('O recuo eliminou o contorno. Reduza o valor.');return hold(new C([polys[0]],'EvenOdd'));};
  const linkedCutterExpansion=p.mode==='separate'?p.stampExpansion:0;
- let original=hold(new C([src[0]],'EvenOdd')),outer=hold(new C(memo('outer',()=>silhouette(hold(hold(original.offset(p.outlineOffset+linkedCutterExpansion,'Round',2,256)).simplify(.002))).toPolygons()),'EvenOdd'));
- let bladeSolid,rimOuter,inner,cutter,relief,stamp,bladeProfile=[],reliefOutline=[];
+ let original=hold(new C([src[0]],'EvenOdd')),outer=hold(new C(memo('outer',()=>silhouette(hold(hold(original.offset(p.outlineOffset+linkedCutterExpansion,'Round',2,roundSegments)).simplify(.002))).toPolygons()),'EvenOdd'));
+ let bladeSolid,rimOuter,inner,cutter,relief,stamp,stampBaseSolid,reliefPart,bladeProfile=[],reliefOutline=[],reinforcementRootOutline=[],reinforcementTransitionOutline=[];
  if(p.mode!=='stamp'&&!cachedCutter){
   const innerPolys=memo('inner',()=>{
-  inner=silhouette(hold(outer.offset(p.clearance,'Round',2,256)));
+  inner=silhouette(hold(outer.offset(p.clearance,'Round',2,roundSegments)));
   if(p.cornerRadius>0){
    const radius=p.cornerRadius+p.wall;
-   const rounded=hold(hold(inner.offset(radius,'Round',2,256)).offset(-radius,'Round',2,256));
+   const rounded=hold(hold(inner.offset(radius,'Round',2,roundSegments)).offset(-radius,'Round',2,roundSegments));
    inner=silhouette(hold(C.union([inner,rounded])));
   }
   return inner.toPolygons();});inner=hold(new C(innerPolys,'EvenOdd'));
   if(!Array.isArray(p.wallEdits)||p.wallEdits.length>100)throw Error('Excesso de ajustes locais na lâmina.');
-  const makeBladeOuter=(fraction=1)=>{
-   const width=p.chamfer?p.tip+(p.wall-p.tip)*fraction:p.wall;
-   let section=silhouette(hold(inner.offset(width,'Round',2,256)));
+  const makeBladeSection=(width,editScale=1)=>{
+   let section=silhouette(hold(inner.offset(width,'Round',2,roundSegments)));
    for(const edit of p.wallEdits){
     if(!Number.isFinite(edit.delta)||Math.abs(edit.delta)>2||!Array.isArray(edit.region)||edit.region.length!==4||!edit.region.flat().every(Number.isFinite))throw Error('Ajuste local inválido.');
     const mask=hold(new C([edit.region.map(([x,y])=>[x*p.size*(p.mirror?-1:1),y*p.size])],'EvenOdd'));
-    const modified=hold(section.offset(edit.delta*fraction,'Round',2,256));
+    const modified=hold(section.offset(edit.delta*editScale,'Round',2,roundSegments));
     section=silhouette(hold(C.union([hold(section.subtract(mask)),hold(modified.intersect(mask))])));
    }
    if(p.wallEdits.length){
-    const low=p.chamfer?p.tip+(Math.max(.3,p.tip+.02)-p.tip)*fraction:.3,high=p.chamfer?p.tip+(5-p.tip)*fraction:5;
-    section=silhouette(hold(hold(C.union([section,hold(inner.offset(low,'Round',2,256))])).intersect(hold(inner.offset(high,'Round',2,256)))));
+    const low=Math.max(.3,Math.min(width,Math.max(.3,p.tip+.02)));
+    const high=Math.max(5,p.wall+p.reinforcementWidth+2);
+    section=silhouette(hold(hold(C.union([section,hold(inner.offset(low,'Round',2,roundSegments))])).intersect(hold(inner.offset(high,'Round',2,roundSegments)))));
    }
    return section;
   };
-  const profiles=memo('blade',()=>{const bladeOuter=makeBladeOuter(),tipOuter=silhouette(hold(inner.offset(p.tip,'Round',2,256))),rings=[];
-   if(p.chamfer&&(p.tip<p.wall-1e-6||p.wallEdits.length)){const count=Math.max(2,Math.min(160,Math.ceil((p.wall-p.tip+p.wallEdits.reduce((s,e)=>s+Math.abs(e.delta),0))/.025)));let previous=bladeOuter;
+  const makeBladeOuter=(fraction=1)=>{
+   const width=p.chamfer?p.tip+(p.wall-p.tip)*fraction:p.wall;
+   return makeBladeSection(width,fraction);
+  };
+  const makeReinforcementOuter=(fraction=1)=>makeBladeSection(p.wall+p.reinforcementWidth*fraction,1);
+  const profiles=memo('blade',()=>{const bladeOuter=makeBladeOuter(),tipOuter=silhouette(hold(inner.offset(p.tip,'Round',2,roundSegments))),rings=[];
+   if(p.chamfer&&(p.tip<p.wall-1e-6||p.wallEdits.length)){const count=Math.max(2,Math.min(maxChamferProfiles,Math.ceil((p.wall-p.tip+p.wallEdits.reduce((s,e)=>s+Math.abs(e.delta),0))/.025)));let previous=bladeOuter;
    for(let i=1;i<count;i++){let section=makeBladeOuter(1-i/count);if(p.wallEdits.length)section=silhouette(hold(C.union([hold(section.intersect(previous)),tipOuter])));rings.push({poly:section.toPolygons()[0],fraction:i/count});previous=section;}}
    return {outer:bladeOuter.toPolygons(),tip:tipOuter.toPolygons(),rings};});
   const bladeOuter=hold(new C(profiles.outer,'EvenOdd'));
-  rimOuter=hold(new C(memo('rim',()=>silhouette(hold(C.union([hold(inner.offset(Math.max(p.rim,p.wall),'Round',2,256)),bladeOuter]))).toPolygons()),'EvenOdd'));
+  rimOuter=hold(new C(memo('rim',()=>silhouette(hold(C.union([hold(inner.offset(Math.max(p.rim,p.wall),'Round',2,roundSegments)),bladeOuter]))).toPolygons()),'EvenOdd'));
   bladeProfile=hold(bladeOuter.subtract(inner)).toPolygons();
+  if(p.bladeReinforcement){reinforcementRootOutline=makeReinforcementOuter(1).toPolygons()[0]||[];reinforcementTransitionOutline=bladeOuter.toPolygons()[0]||[];}
   const savedBlade=ctx?.getSolid?.('bladeSolid');if(savedBlade){bladeSolid=hold(savedBlade.translate([0,0,0]));}else{
-  if(p.chamfer&&(p.tip<p.wall-1e-6||p.wallEdits.length)){
+  if(p.bladeReinforcement){
+   // Reforço segue o mesmo princípio do chanfro:
+   // perfis derivados diretamente do mesmo contorno interno e unidos pelo
+   // mesmo loft/bandTriangles já usado na ponta da lâmina.
+   const reinforcementOuter=makeReinforcementOuter(1);
+   reinforcementRootOutline=reinforcementOuter.toPolygons()[0]||[];
+   reinforcementTransitionOutline=bladeOuter.toPolygons()[0]||[];
+   const rootZ=p.base,reinforcementEnd=p.base+p.reinforcementHeight;
+   const intermediate=[];
+   const reinforcementSegment=Math.max(.25,Math.min(.7,p.size/180));
+   const dense=poly=>densifyLoop(poly,reinforcementSegment);
+   const count=Math.max(2,Math.min(maxChamferProfiles,Math.ceil(p.reinforcementWidth/.025)));
+   let previous=reinforcementOuter;
+   for(let i=1;i<count;i++){
+    const fraction=i/count;
+    let section=makeReinforcementOuter(1-fraction);
+    // Mesma proteção de monotonicidade usada no chanfro quando há edições locais.
+    if(p.wallEdits.length)section=silhouette(hold(section.intersect(previous)));
+    intermediate.push({poly:dense(section.toPolygons()[0]),z:rootZ+p.reinforcementHeight*fraction});
+    previous=section;
+   }
+   intermediate.push({poly:dense(bladeOuter.toPolygons()[0]),z:reinforcementEnd});
+
+   if(p.chamfer&&(p.tip<p.wall-1e-6||p.wallEdits.length)){
+    const zBody=p.height-p.chamferHeight,tipOuter=hold(new C(profiles.tip,'EvenOdd'));
+    if(reinforcementEnd<zBody-1e-6)intermediate.push({poly:dense(bladeOuter.toPolygons()[0]),z:zBody});
+    for(const r of profiles.rings)intermediate.push({poly:dense(r.poly),z:zBody+p.chamferHeight*r.fraction});
+    const continuousBlade=hold(loft(
+      m,
+      dense(reinforcementOuter.toPolygons()[0]),
+      dense(tipOuter.toPolygons()[0]),
+      rootZ,
+      p.height,
+      Math.max(0,rootZ-.02),
+      intermediate
+    ));
+    if(continuousBlade.status()!=='NoError')throw Error('Não foi possível fechar a lâmina com reforço. Reduza a altura ou a largura do reforço.');
+    bladeSolid=hold(continuousBlade.subtract(hold(inner.extrude(p.height+1))));
+   }else{
+    const continuousBlade=hold(loft(
+      m,
+      dense(reinforcementOuter.toPolygons()[0]),
+      dense(bladeOuter.toPolygons()[0]),
+      rootZ,
+      p.height,
+      Math.max(0,rootZ-.02),
+      intermediate
+    ));
+    if(continuousBlade.status()!=='NoError')throw Error('Não foi possível fechar a lâmina com reforço. Reduza a altura ou a largura do reforço.');
+    bladeSolid=hold(continuousBlade.subtract(hold(inner.extrude(p.height+1))));
+   }
+  }else if(p.chamfer&&(p.tip<p.wall-1e-6||p.wallEdits.length)){
    const zBody=p.height-p.chamferHeight,tipOuter=hold(new C(profiles.tip,'EvenOdd')),rings=profiles.rings.map(r=>({poly:r.poly,z:zBody+p.chamferHeight*r.fraction}));
-   const taper=hold(loft(m,bladeOuter.toPolygons()[0],tipOuter.toPolygons()[0],zBody,p.height,p.base-.02,rings));
+   const taper=hold(loft(m,bladeOuter.toPolygons()[0],tipOuter.toPolygons()[0],zBody,p.height,Math.max(0,p.base-.02),rings));
    if(taper.status()!=='NoError')throw Error('Não foi possível fechar o chanfro. Reduza sua altura ou revise o contorno.');
    bladeSolid=hold(taper.subtract(hold(inner.extrude(p.height+1))));
-  }else bladeSolid=hold(hold(hold(bladeOuter.subtract(inner)).extrude(p.height-p.base+.02)).translate([0,0,p.base-.02]));
+  }else bladeSolid=hold(hold(hold(bladeOuter.subtract(inner)).extrude(p.height-p.base+Math.min(.02,p.base))).translate([0,0,Math.max(0,p.base-.02)]));
   ctx?.setSolid?.('bladeSolid',bladeSolid.translate([0,0,0]));}
   if(p.mode!=='integrated')cutter=hold(M.union([bladeSolid,hold(hold(rimOuter.subtract(inner)).extrude(p.base))]));
  }
  if(p.mode!=='cutter'&&!cachedStamp){
-  const artPolys=memo('art',()=>{let ink=hold(new C(src,'EvenOdd'));if(p.detailOffset)ink=hold(ink.offset(p.detailOffset,'Round',2,128));
-  if(p.removeOutline)ink=hold(ink.intersect(hold(original.offset(-p.outlineBand,'Round',2,256))));
-  const footprint=p.mode==='integrated'?outer:silhouette(hold(original.offset(-p.stampInset,'Round',2,256)));
+  const artPolys=memo('art',()=>{let ink=hold(new C(src,'EvenOdd'));if(p.detailOffset)ink=hold(ink.offset(p.detailOffset,'Round',2,detailSegments));
+  if(p.removeOutline)ink=hold(ink.intersect(hold(original.offset(-p.outlineBand,'Round',2,roundSegments))));
+  const footprint=p.mode==='integrated'?outer:silhouette(hold(original.offset(-p.stampInset,'Round',2,roundSegments)));
   const art=hold(ink.intersect(footprint));if(art.isEmpty())throw Error('Nenhum detalhe restou no carimbo. Reduza a remoção de borda ou o recuo.');return art.toPolygons();});
   reliefOutline=artPolys;
   const art=hold(new C(artPolys,'EvenOdd')),zBase=p.mode==='integrated'?p.base:p.stampBase;
-  const baseFootprint=hold(new C(memo('footprint',()=>{const footprint=p.mode==='integrated'?outer:silhouette(hold(original.offset(-p.stampInset,'Round',2,256)));return (p.mode!=='integrated'&&p.stampExpansion>0?silhouette(hold(original.offset(p.stampExpansion-p.stampInset,'Round',2,256))):footprint).toPolygons();}),'EvenOdd'));
+  const baseFootprint=hold(new C(memo('footprint',()=>{const footprint=p.mode==='integrated'?outer:silhouette(hold(original.offset(-p.stampInset,'Round',2,roundSegments)));return (p.mode!=='integrated'&&p.stampExpansion>0?silhouette(hold(original.offset(p.stampExpansion-p.stampInset,'Round',2,roundSegments))):footprint).toPolygons();}),'EvenOdd'));
+  if(p.mode!=='integrated')stampBaseSolid=hold(baseFootprint.extrude(p.stampBase));
   if(p.reliefInverted){
    // Relevo invertido não cava a base estrutural. A profundidade define uma camada
    // paramétrica acima da base; o desenho é subtraído apenas dessa camada.
@@ -136,16 +212,27 @@ export function build(m,loops,params,ctx=null){const started=performance.now(),p
    const face=hold(hold(faceFootprint.extrude(p.relief+.02)).translate([0,0,zBase-.02]));
    relief=hold(hold(art.extrude(p.relief+.02)).translate([0,0,zBase]));
    const engravedFace=hold(face.subtract(relief));
-   if(p.mode!=='integrated')stamp=hold(M.union([hold(baseFootprint.extrude(p.stampBase)),engravedFace]));
-   else stamp=engravedFace;
+   if(p.mode!=='integrated'){
+    stamp=hold(M.union([stampBaseSolid,engravedFace]));
+    if(p.reliefSeparate){
+     const exactFace=hold(hold(baseFootprint.extrude(p.relief)).translate([0,0,zBase]));
+     const engravingTool=hold(hold(art.extrude(p.relief+.02)).translate([0,0,zBase-.01]));
+     reliefPart=hold(exactFace.subtract(engravingTool));
+    }
+   }else stamp=engravedFace;
   }else{
-   relief=hold(hold(art.extrude(p.relief+.02)).translate([0,0,zBase-.02]));
-   if(p.mode!=='integrated')stamp=hold(M.union([hold(baseFootprint.extrude(p.stampBase)),relief]));
+   relief=hold(hold(art.extrude(p.relief+Math.min(.02,zBase))).translate([0,0,Math.max(0,zBase-.02)]));
+   if(p.mode!=='integrated'){
+    stamp=hold(M.union([stampBaseSolid,relief]));
+    if(p.reliefSeparate)reliefPart=hold(hold(art.extrude(p.relief)).translate([0,0,zBase]));
+   }
   }
  }
  let parts=[];if(p.mode==='integrated'){const baseSolid=hold(rimOuter.extrude(p.base)),stampSurface=p.reliefInverted?hold(M.union([baseSolid,stamp])):hold(M.union([baseSolid,relief]));parts=[{name:'Cortador integrado',solid:hold(M.union([bladeSolid,stampSurface]))}];}
- else if(p.mode==='separate')parts=[{name:'Cortador',solid:cutter},{name:'Carimbo',solid:stamp}];else parts=[p.mode==='cutter'?{name:'Cortador',solid:cutter}:{name:'Carimbo',solid:stamp}];
- const result={parts:parts.map(({name,solid})=>{if(name==='Cortador'&&cachedCutter)return cachedCutter.part;if(name==='Carimbo'&&cachedStamp)return cachedStamp.part;solid=hold(solid.setTolerance(.001));if(solid.status()!=='NoError'||solid.isEmpty())throw Error(`${name}: falha na construção do sólido (${solid.status()}).`);const mesh=cleanExportMesh(solid.getMesh()),stats=checkMesh(mesh);if(stats.open||stats.nonmanifold||!stats.finite)throw Error(`${name}: malha inválida (${JSON.stringify(stats)}), exportação bloqueada.`);const components=solid.decompose();const bodies=components.length;components.forEach(s=>s.delete());return {name,positions:Float32Array.from(mesh.vertProperties),indices:Uint32Array.from(mesh.triVerts),stride:mesh.numProp,volume:solid.volume(),bounds:solid.boundingBox(),stats,bodies};}),outline:outer.toPolygons(),reliefOutline,cuttingOutline:cachedCutter?.cuttingOutline||inner?.toPolygons()||[],bladeProfile:cachedCutter?.bladeProfile||bladeProfile,params:p};for(const part of result.parts){if(part.name==='Cortador'&&!cachedCutter)ctx?.set('cutter',{part,cuttingOutline:result.cuttingOutline,bladeProfile:result.bladeProfile});if(part.name==='Carimbo'&&!cachedStamp)ctx?.set('stamp',{part});}result.elapsed=performance.now()-started;return result;
+ else if(p.mode==='separate')parts=p.reliefSeparate?[{name:'Cortador',solid:cutter},{name:'Base do carimbo',solid:stampBaseSolid},{name:'Relevo',solid:reliefPart}]:[{name:'Cortador',solid:cutter},{name:'Carimbo',solid:stamp}];
+ else if(p.mode==='stamp')parts=p.reliefSeparate?[{name:'Base do carimbo',solid:stampBaseSolid},{name:'Relevo',solid:reliefPart}]:[{name:'Carimbo',solid:stamp}];
+ else parts=[{name:'Cortador',solid:cutter}];
+ const result={parts:parts.map(({name,solid})=>{if(name==='Cortador'&&cachedCutter)return cachedCutter.part;if(name==='Carimbo'&&cachedStamp)return cachedStamp.part;solid=hold(solid.setTolerance(.001));if(solid.status()!=='NoError'||solid.isEmpty())throw Error(`${name}: falha na construção do sólido (${solid.status()}).`);const mesh=cleanExportMesh(solid.getMesh()),stats=checkMesh(mesh);if(stats.open||stats.nonmanifold||!stats.finite)throw Error(`${name}: malha inválida (${JSON.stringify(stats)}), exportação bloqueada.`);const components=solid.decompose();const bodies=components.length;components.forEach(s=>s.delete());return {name,positions:Float32Array.from(mesh.vertProperties),indices:Uint32Array.from(mesh.triVerts),stride:mesh.numProp,volume:solid.volume(),bounds:solid.boundingBox(),stats,bodies};}),outline:outer.toPolygons(),reliefOutline:cachedStamp?.reliefOutline||reliefOutline,cuttingOutline:cachedCutter?.cuttingOutline||inner?.toPolygons()||[],bladeProfile:cachedCutter?.bladeProfile||bladeProfile,reinforcementRootOutline:cachedCutter?.reinforcementRootOutline||reinforcementRootOutline,reinforcementTransitionOutline:cachedCutter?.reinforcementTransitionOutline||reinforcementTransitionOutline,params:p,buildProfile,sourcePoints};for(const part of result.parts){if(part.name==='Cortador'&&!cachedCutter)ctx?.set('cutter',{part,cuttingOutline:result.cuttingOutline,bladeProfile:result.bladeProfile,reinforcementRootOutline:result.reinforcementRootOutline,reinforcementTransitionOutline:result.reinforcementTransitionOutline});if(part.name==='Carimbo'&&!cachedStamp)ctx?.set('stamp',{part,reliefOutline:result.reliefOutline});}result.elapsed=performance.now()-started;return result;
  }finally{keep.reverse().forEach(o=>o.delete());}}
 
 // Boolean editing preserves filled-region topology. Brush paths are widened to real areas.

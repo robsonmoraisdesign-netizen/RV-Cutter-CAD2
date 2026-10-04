@@ -1,8 +1,9 @@
 import {createSketchController} from './sketch/controller.mjs';
 import {simplify} from './geometry.mjs';
+import {themeColor} from './theme-controller.mjs';
 
 export function createEditor(svg,api){
- let view=[-.65,-.65,1.3,1.3],tool='select',selected=-1,node=-1,region=null,drag=null,hoveredEntity=null,inference=null,bezierClicks=[],bezierHover=null;
+ let view=[-.65,-.65,1.3,1.3],tool='select',selected=-1,node=-1,region=null,drag=null,hoveredEntity=null,hoveredLoop=null,inference=null,bezierClicks=[],bezierHover=null;
  const NS='http://www.w3.org/2000/svg';
  const el=(tag,attrs)=>{const o=document.createElementNS(NS,tag);Object.entries(attrs).forEach(([k,v])=>v!==undefined&&v!==null&&o.setAttribute(k,v));return o;};
  const sketch=createSketchController(api);let arcClicks=[];
@@ -14,8 +15,8 @@ export function createEditor(svg,api){
  const bezierPoint=(points,t)=>{let work=points.map(p=>[...p]);for(let level=work.length-1;level>0;level--)for(let i=0;i<level;i++)work[i]=[work[i][0]*(1-t)+work[i+1][0]*t,work[i][1]*(1-t)+work[i+1][1]*t];return work[0];};
  const entityMid=e=>e.type==='point'?[...e.position]:e.type==='line'?[(e.start[0]+e.end[0])/2,(e.start[1]+e.end[1])/2]:e.type==='bezier'?bezierPoint(e.points,.5):[...e.center];
  const entityName=e=>({point:'Ponto',line:'Linha',circle:'Círculo',arc:'Arco',bezier:'Bézier'}[e?.type]||'Entidade');
- const constraintLabel=t=>({horizontal:'H',vertical:'V',coincident:'●',midpoint:'◇',fixed:'F',parallel:'∥',perpendicular:'⊥',equal:'=',concentric:'◎',collinear:'—',tangent:'T'}[t]||'?');
- const ruleName=t=>({horizontal:'Horizontal',vertical:'Vertical',coincident:'Coincidente',midpoint:'Ponto médio',fixed:'Fixar',parallel:'Paralela',perpendicular:'Perpendicular',equal:'Igual',concentric:'Concêntrica',collinear:'Colinear',tangent:'Tangente',lineLength:'Comprimento',circleRadius:'Raio',arcRadius:'Raio do arco'}[t]||t);
+ const constraintLabel=t=>({horizontal:'H',vertical:'V',coincident:'●',coincidentOrigin:'O',pointOnAxis:'⊢',midpoint:'◇',fixed:'F',parallel:'∥',perpendicular:'⊥',equal:'=',concentric:'◎',collinear:'—',tangent:'T'}[t]||'?');
+ const ruleName=t=>({horizontal:'Horizontal',vertical:'Vertical',coincident:'Coincidente',coincidentOrigin:'Coincidente com a origem',pointOnAxis:'Ponto sobre eixo',midpoint:'Ponto médio',fixed:'Fixar',parallel:'Paralela',perpendicular:'Perpendicular',equal:'Igual',concentric:'Concêntrica',collinear:'Colinear',tangent:'Tangente',lineLength:'Comprimento',circleRadius:'Raio',arcRadius:'Raio do arco'}[t]||t);
  const normAngle=a=>Math.atan2(Math.sin(a),Math.cos(a));
  const lineAngle=e=>Math.atan2(e.end[1]-e.start[1],e.end[0]-e.start[0]);
  const lineMid=e=>[(e.start[0]+e.end[0])/2,(e.start[1]+e.end[1])/2];
@@ -34,9 +35,22 @@ export function createEditor(svg,api){
  };
  const pickEntity=(q,pixels=8)=>{
   const o=api.object(),doc=sketch.native(),rect=svg.getBoundingClientRect();if(!o||!doc?.entities?.length||!rect.width||!rect.height)return null;
-  const p=nativePoint(q),mmPerPx=o.params.size*Math.max(view[2]/rect.width,view[3]/rect.height),limit=Math.max(.05,mmPerPx*pixels);let best=null,bestD=limit;
+  const p=nativePoint(q),mmPerPx=o.params.size*Math.max(view[2]/rect.width,view[3]/rect.height),limit=mmPerPx*pixels;let best=null,bestD=limit;
   for(const e of doc.entities){const d=entityDistance(p,e);if(d<bestD){bestD=d;best=e;}}
   return best?.id||null;
+ };
+
+ // Hit tolerance is measured in screen pixels, independently of zoom or model size.
+ const pickLoop=(q,pixels=8)=>{
+  const o=api.object(),rect=svg.getBoundingClientRect();
+  if(!o||o.sketch?.entities?.length||!rect.width||!rect.height)return null;
+  let best=null,distance=pixels*Math.max(view[2]/rect.width,view[3]/rect.height);
+  for(let i=0;i<o.loops.length;i++){
+   const pts=o.loops[i];if(!pts.length)continue;
+   const d=pointPolylineDistance(q,[...pts,pts[0]]);
+   if(d<distance){distance=d;best=i;}
+  }
+  return best;
  };
 
  function contourMode(){if(api.object()?.sketch?.entities.length){api.status('Para editar contornos derivados, use Converter em contornos. O Sketch paramétrico permanece editável.');return false;}return true;}
@@ -47,27 +61,42 @@ export function createEditor(svg,api){
   return {end,inference:null,icon:null};
  }
  function snapNative(p,n){
+  const o=api.object(),rect=svg.getBoundingClientRect();
+  if(!o||!rect.width||!rect.height)return {point:p,relation:null,referenceId:null,icon:null,distance:null};
+  const mmPerPx=o.params.size*Math.max(view[2]/rect.width,view[3]/rect.height);
+  const pointLimit=mmPerPx*12,axisLimit=mmPerPx*10,originLimit=mmPerPx*14;
   const candidates=[];
+  // CAD datum references have explicit priority over ordinary geometry.
+  const originDistance=Math.hypot(p[0],p[1]);
+  if(originDistance<=originLimit)candidates.push({point:[0,0],relation:{type:'origin'},referenceId:'datum-origin',icon:'O',label:'Origem (0,0)',distance:originDistance,priority:0});
+  const dx=Math.abs(p[1]),dy=Math.abs(p[0]);
+  if(dx<=axisLimit)candidates.push({point:[p[0],0],relation:{type:'axis',axis:'x'},referenceId:'datum-axis-x',icon:'X',label:'Eixo X',distance:dx,priority:3});
+  if(dy<=axisLimit)candidates.push({point:[0,p[1]],relation:{type:'axis',axis:'y'},referenceId:'datum-axis-y',icon:'Y',label:'Eixo Y',distance:dy,priority:3});
   for(const e of n?.entities||[]){
-   if(e.type==='point')candidates.push({point:e.position,relation:{type:'coincident',ref:{entity:e.id,point:'point'}},referenceId:e.id,icon:'●'});
+   if(e.type==='point')candidates.push({point:e.position,relation:{type:'coincident',ref:{entity:e.id,point:'point'}},referenceId:e.id,icon:'●',label:'Ponto',priority:1});
    else if(e.type==='line'){
     candidates.push(
-      {point:e.start,relation:{type:'coincident',ref:{entity:e.id,point:'start'}},referenceId:e.id,icon:'●'},
-      {point:e.end,relation:{type:'coincident',ref:{entity:e.id,point:'end'}},referenceId:e.id,icon:'●'},
-      {point:lineMid(e),relation:{type:'midpoint',line:e.id},referenceId:e.id,icon:'◇'}
+      {point:e.start,relation:{type:'coincident',ref:{entity:e.id,point:'start'}},referenceId:e.id,icon:'●',label:'Extremidade',priority:1},
+      {point:e.end,relation:{type:'coincident',ref:{entity:e.id,point:'end'}},referenceId:e.id,icon:'●',label:'Extremidade',priority:1},
+      {point:lineMid(e),relation:{type:'midpoint',line:e.id},referenceId:e.id,icon:'◇',label:'Ponto médio',priority:2}
     );
-   }else if(e.type==='circle')candidates.push({point:e.center,relation:{type:'coincident',ref:{entity:e.id,point:'center'}},referenceId:e.id,icon:'●'});
+   }else if(e.type==='circle')candidates.push({point:e.center,relation:{type:'coincident',ref:{entity:e.id,point:'center'}},referenceId:e.id,icon:'●',label:'Centro',priority:1});
    else if(e.type==='bezier'){
-    e.points.forEach((p,i)=>candidates.push({point:p,relation:{type:'coincident',ref:{entity:e.id,point:`control:${i}`}},referenceId:e.id,icon:'●'}));
+    e.points.forEach((q,i)=>candidates.push({point:q,relation:{type:'coincident',ref:{entity:e.id,point:`control:${i}`}},referenceId:e.id,icon:'●',label:'Controle Bézier',priority:1}));
    }else if(e.type==='arc'){
-    candidates.push({point:e.center,relation:{type:'coincident',ref:{entity:e.id,point:'center'}},referenceId:e.id,icon:'●'});
-    for(const key of ['start','end']){const a=e[key+'Angle'];candidates.push({point:[e.center[0]+Math.cos(a)*e.radius,e.center[1]+Math.sin(a)*e.radius],relation:{type:'coincident',ref:{entity:e.id,point:key}},referenceId:e.id,icon:'●'});}
+    candidates.push({point:e.center,relation:{type:'coincident',ref:{entity:e.id,point:'center'}},referenceId:e.id,icon:'●',label:'Centro',priority:1});
+    for(const key of ['start','end']){const a=e[key+'Angle'];candidates.push({point:[e.center[0]+Math.cos(a)*e.radius,e.center[1]+Math.sin(a)*e.radius],relation:{type:'coincident',ref:{entity:e.id,point:key}},referenceId:e.id,icon:'●',label:'Extremidade',priority:1});}
    }
   }
-  const threshold=api.object().params.size*Math.max(view[2],view[3])*.018;
-  let best=null,bestD=threshold;
-  for(const candidate of candidates){const d=Math.hypot(candidate.point[0]-p[0],candidate.point[1]-p[1]);if(d<bestD){bestD=d;best=candidate;}}
-  return best?{point:[...best.point],relation:best.relation,referenceId:best.referenceId,icon:best.icon,distance:bestD}:{point:p,relation:null,referenceId:null,icon:null,distance:null};
+  let best=null;
+  for(const candidate of candidates){
+   const d=candidate.distance??Math.hypot(candidate.point[0]-p[0],candidate.point[1]-p[1]);
+   const limit=candidate.relation?.type==='axis'?axisLimit:pointLimit;
+   if(d>limit&&candidate.relation?.type!=='origin')continue;
+   const score=(candidate.priority??5)*1000+d/Math.max(mmPerPx,1e-9);
+   if(!best||score<best.score)best={...candidate,distance:d,score};
+  }
+  return best?{point:[...best.point],relation:best.relation,referenceId:best.referenceId,icon:best.icon,label:best.label,distance:best.distance}:{point:p,relation:null,referenceId:null,icon:null,label:null,distance:null};
  }
  function parallelInference(start,end,doc){
   const dx=end[0]-start[0],dy=end[1]-start[1],len=Math.hypot(dx,dy);if(len<1e-6)return null;
@@ -127,10 +156,27 @@ export function createEditor(svg,api){
  function addText(text,p,attrs={}){
   const t=el('text',{x:p[0],y:-p[1],class:'sketch-svg-text',...attrs});t.textContent=text;svg.appendChild(t);return t;
  }
- function renderAxes(){
-  if(view[0]<=0&&view[0]+view[2]>=0)svg.appendChild(el('line',{x1:0,y1:view[1],x2:0,y2:view[1]+view[3],class:'sketch-axis sketch-axis-y','vector-effect':'non-scaling-stroke'}));
-  if(view[1]<=0&&view[1]+view[3]>=0)svg.appendChild(el('line',{x1:view[0],y1:0,x2:view[0]+view[2],y2:0,class:'sketch-axis sketch-axis-x','vector-effect':'non-scaling-stroke'}));
-  svg.appendChild(el('circle',{cx:0,cy:0,r:view[2]*.0035,class:'sketch-origin','vector-effect':'non-scaling-stroke'}));
+ function renderReferenceDock(active){
+  const refs=(api.objects?.()||[]).filter(o=>o&&o.id!==active.id&&Array.isArray(o.loops)&&o.loops.length);
+  if(!refs.length)return;
+  const count=refs.length,cols=Math.min(5,Math.max(1,Math.ceil(Math.sqrt(count)))),rows=Math.ceil(count/cols);
+  const gap=Math.min(view[2],view[3])*.010,tile=Math.min(view[2]*.155,view[3]*.19,.27);
+  const totalW=cols*tile+(cols-1)*gap;
+  const startX=view[0]+view[2]-totalW-gap,startY=view[1]+gap;
+  refs.forEach((ref,i)=>{
+   const col=i%cols,row=Math.floor(i/cols),x=startX+col*(tile+gap),y=startY+row*(tile+gap);
+   const mini=el('svg',{x,y,width:tile,height:tile,viewBox:'-.62 -.62 1.24 1.24',preserveAspectRatio:'xMidYMid meet',class:'sketch-reference-tile','data-reference-object':ref.id,'aria-label':'Editar '+ref.name});
+   mini.appendChild(el('rect',{x:-.61,y:-.61,width:1.22,height:1.22,rx:.06,class:'sketch-reference-bg','data-reference-object':ref.id}));
+   mini.appendChild(el('path',{d:ref.loops.map(p=>path(p)+'Z').join(' '),class:'sketch-reference-shape','fill-rule':'evenodd','pointer-events':'none'}));
+   const label=el('text',{x:0,y:.54,class:'sketch-reference-label','pointer-events':'none'});label.textContent=String(ref.name||'Sketch').replace(/^Sketch\s*[·\d]*\s*/,'').slice(0,16);mini.appendChild(label);
+   svg.appendChild(mini);
+  });
+ }
+ function renderAxes(n){
+  const origin=localPoint([0,0],n),ox=origin[0],oy=-origin[1],originActive=inference?.referenceId==='datum-origin',xActive=inference?.referenceId==='datum-axis-x',yActive=inference?.referenceId==='datum-axis-y';
+  if(ox>=view[0]&&ox<=view[0]+view[2])svg.appendChild(el('line',{x1:ox,y1:view[1],x2:ox,y2:view[1]+view[3],class:'sketch-axis sketch-axis-y'+(yActive?' datum-active':''),'vector-effect':'non-scaling-stroke','data-datum':'axis-y'}));
+  if(oy>=view[1]&&oy<=view[1]+view[3])svg.appendChild(el('line',{x1:view[0],y1:oy,x2:view[0]+view[2],y2:oy,class:'sketch-axis sketch-axis-x'+(xActive?' datum-active':''),'vector-effect':'non-scaling-stroke','data-datum':'axis-x'}));
+  svg.appendChild(el('circle',{cx:ox,cy:oy,r:view[2]*.0045,class:'sketch-origin'+(originActive?' datum-active':''),'vector-effect':'non-scaling-stroke','data-datum':'origin'}));
  }
  function renderDimensions(n,o){
   for(const d of n.dimensions||[]){
@@ -153,6 +199,7 @@ export function createEditor(svg,api){
    if(c.entity)entities=[n.entities.find(e=>e.id===c.entity)].filter(Boolean);
    else if(c.type==='coincident')entities=[n.entities.find(e=>e.id===c.a.entity),n.entities.find(e=>e.id===c.b.entity)].filter(Boolean);
    else if(c.type==='midpoint')entities=[n.entities.find(e=>e.id===c.point.entity),n.entities.find(e=>e.id===c.line)].filter(Boolean);
+   else if(c.type==='coincidentOrigin'||c.type==='pointOnAxis')entities=[n.entities.find(e=>e.id===c.point.entity)].filter(Boolean);
    else entities=[n.entities.find(e=>e.id===c.first),n.entities.find(e=>e.id===c.second)].filter(Boolean);
    if(!entities.length)continue;
    const centers=entities.map(entityMid),p=[centers.reduce((s,q)=>s+q[0],0)/centers.length,centers.reduce((s,q)=>s+q[1],0)/centers.length],q=localPoint(p,n);
@@ -216,6 +263,7 @@ export function createEditor(svg,api){
   if(!inference?.icon||!inference.point)return;
   const p=localPoint(inference.point,n);
   addText(inference.icon,[p[0]+view[2]*.018,p[1]+view[3]*.018],{class:'sketch-inference-icon',style:`font-size:${view[2]*.016}px`});
+  if(inference.label)addText(inference.label,[p[0]+view[2]*.032,p[1]+view[3]*.034],{class:'sketch-inference-label',style:`font-size:${view[2]*.012}px`});
  }
  function updateInspector(n){
   const info=sketch.selectionInfo(),status=sketch.describe();
@@ -241,14 +289,14 @@ export function createEditor(svg,api){
  function render(){
   if(svg.hasAttribute('hidden')){svg.replaceChildren();return;}
   const o=api.object();svg.replaceChildren();svg.setAttribute('viewBox',view.join(' '));if(!o)return;
-  renderAxes();
-  const n=sketch.native(),nativeCount=n?.entities?.length||0,stateMap=sketch.states();
-  if(o.result?.bladeProfile?.length&&!nativeCount)svg.appendChild(el('path',{class:'blade-preview',d:o.result.bladeProfile.map(p=>path(p.map(([x,y])=>[x/o.result.params.size*(o.result.params.mirror?-1:1),y/o.result.params.size]))+'Z').join(' '),fill:'#d99c32','fill-opacity':.42,'fill-rule':'evenodd','pointer-events':'none'}));
-  if(o.loops.length)svg.appendChild(el('path',{d:o.loops.map(p=>path(p)+'Z').join(' '),class:nativeCount?'sketch-derived-profile':'legacy-profile',fill:'#476a90','fill-rule':'evenodd','fill-opacity':nativeCount?.045:.42,'pointer-events':'none'}));
-  if(!nativeCount)o.loops.forEach((p,i)=>svg.appendChild(el('path',{d:path(p)+'Z',fill:'none',stroke:i===selected?'#e5852d':i===0?'#286bbb':'#597a97','stroke-width':i===selected?2:1.1,'vector-effect':'non-scaling-stroke','pointer-events':'stroke','data-loop':i})));
-  if(selected>=0&&o.loops[selected]&&tool==='select'&&!nativeCount)o.loops[selected].forEach(([x,y],i)=>svg.appendChild(el('circle',{cx:x,cy:-y,r:view[2]*.004,fill:i===node?'#e88024':'white',stroke:'#bd6c21','stroke-width':1,'vector-effect':'non-scaling-stroke','data-node':i})));
-  if(region)svg.appendChild(el('path',{d:path(region)+'Z',fill:'#7cbfff22',stroke:'#45b6a3','stroke-dasharray':'5 4','stroke-width':1.5,'vector-effect':'non-scaling-stroke','pointer-events':'none'}));
-  if(drag?.points?.length)svg.appendChild(el('path',{d:path(drag.points),fill:'none',stroke:tool==='erase'?'#f18787':'#45b6a3','stroke-width':(+$('brushWidth')?.value||.8)/o.params.size,'stroke-linecap':'round','pointer-events':'none'}));
+  const n=sketch.native();renderAxes(n);
+  const nativeCount=n?.entities?.length||0,stateMap=sketch.states();
+  if(o.result?.bladeProfile?.length&&!nativeCount)svg.appendChild(el('path',{class:'blade-preview',d:o.result.bladeProfile.map(p=>path(p.map(([x,y])=>[x/o.result.params.size*(o.result.params.mirror?-1:1),y/o.result.params.size]))+'Z').join(' '),fill:themeColor('sketchBlade'),'fill-opacity':.42,'fill-rule':'evenodd','pointer-events':'none'}));
+  if(o.loops.length)svg.appendChild(el('path',{d:o.loops.map(p=>path(p)+'Z').join(' '),class:nativeCount?'sketch-derived-profile':'legacy-profile',fill:themeColor('sketchUnder'),'fill-rule':'evenodd','fill-opacity':nativeCount?.045:.42,'pointer-events':'none'}));
+  if(!nativeCount)o.loops.forEach((p,i)=>svg.appendChild(el('path',{d:path(p)+'Z',fill:'none',stroke:i===selected?themeColor('sketchSelected'):i===hoveredLoop?themeColor('sketchHover'):i===0?themeColor('sketchEntity'):themeColor('sketchConstruction'),'stroke-width':i===selected?2:1.1,'vector-effect':'non-scaling-stroke','pointer-events':'stroke','data-loop':i})));
+  if(selected>=0&&o.loops[selected]&&tool==='select'&&!nativeCount)o.loops[selected].forEach(([x,y],i)=>svg.appendChild(el('circle',{cx:x,cy:-y,r:view[2]*.004,fill:i===node?themeColor('sketchSelected'):themeColor('sketchHandle'),stroke:themeColor('sketchConstraint'),'stroke-width':1,'vector-effect':'non-scaling-stroke','data-node':i})));
+  if(region)svg.appendChild(el('path',{d:path(region)+'Z',fill:themeColor('accentSoft'),'fill-opacity':.45,stroke:themeColor('sketchConstrained'),'stroke-dasharray':'5 4','stroke-width':1.5,'vector-effect':'non-scaling-stroke','pointer-events':'none'}));
+  if(drag?.points?.length)svg.appendChild(el('path',{d:path(drag.points),fill:'none',stroke:tool==='erase'?themeColor('danger'):themeColor('sketchConstrained'),'stroke-width':(+$('brushWidth')?.value||.8)/o.params.size,'stroke-linecap':'round','pointer-events':'none'}));
 
   if(nativeCount){
    for(const e of n.entities){
@@ -256,7 +304,7 @@ export function createEditor(svg,api){
     if(chosen&&tool==='select'){
      const handles=e.type==='point'?[['point',e.position]]:e.type==='line'?[['start',e.start],['end',e.end]]:e.type==='bezier'?e.points.map((p,i)=>[`control:${i}`,p]):[['center',e.center],['radius',[e.center[0]+e.radius,e.center[1]]]];
      if(e.type==='arc')for(const key of ['start','end']){const a=e[key+'Angle'];handles.push([key,[e.center[0]+Math.cos(a)*e.radius,e.center[1]+Math.sin(a)*e.radius]]);}
-     for(const [key,p] of handles){const cc=localPoint(p,n);svg.appendChild(el('circle',{cx:cc[0],cy:-cc[1],r:view[2]*.006,fill:sketch.points().some(p=>p.entity===e.id&&p.point===key)?'#f4b860':'#eef4f3',stroke:'#258d7d','stroke-width':1,'vector-effect':'non-scaling-stroke','data-entity':e.id,'data-handle':key}));}
+     for(const [key,p] of handles){const cc=localPoint(p,n);svg.appendChild(el('circle',{cx:cc[0],cy:-cc[1],r:view[2]*.006,fill:sketch.points().some(p=>p.entity===e.id&&p.point===key)?themeColor('warning'):themeColor('sketchHandle'),stroke:themeColor('sketchConstrained'),'stroke-width':1,'vector-effect':'non-scaling-stroke','data-entity':e.id,'data-handle':key}));}
     }
    }
    renderConstraints(n);renderDimensions(n,o);
@@ -275,11 +323,11 @@ export function createEditor(svg,api){
    const target=drag.endRelation?drag.end:drag.start,cc=localPoint(target,n);
    svg.appendChild(el('circle',{cx:cc[0],cy:-cc[1],r:view[2]*.009,class:'sketch-snap-marker','vector-effect':'non-scaling-stroke'}));
   }
-  renderBezierDraft(n);renderBox();renderInference(n);updateInspector(n);
+  renderBezierDraft(n);renderBox();renderInference(n);renderReferenceDock(o);updateInspector(n);
   const selection=$('selection');
   if(selection)selection.textContent=drag?.kind==='box-select'?(drag.end?.[0]<drag.start[0]?'Seleção cruzada: toca a janela para selecionar.':'Seleção por janela: a entidade precisa ficar dentro.'):region?'Região selecionada para edição de contorno.':sketch.selected().length?`${sketch.selected().length} entidade(s) selecionada(s) · Shift adiciona à seleção`:selected>=0?`Contorno ${selected+1} · ${o.loops[selected]?.length||0} pontos`:tool==='trim'?'Trim: clique no trecho que deseja remover.':tool==='extend'?'Extend: clique perto da extremidade que deseja prolongar.':tool==='dimension'?'Cota: clique em uma linha, círculo ou arco.':tool==='bezier'?(bezierClicks.length?'Bézier: continue clicando · duplo clique ou Enter conclui.':'Bézier: clique para iniciar a curva.'):tool==='point'?'Ponto: clique para posicionar · Shift suprime inferências.':'Clique para selecionar · arraste no vazio para seleção por janela.';
  }
- function reset(){view=[-.65,-.65,1.3,1.3];selected=-1;node=-1;region=null;drag=null;arcClicks=[];bezierClicks=[];bezierHover=null;hoveredEntity=null;inference=null;sketch.reset();closeInlineDimension();render();}
+ function reset(){view=[-.65,-.65,1.3,1.3];selected=-1;node=-1;region=null;drag=null;arcClicks=[];bezierClicks=[];bezierHover=null;hoveredEntity=null;hoveredLoop=null;inference=null;sketch.reset();closeInlineDimension();render();}
  async function operate(op){const o=api.object();if(!o||!contourMode())return;const original=o.loops;try{api.status('Aplicando edição vetorial…');const loops=await api.request({action:'edit',loops:original,op:{...op,size:o.params.size}});if(api.object()?.id!==o.id||o.loops!==original){api.status('Edição cancelada porque o objeto mudou.');return;}api.history();delete o.sketch;o.loops=loops;selected=-1;node=-1;api.changed();render();}catch(e){api.status(e.message);}}
 
  function closeInlineDimension(){const box=$('sketchInlineDimension');if(box)box.hidden=true;}
@@ -300,7 +348,8 @@ export function createEditor(svg,api){
  if($('showSketchConstraints'))$('showSketchConstraints').onchange=render;
 
  svg.onpointerdown=e=>{
-  const o=api.object();if(!o)return;svg.setPointerCapture(e.pointerId);const q=point(e),n=e.target.dataset.node,l=e.target.dataset.loop;let entity=e.target.dataset.entity;if(['select','trim','extend','dimension'].includes(tool))entity=pickEntity(q,8)||entity;
+  const reference=e.target.closest?.('[data-reference-object]');if(reference){e.preventDefault();api.activateObject?.(reference.dataset.referenceObject);return;}
+  const o=api.object();if(!o)return;svg.setPointerCapture(e.pointerId);const q=point(e),n=e.target.dataset.node;let l=e.target.dataset.loop,entity=e.target.dataset.entity;const explicitHandle=e.target.dataset.handle!==undefined;if(!explicitHandle&&n===undefined&&['select','trim','extend','dimension'].includes(tool))entity=pickEntity(q,8)||entity;if(l===undefined&&['select','move'].includes(tool)){const hit=pickLoop(q);if(hit!==null)l=hit;}
   if(e.button===1||e.button===2){drag={kind:'pan',x:e.clientX,y:e.clientY,view:[...view]};return;}
   if(e.target.dataset.dimensionEntity){openInlineDimension(e.target.dataset.dimensionEntity,e.clientX,e.clientY);return;}
   if(entity&&tool==='trim'){
@@ -316,7 +365,13 @@ export function createEditor(svg,api){
    if(drag?.kind==='primitive'){commitPrimitive(q,{suppress:e.shiftKey});return;}
    beginPrimitive(q,{suppress:e.shiftKey});render();return;
   }
-  if(tool==='arc'){arcClicks.push(nativePoint(q));if(arcClicks.length===3){sketch.create('arc',...arcClicks);arcClicks=[];}else api.status('Arco de 3 pontos · clique '+(arcClicks.length+1)+' de 3.');render();return;}
+  if(tool==='arc'){
+   const raw=nativePoint(q),snap=e.shiftKey?{point:raw,relation:null}:snapNative(raw,sketch.native());
+   arcClicks.push({point:snap.point,relation:snap.relation});
+   if(arcClicks.length===3){sketch.create('arc',arcClicks[0].point,arcClicks[1].point,arcClicks[2].point,{startRelation:arcClicks[0].relation,endRelation:arcClicks[2].relation});arcClicks=[];inference=null;}
+   else{inference=snap.relation?{...snap,point:snap.point,type:snap.relation.type}:null;api.status('Arco de 3 pontos · clique '+(arcClicks.length+1)+' de 3.');}
+   render();return;
+  }
   if(tool==='bezier'){
    const raw=nativePoint(q),snap=e.shiftKey?{point:raw,relation:null}:snapNative(raw,sketch.native());
    if(e.detail>=2&&bezierClicks.length>=2){
@@ -339,8 +394,8 @@ export function createEditor(svg,api){
  };
  svg.onpointermove=e=>{
   const o=api.object();if(!o)return;
-  const q=point(e);hoveredEntity=['select','trim','extend','dimension'].includes(tool)?(pickEntity(q,8)||e.target?.dataset?.entity||null):(e.target?.dataset?.entity||null);
-  if(!drag){if(tool==='bezier'&&bezierClicks.length){const raw=nativePoint(q),snap=e.shiftKey?{point:raw,relation:null}:snapNative(raw,sketch.native());bezierHover={point:snap.point,relation:snap.relation};inference=snap.relation?{...snap,point:snap.point,type:snap.relation.type}:null;}render();return;}
+  const q=point(e),previousEntity=hoveredEntity,previousLoop=hoveredLoop;hoveredLoop=['select','move'].includes(tool)?pickLoop(q):null;hoveredEntity=['select','trim','extend','dimension'].includes(tool)?(pickEntity(q,8)||e.target?.dataset?.entity||null):(e.target?.dataset?.entity||null);
+  if(!drag){if(previousEntity===hoveredEntity&&previousLoop===hoveredLoop&&!(tool==='bezier'&&bezierClicks.length))return;if(tool==='bezier'&&bezierClicks.length){const raw=nativePoint(q),snap=e.shiftKey?{point:raw,relation:null}:snapNative(raw,sketch.native());bezierHover={point:snap.point,relation:snap.relation};inference=snap.relation?{...snap,point:snap.point,type:snap.relation.type}:null;}render();return;}
   if(drag.kind==='primitive'){updatePrimitiveDraft(q,{suppress:e.shiftKey||drag.suppress});render();return;}
   if(drag.kind==='trim-sweep'){
    const hit=document.elementFromPoint(e.clientX,e.clientY)?.closest?.('[data-entity]'),id=hit?.dataset?.entity;
@@ -348,7 +403,10 @@ export function createEditor(svg,api){
    render();return;
   }
   if(drag.kind==='box-select'){drag.end=q;render();return;}
-  if(drag.kind==='entity-point'){drag.end=nativePoint(q);return;}
+  if(drag.kind==='entity-point'){
+   const raw=nativePoint(q),snap=e.shiftKey?{point:raw,relation:null,referenceId:null,icon:null}:snapNative(raw,sketch.native());
+   drag.end=snap.point;drag.endRelation=snap.relation;inference=snap.relation?{...snap,point:snap.point,type:snap.relation.type}:null;render();return;
+  }
   if(drag.kind==='node'){o.loops[selected][node]=q;render();}
   else if(drag.kind==='move'){o.loops[selected]=drag.original.map(v=>[v[0]+q[0]-drag.start[0],v[1]+q[1]-drag.start[1]]);render();}
   else if(drag.kind==='region'){const a=drag.start;region=[[Math.min(a[0],q[0]),Math.min(a[1],q[1])],[Math.max(a[0],q[0]),Math.min(a[1],q[1])],[Math.max(a[0],q[0]),Math.max(a[1],q[1])],[Math.min(a[0],q[0]),Math.max(a[1],q[1])]];render();}
@@ -363,13 +421,13 @@ export function createEditor(svg,api){
    const a=nativePoint(d.start),b=nativePoint(d.end||d.start),bounds={minX:Math.min(a[0],b[0]),minY:Math.min(a[1],b[1]),maxX:Math.max(a[0],b[0]),maxY:Math.max(a[1],b[1])};
    sketch.selectBox(bounds,{crossing:(d.end?.[0]??d.start[0])<d.start[0],extend:d.extend});
   }
-  if(d.kind==='entity-point'&&d.end)sketch.movePoint(d.entity,d.handle,d.end);
+  if(d.kind==='entity-point'&&d.end)sketch.movePoint(d.entity,d.handle,d.end,d.endRelation||null);
   if(['node','move'].includes(d.kind))api.changed();
   if(d.kind==='stroke'&&d.points.length)operate({type:'stroke',points:d.points,width:+$('brushWidth')?.value||.8,subtract:tool==='erase'});
   inference=null;render();
  };
  svg.onpointercancel=()=>{if(drag&&['node','move'].includes(drag.kind))api.changed();if(drag?.kind!=='primitive'){drag=null;inference=null;}render();};
- svg.onpointerleave=()=>{if(!drag){hoveredEntity=null;inference=null;render();}};
+ svg.onpointerleave=()=>{if(!drag){hoveredLoop=null;hoveredEntity=null;inference=null;render();}};
  svg.oncontextmenu=e=>e.preventDefault();
  svg.onwheel=e=>{e.preventDefault();const f=e.deltaY>0?1.12:1/1.12;if(view[2]*f<.015||view[2]*f>12)return;const [x,negY]=point(e),y=-negY;view=[x+(view[0]-x)*f,y+(view[1]-y)*f,view[2]*f,view[3]*f];render();};
  svg.ondblclick=e=>{
@@ -387,6 +445,7 @@ export function createEditor(svg,api){
   bezierClicks=[];bezierHover=null;inference=null;render();return ok;
  }
  function setTool(t){tool=t;arcClicks=[];bezierClicks=[];bezierHover=null;drag=null;inference=null;closeInlineDimension();render();}
+ window.addEventListener('rv-theme-change',()=>render());
  return {
   sketch,render,reset,fit:()=>{view=[-.65,-.65,1.3,1.3];render()},
   setTool,getTool:()=>tool,openInlineDimension,finishBezier,
@@ -397,3 +456,4 @@ export function createEditor(svg,api){
   getSelection:()=>({selected,node,region})
  };
 }
+

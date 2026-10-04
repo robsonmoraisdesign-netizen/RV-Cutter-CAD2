@@ -1,0 +1,71 @@
+name: RV Cutter 14.28.12 Windows Delivery
+
+on:
+  push:
+    branches:
+      - feature/14.28.12-sketch-clarity
+    paths:
+      - .github/workflows/RV_Cutter_14_28_12_Windows.yml
+      - app/**
+      - src/**
+      - qa-**
+      - package*.json
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-delivery:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Copy Manifold WASM
+        shell: node {0}
+        run: |
+          const fs=require('fs'),path=require('path');
+          function walk(dir){for(const name of fs.readdirSync(dir)){const p=path.join(dir,name),st=fs.statSync(p);if(st.isDirectory()){const r=walk(p);if(r)return r;}else if(name==='manifold.wasm')return p;}}
+          const wasm=walk(path.join(process.cwd(),'node_modules','manifold-3d'));if(!wasm)throw new Error('manifold.wasm not found');
+          fs.copyFileSync(wasm,path.join(process.cwd(),'app','manifold.wasm'));
+      - run: npm test
+      - name: Electron desktop smoke
+        shell: pwsh
+        run: |
+          $dir = Join-Path (Get-Location) 'desktop-smoke'
+          Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $dir | Out-Null
+          $electron = Join-Path (Get-Location) 'node_modules\electron\dist\electron.exe'
+          $p = Start-Process -FilePath $electron -ArgumentList @('app', "--rv-desktop-smoke=$dir") -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Electron desktop smoke failed with code $($p.ExitCode)" }
+      - name: Package Windows x64
+        env:
+          RV_SOURCE_COMMIT: ${{ github.sha }}
+        run: node scripts/package-windows.cjs
+      - name: Packaged Windows desktop smoke
+        shell: pwsh
+        run: |
+          $dir = Join-Path (Get-Location) 'packaged-desktop-smoke'
+          Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $dir | Out-Null
+          $exe = Get-ChildItem -Path dist -Recurse -Filter 'RV Cutter CAD.exe' | Select-Object -First 1
+          if (-not $exe) { throw 'Packaged RV Cutter CAD.exe not found' }
+          $p = Start-Process -FilePath $exe.FullName -ArgumentList @("--rv-desktop-smoke=$dir") -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Packaged Electron smoke failed with code $($p.ExitCode)" }
+      - name: Zip Windows x64
+        shell: pwsh
+        run: |
+          $folder = Get-ChildItem -Path dist -Directory | Where-Object { $_.Name -like 'RV_Cutter_CAD_*_Windows_x64' } | Select-Object -First 1
+          if (-not $folder) { throw 'Packaged folder not found' }
+          Compress-Archive -Path $folder.FullName -DestinationPath 'dist/RV_Cutter_CAD_14.28.12_Windows_x64.zip' -CompressionLevel Optimal
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RV_Cutter_CAD_14.28.12_Windows_x64_Delivery
+          path: dist/RV_Cutter_CAD_14.28.12_Windows_x64.zip
+          if-no-files-found: error
+          retention-days: 30

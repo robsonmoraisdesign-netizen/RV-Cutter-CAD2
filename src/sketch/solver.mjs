@@ -62,6 +62,13 @@ function applyConstraint(sketch,c){
     const e=getEntity(sketch,c.point.entity),ln=getEntity(sketch,c.line);
     setPoint(e,c.point.point,midpoint(ln));return;
   }
+  if(c.type==='coincidentOrigin'){
+    const e=getEntity(sketch,c.point.entity);setPoint(e,c.point.point,[0,0]);return;
+  }
+  if(c.type==='pointOnAxis'){
+    const e=getEntity(sketch,c.point.entity),p=entityEndpoint(e,c.point.point);
+    setPoint(e,c.point.point,c.axis==='x'?[p[0],0]:[0,p[1]]);return;
+  }
   if(c.type==='parallel'||c.type==='perpendicular'){
     const [a,b]=pair(sketch,c),base=lineAngle(a)+(c.type==='perpendicular'?Math.PI/2:0);
     setLineAngle(b,closestEquivalentAngle(base,lineAngle(b)));return;
@@ -111,6 +118,8 @@ function constraintResidual(sketch,c){
   if(c.type==='vertical'){const e=getEntity(sketch,c.entity);return Math.abs(e.start[0]-e.end[0]);}
   if(c.type==='coincident'){const a=getEntity(sketch,c.a.entity),b=getEntity(sketch,c.b.entity);return dist(entityEndpoint(a,c.a.point),entityEndpoint(b,c.b.point));}
   if(c.type==='midpoint'){const e=getEntity(sketch,c.point.entity),ln=getEntity(sketch,c.line);return dist(entityEndpoint(e,c.point.point),midpoint(ln));}
+  if(c.type==='coincidentOrigin'){const e=getEntity(sketch,c.point.entity);return dist(entityEndpoint(e,c.point.point),[0,0]);}
+  if(c.type==='pointOnAxis'){const e=getEntity(sketch,c.point.entity),p=entityEndpoint(e,c.point.point);return Math.abs(c.axis==='x'?p[1]:p[0]);}
   if(c.type==='parallel'){const [a,b]=pair(sketch,c);return Math.abs(normalizedCross(lineVector(a),lineVector(b)));}
   if(c.type==='perpendicular'){const [a,b]=pair(sketch,c);return Math.abs(normalizedDot(lineVector(a),lineVector(b)));}
   if(c.type==='equal'){const [a,b]=pair(sketch,c);return Math.abs(a.type==='line'?lineLength(a)-lineLength(b):a.radius-b.radius);}
@@ -133,6 +142,7 @@ function residual(sketch){
 function constraintEntityIds(c){
   if(c.type==='coincident')return [c.a.entity,c.b.entity];
   if(c.type==='midpoint')return [c.point.entity,c.line];
+  if(c.type==='coincidentOrigin'||c.type==='pointOnAxis')return [c.point.entity];
   if(c.first||c.second)return [c.first,c.second].filter(Boolean);
   return c.entity?[c.entity]:[];
 }

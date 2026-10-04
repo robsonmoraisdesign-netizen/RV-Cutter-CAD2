@@ -91,6 +91,8 @@ async function runDesktopSmoke(){
     out.health=await window.desktop.health();
     await RVTest.newProject();
     const o=RVTest.active();
+    if(o.params.mirror!==true)throw Error("Mirror must default to true");
+    Object.assign(o.params,{bladeReinforcement:true,reinforcementWidth:.6,reinforcementHeight:1.5,chamfer:true});
     o.loops=[[[-.4,-.4],[.4,-.4],[.4,.4],[-.4,.4]]];
     o.contourVersion=(o.contourVersion||0)+1;
     RVTest.convertToCutter(o.id);

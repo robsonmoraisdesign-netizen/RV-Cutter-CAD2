@@ -42,15 +42,19 @@ async function cdp(url){
     };
   })();`});
   await send('Page.navigate',{url:'http://127.0.0.1:8092/'});await waitFor(async()=>{const r=await send('Runtime.evaluate',{expression:'document.readyState==="complete" && !!window.RVTest',returnByValue:true});return r.result.value;},60000);
-  const evalv=async expression=>(await send('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true})).result.value;
+  const evalv=async expression=>{const r=await send('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw Error(r.exceptionDetails.exception?.description||r.exceptionDetails.text);return r.result.value;};
   assert(await evalv("document.querySelector('#home').classList.contains('home-v4')"),'V4 library must be active');
   const homeShot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync('audit-home-14.27.png',Buffer.from(homeShot.data,'base64'));
   await evalv("document.querySelector('#newProject').click(); true");
   await waitFor(()=>evalv("RVTest.state.screen==='studio' && !!RVTest.state.editingSketchId"));
-  assert(await evalv("document.querySelector('#tab2d').hidden"),'Sketch must not be a separate visible workspace tab');
-  assert(await evalv("!document.querySelector('#three').hidden && !document.querySelector('#editor').hidden"),'Sketch must edit inside the same graphics workspace');
-  assert(await evalv("!!document.querySelector('.onshape-ribbon')"),'Contextual Sketch ribbon must be visible');
+  assert(await evalv("!document.querySelector('#tab2d').hidden && getComputedStyle(document.querySelector('#tab2d')).display!=='none'"),'Sketch 2D must be a visible persistent workspace tab');
+  assert(await evalv("document.querySelector('#tab2d').classList.contains('active') && RVTest.state.stage==='2d'"),'New project must enter the Sketch 2D workspace');
+  assert(await evalv("!document.querySelector('#three').hidden && !document.querySelector('#editor').hasAttribute('hidden')"),'Sketch workspace must retain the shared graphics viewport');
+  assert(await evalv("!!document.querySelector('.v4-sketchbar')"),'Approved grouped Sketch toolbar must be visible');
+  assert(await evalv("document.querySelectorAll('.v4-menu-group').length>=4"),'Sketch must expose grouped Create/Modify/Constrain/Reference menus');
+  assert(await evalv("document.querySelector('#inspectorLevels') && !!document.querySelector('[data-inspector-level=\"essential\"]')"),'Inspector levels must exist');
   assert(await evalv("!!document.querySelector('[data-tool=\"trim\"]') && !!document.querySelector('[data-tool=\"extend\"]') && !!document.querySelector('[data-tool=\"bezier\"]')"),'Phase 2 CAD tools must be present');
+  assert(await evalv("RVTest.active().params.mirror && document.querySelector('#mirror').checked"),'New art must default to mirrored');
   assert.equal(await evalv("RVTest.active().features.length"),0,'New Sketch must not auto-create a cutter feature');
 
   await evalv("document.querySelector('[data-tool=\"circle\"]').click(); true");
@@ -73,6 +77,11 @@ async function cdp(url){
   assert.equal(await evalv("RVTest.active().result"),null,'Sketch alone must not generate 3D');
   assert(await evalv("document.querySelectorAll('.sketch-dimension').length>=1"),'Driving dimension must render on canvas');
   assert(await evalv("document.querySelectorAll('.sketch-entity-hit').length>=1"),'Sketch selection must keep hit geometry');
+  await evalv("document.querySelector('#undo').click();true");
+  assert(await evalv("!!RVTest.state.editingSketchId && !document.querySelector('#editor').hasAttribute('hidden')"),'Undo must retain Sketch editing');
+  await evalv("document.querySelector('#redo').click();true");
+  assert.equal(await evalv("RVTest.active().sketch.entities[0].radius"),18);
+  assert(await evalv("RVTest.state.editingSketchId===RVTest.state.activeId"),'Redo must restore active editing context');
   const sketchShot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync('audit-sketch-14.27.png',Buffer.from(sketchShot.data,'base64'));
 
   await evalv("document.querySelector('#finishSketch').click();true");await waitFor(()=>evalv("!RVTest.state.editingSketchId"));
@@ -91,6 +100,9 @@ async function cdp(url){
   assert(render3d.nonTransparentSamples>0,'3D framebuffer must contain rendered pixels');
   const shot3d=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync('audit-3d-14.27.png',Buffer.from(shot3d.data,'base64'));
 
+  await evalv("(async()=>{const r=await RVTest.savePreset('QA preset');RVTest.setParam('wall',2);RVTest.applyPreset(r.id);await RVTest.wait();return true;})()");
+  assert(await evalv("RVTest.active().params.wall===RVTest.active().features[0].params.wall && RVTest.active().params.wall!==2"),'Preset must update persistent feature parameters');
+  assert(await evalv("(async()=>{const files=await RVTest.exportData('all',true);return Object.values(files).every(b=>b.length===84+50*new DataView(b.buffer,b.byteOffset,b.byteLength).getUint32(80,true));})()"),'STL triangle count must match exported payload');
   await evalv("document.querySelector('#tabPresentation').click();true");await waitFor(()=>evalv("RVTest.state.stage==='presentation'"));
   await sleep(250);
   const renderPresentation=await evalv("RVTest.viewer.diagnostics()");
@@ -100,7 +112,8 @@ async function cdp(url){
   const shotPres=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync('audit-presentation-14.27.png',Buffer.from(shotPres.data,'base64'));
 
   await evalv("RVTest.setStage('3d');RVTest.enterSketch();true");await waitFor(()=>evalv("!!RVTest.state.editingSketchId"));
-  assert(await evalv("!document.querySelector('#three').hidden && !document.querySelector('#editor').hidden"),'Re-entering Sketch must keep the unified graphics workspace');
+  assert(await evalv("RVTest.state.stage==='2d' && document.querySelector('#tab2d').classList.contains('active')"),'Re-entering Sketch must activate the Sketch 2D workspace');
+  assert(await evalv("!document.querySelector('#three').hidden && !document.querySelector('#editor').hasAttribute('hidden')"),'Re-entering Sketch must keep the shared graphics viewport');
   await evalv("RVTest.finishSketch(true);true");
 
   await evalv("document.querySelector('#homeBtn').click();true");await waitFor(()=>evalv("document.querySelector('#leaveProjectDialog').open"));
@@ -126,14 +139,137 @@ async function cdp(url){
   await evalv("document.querySelector('#leaveDiscard').click();true");await waitFor(()=>evalv("RVTest.state.screen==='home'"));
   assert.equal(await evalv("RVTest.state.objects.length"),0);
   assert.equal(await evalv("RVTest.diagnostics().worker"),false);
+  await evalv("RVTest.newProject()");
+  await evalv("window.firstSketch=RVTest.active().id;RVTest.createNewSketch();RVTest.selectObject(firstSketch);true");
+  assert(await evalv("RVTest.state.editingSketchId===firstSketch && RVTest.state.activeId===firstSketch"),'Selecting another Sketch must switch editor context');
+  await evalv("RVTest.commitImport([[[[-.5,-.5],[.5,-.5],[.5,.5],[-.5,.5]]]],'Imported square',null);true");
+  assert(await evalv("RVTest.state.stage==='2d' && !!RVTest.state.editingSketchId && !document.querySelector('#editor').hasAttribute('hidden') && document.body.classList.contains('sketching')"),'Import must enter the Sketch workspace with the imported art active');
+  await evalv("RVTest.editor.setTool('select');true");
+  await sleep(100);
+  const pick=await evalv("(()=>{const s=document.querySelector('#editor'),p=new DOMPoint(0,.5).matrixTransform(s.getScreenCTM());return {x:p.x,y:p.y-6};})()");
+  await send('Input.dispatchMouseEvent',{type:'mouseMoved',...pick,button:'none'});
+  await send('Input.dispatchMouseEvent',{type:'mousePressed',...pick,button:'left',clickCount:1});
+  await send('Input.dispatchMouseEvent',{type:'mouseReleased',...pick,button:'left',clickCount:1});
+  assert(await evalv("(()=>{const p=document.querySelector('#editor path[data-loop]');return !!p&&p.getAttribute('stroke')===RVTheme.color('sketchSelected')})()"),'Imported contour must be selectable six pixels away');
+  console.log('Integration regressions: undo/redo, preset, STL, Sketch switch, import, proximity picking PASS');
+
+  await evalv("RVTest.finishSketch(true);true");
+  await evalv(`RVTest.commitImport([
+    [[[-.46,-.46],[.46,-.46],[.46,.46],[-.46,.46]]],
+    [[[0,-.48],[.46,.40],[-.46,.40]]],
+    [[[0,-.50],[.48,0],[0,.50],[-.48,0]]]
+  ],'Colecao QA',null,false);true`);
+  await waitFor(()=>evalv("RVTest.state.objects.length===3 && RVTest.state.stage==='2d' && !!RVTest.state.editingSketchId"));
+  assert.equal(await evalv("document.querySelectorAll('#layers .layer[data-object-id]').length"),3,'Outliner must list every imported Sketch');
+  assert.equal(await evalv("document.querySelectorAll('.sketch-reference-tile').length"),2,'All non-active arts must remain visible as Sketch references');
+  assert(await evalv("!document.body.classList.contains('drawer-collapsed') && document.querySelector('#layers').getBoundingClientRect().height>=120"),'Outliner must stay visibly open for multi-object work');
+  const beforeActive=await evalv("RVTest.state.editingSketchId");
+  await evalv("document.querySelector('.sketch-reference-tile').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,pointerId:77}));true");
+  await waitFor(()=>evalv("RVTest.state.editingSketchId!=="+JSON.stringify(beforeActive)));
+  assert.equal(await evalv("document.querySelectorAll('.sketch-reference-tile').length"),2,'Switching active Sketch must keep the other arts visible');
+  await evalv("document.querySelector('#convertAllCutters').click();true");
+  await waitFor(()=>evalv("RVTest.state.objects.every(o=>o.features.some(f=>f.type==='cookie-cutter'))"));
+  await evalv("RVTest.wait()");
+  await evalv("RVTest.setStage('3d');true");await sleep(250);
+  const multiRender=await evalv("RVTest.viewer.diagnostics()");
+  console.log('Multi-object render diagnostics',JSON.stringify(multiRender));
+  assert(multiRender.groups>=3&&multiRender.visibleMeshes>=3,'Bulk conversion must place all imported arts in the 3D scene');
+  assert.equal(await evalv("RVTest.state.view.material"),'cad','CAD technical style must be the default model display');
+  assert(multiRender.cadEdgeSets>=3,'CAD technical style must expose thresholded feature-edge sets without triangle wireframe');
+  assert(multiRender.roleMeshes>0&&multiRender.opaqueRoleMeshes===multiRender.roleMeshes,'All CAD model surfaces must remain fully opaque');
+  assert(multiRender.depthWritingRoleMeshes===multiRender.roleMeshes,'All CAD model surfaces must write depth so hidden edges remain occluded');
+  const expectedViewportBg=await evalv("RVTheme.color('viewportBg').slice(1).toLowerCase()");
+  assert.equal(multiRender.background,expectedViewportBg,'CAD technical viewport background must come from the universal theme engine');
+  const roleColors=Object.values(multiRender.roleColors||{});
+  assert(roleColors.length>=3&&new Set(roleColors).size>=3,'CAD mode must preserve distinct vivid colors for cutter base, blade, stamp base and relief');
+  const theme=await evalv("RVTheme.diagnostics()");
+  assert(theme.pairs.every(x=>x.pass),'Dark theme semantic contrast contract failed: '+JSON.stringify(theme.pairs));
+  assert.equal(await evalv("document.documentElement.dataset.rvTheme"),'dark','Default theme must be dark');
+  await evalv("RVTheme.set('light');true");await sleep(180);
+  const lightTheme=await evalv("RVTheme.diagnostics()");
+  assert(lightTheme.pairs.every(x=>x.pass),'Light theme semantic contrast contract failed: '+JSON.stringify(lightTheme.pairs));
+  assert.equal(await evalv("document.documentElement.dataset.rvTheme"),'light','Theme engine must switch the whole application to light');
+  const lightUi=await evalv("(()=>{const nav=getComputedStyle(document.querySelector('.workspace-nav')),input=getComputedStyle(document.querySelector('.right input')),panel=getComputedStyle(document.querySelector('.visual-popover'));return {navBg:nav.backgroundColor,inputBg:input.backgroundColor,inputColor:input.color,panelBg:panel.backgroundColor}})()");
+  assert(lightUi.navBg!==lightUi.inputColor,'Light theme must not collapse surface and text colors: '+JSON.stringify(lightUi));
+  const lightShot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync('audit-theme-light-14.28.11.png',Buffer.from(lightShot.data,'base64'));
+  await evalv("RVTheme.set('dark');true");await sleep(120);
+  assert((await evalv("RVTheme.diagnostics().pairs.every(x=>x.pass)")),'Dark theme contrast must remain valid after round-trip');
+  const guardStability=await evalv(`(async()=>{
+    const node=document.createElement('button');node.textContent='Contrast regression';node.style.cssText='color:rgb(245,245,245)!important;background:rgb(250,250,250)!important;position:fixed;top:400px;left:400px;z-index:9999';document.body.appendChild(node);
+    RVAppearance.audit();await new Promise(r=>setTimeout(r,150));
+    const first=getComputedStyle(node).color;RVAppearance.audit();const second=getComputedStyle(node).color;
+    const before=RVAppearance.last().timestamp;await new Promise(r=>setTimeout(r,300));const after=RVAppearance.last().timestamp;
+    node.remove();return {first,second,before,after};
+  })()`);
+  assert.equal(guardStability.first,guardStability.second,'Contrast correction must remain stable');
+  assert.equal(guardStability.before,guardStability.after,'Audit must settle without self-triggering loops');
+  const chromeRects=await evalv("(()=>{const a=document.querySelector('#pieceModeHost .mode-block')?.getBoundingClientRect(),b=document.querySelector('.viewport-title')?.getBoundingClientRect();return a&&b?{a:{l:a.left,r:a.right,t:a.top,b:a.bottom},b:{l:b.left,r:b.right,t:b.top,b:b.bottom}}:null})()");
+  assert(chromeRects&&!(chromeRects.a.l<chromeRects.b.r&&chromeRects.a.r>chromeRects.b.l&&chromeRects.a.t<chromeRects.b.b&&chromeRects.a.b>chromeRects.b.t),'Piece selector and object title must never overlap');
+  console.log('Multi-object regression: Outliner + persistent Sketch references + bulk 3D conversion PASS');
+  await evalv("window.__showAllRefs=RVTest.state.objects.map(o=>o.result);RVTest.toggleIsolation(RVTest.state.objects[0].id);RVTest.state.objects[1].visible=false;document.querySelector('#showAll').click();true");
+  await waitFor(()=>evalv("RVTest.state.objects.every(o=>o.visible) && document.querySelector('#isolationBanner').hidden"));
+  assert(await evalv("RVTest.state.objects.every((o,i)=>o.result===window.__showAllRefs[i])"),'Show All must not discard/rebuild in-memory geometry merely because objects were hidden or isolated');
+
+  const savedPreset=await evalv(`(async()=>{
+    const o=RVTest.active(),feature=o.features.find(f=>f.type==='cookie-cutter');
+    Object.assign(o.params,{mode:'separate',size:68,wall:1.1,height:14,rim:4.2,base:2.4,stampBase:2.2,stampExpansion:.6,stampInset:.25,clearance:.8,detailOffset:.12,outlineOffset:.4,relief:2.1,reliefOut:2.1,reliefIn:.7,reliefInverted:false,reliefSeparate:true,chamfer:true,tip:.35,chamferHeight:2.2,cornerRadius:1.4,mirror:false,removeOutline:false,outlineBand:.8,tolerance:.04,threshold:160,wallEdits:[{region:[[-.15,-.15],[.15,-.15],[.15,.15],[-.15,.15]],delta:.05}]});
+    feature.params=o.params;
+    const row=await RVTest.savePreset('QA preset completo');
+    return {id:row.id,version:row.version,wallEdits:row.params.wallEdits,mode:row.params.mode,reliefSeparate:row.params.reliefSeparate,chamfer:row.params.chamfer};
+  })()`);
+  assert.equal(savedPreset.version,2,'New presets must use complete schema v2');
+  assert.equal(savedPreset.mode,'separate');
+  assert.equal(savedPreset.reliefSeparate,true);
+  assert.equal(savedPreset.chamfer,true);
+  assert.equal(savedPreset.wallEdits.length,1,'Preset must preserve local blade edits instead of silently dropping them');
+
+  const immediatePreset=await evalv(`(()=>{
+    document.querySelector('#paramScope').value='all';
+    RVTest.state.objects.forEach(o=>{Object.assign(o.params,{mode:'integrated',wall:.65,height:11,relief:1.2,reliefSeparate:false,chamfer:false,wallEdits:[]});const f=o.features.find(x=>x.type==='cookie-cutter');f.params=o.params;});
+    window.__presetOldResults=RVTest.state.objects.map(o=>o.result);
+    RVTest.applyPreset(${JSON.stringify(savedPreset.id)});
+    const d=RVTest.diagnostics();
+    return {sameRefs:RVTest.state.objects.every((o,i)=>o.result===window.__presetOldResults[i]),batchProtected:d.batchProtected,visible:RVTest.state.objects.every(o=>o.visible!==false),params:RVTest.state.objects.map(o=>({mode:o.params.mode,size:o.params.size,wall:o.params.wall,height:o.params.height,relief:o.params.relief,reliefSeparate:o.params.reliefSeparate,chamfer:o.params.chamfer,tip:o.params.tip,chamferHeight:o.params.chamferHeight,wallEdits:o.params.wallEdits}))};
+  })()`);
+  assert(immediatePreset.sameRefs,'Applying a preset to multiple products must keep the previous valid geometry visible until replacements are ready');
+  assert.equal(immediatePreset.batchProtected,3,'Every product in a preset batch must be protected from mesh eviction while rebuilding');
+  assert(immediatePreset.visible,'Preset application must not hide products');
+  for(const p of immediatePreset.params){
+    assert.equal(p.mode,'separate');assert.equal(p.size,68);assert.equal(p.wall,1.1);assert.equal(p.height,14);assert.equal(p.relief,2.1);assert.equal(p.reliefSeparate,true);assert.equal(p.chamfer,true);assert.equal(p.tip,.35);assert.equal(p.chamferHeight,2.2);assert.equal(p.wallEdits.length,1);
+  }
+  await evalv("RVTest.wait()");
+  const presetDone=await evalv("RVTest.state.objects.map(o=>({released:!!o.result?.released,error:o.error||null,parts:o.result?.parts?.length||0,mode:o.params.mode,wall:o.params.wall,reliefSeparate:o.params.reliefSeparate,wallEdits:o.params.wallEdits?.length||0}))");
+  for(const row of presetDone){assert.equal(row.released,false,'Completed preset batch must not leave visible products released');assert.equal(row.error,null,'Completed preset batch must not leave a geometry error');assert(row.parts>=2,'Separate cutter+stamp preset must generate both products');assert.equal(row.mode,'separate');assert.equal(row.wall,1.1);assert.equal(row.reliefSeparate,true);assert.equal(row.wallEdits,1);}
+  console.log('Preset batch regression: complete parameters + visible geometry + protected rebuild PASS');
+
+  const multiImport=await evalv(`(async()=>{
+    async function png(name,kind){
+      const c=document.createElement('canvas');c.width=120;c.height=120;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,120,120);x.fillStyle='#000';
+      if(kind==='rect')x.fillRect(20,25,80,70);else{x.beginPath();x.moveTo(60,14);x.lineTo(108,104);x.lineTo(12,104);x.closePath();x.fill();}
+      const blob=await new Promise(r=>c.toBlob(r,'image/png'));return new File([blob],name,{type:'image/png'});
+    }
+    await RVTest.importFiles([await png('arte-a.png','rect'),await png('arte-b.png','tri')]);
+    return {open:document.querySelector('#importDialog').open,candidates:document.querySelectorAll('#importCandidates .candidate').length,status:document.querySelector('#status').textContent};
+  })()`);
+  console.log('Multi-image import diagnostics',JSON.stringify(multiImport));
+  assert(multiImport.open&&multiImport.candidates===2,'Multiple image review must open with both raster files: '+JSON.stringify(multiImport));
+  assert.equal(await evalv("document.querySelectorAll('#importCandidates input:checked').length"),2,'All objects from multiple selected files must be preselected');
+  await evalv("document.querySelector('#appendObjects').checked=false;document.querySelector('#confirmImport').click();true");
+  await waitFor(()=>evalv("RVTest.state.objects.length===2 && RVTest.state.stage==='2d'"));
+  assert(await evalv("RVTest.state.objects.some(o=>/Arte A/i.test(o.name))&&RVTest.state.objects.some(o=>/Arte B/i.test(o.name))"),'Multiple image import must preserve per-file object naming');
+  assert.equal(await evalv("document.querySelectorAll('#viewport').length"),1,'Viewport ID must be unique');
+
+  await evalv("(()=>{const p=RVTest.project();p.version='14.28.11';p.view.material='pla';RVTest.applyProject(p);return true;})()");
+  assert.equal(await evalv("RVTest.state.view.material"),'pla','Opening older project must retain PLA selection');
   const exceptions=dev.events.filter(e=>e.method==='Runtime.exceptionThrown');
   const severe=dev.events.filter(e=>e.method==='Log.entryAdded'&&['error'].includes(e.params?.entry?.level));
   assert.deepEqual(exceptions.map(e=>e.params?.exceptionDetails?.text),[]);
   assert.deepEqual(severe.map(e=>e.params?.entry?.text),[]);
   dev.close();
-  console.log('CDP browser smoke: unified Sketch/Feature workspace + verified 3D rendering PASS');
+  console.log('CDP browser smoke: v4 persistent workspaces + grouped Sketch menus + verified 3D rendering PASS');
  }finally{
   proc.kill('SIGKILL');server.close();fs.rmSync(userData,{recursive:true,force:true});
   if(proc.exitCode&&!proc.killed)console.error(stderr.slice(-4000));
  }
 })().catch(e=>{console.error(e);process.exit(1);});
+

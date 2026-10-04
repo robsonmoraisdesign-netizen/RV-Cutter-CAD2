@@ -9,11 +9,13 @@ const measuredValue=e=>e.type==='line'?lineLength(e):['circle','arc'].includes(e
 
 // Domain/controller shared by the existing SVG editor; no second editor or overlay app.
 export function createSketchController(api){
- let selected=[],points=[],lastSolution=null,cache=null,statusCache=null;
+ let selected=[],points=[],lastSolution=null,cache=null,statusCache=null,statesCache=null;
  function native(){const o=api.object();if(!o)return null;const key=[o,o.sketch,o.loops,o.params.size,o.contourVersion];if(cache&&key.every((v,i)=>v===cache.key[i]))return cache.value;cache={key,value:sketchFromObject(o)};return cache.value;}
- function invalidate(){cache=null;statusCache=null;}
+ function invalidate(){cache=null;statusCache=null;statesCache=null;}
  function transact(edit,changedIds=null){const o=api.object();if(!o)return false;try{
-  const s=cloneSketch(native());edit(s);const r=resolveDocument(s,changedIds);
+  const s=cloneSketch(native()),existing=new Set(s.entities.map(e=>e.id));edit(s);
+  const affected=changedIds===null?null:[...new Set([...changedIds,...s.entities.filter(e=>!existing.has(e.id)).map(e=>e.id)])];
+  const r=resolveDocument(s,affected);
   const geometryChanged=o.params.size!==r.size||JSON.stringify(o.loops)!==JSON.stringify(r.loops);api.history();o.sketch=r.sketch;o.loops=r.loops;o.params.size=r.size;
   lastSolution=r.solution;selected=selected.filter(id=>s.entities.some(e=>e.id===id));points=points.filter(p=>selected.includes(p.entity));invalidate();
   api.changed({geometryChanged});return true;
@@ -21,8 +23,14 @@ export function createSketchController(api){
  function create(type,a,b,c,options={}){return transact(s=>{
   if(type==='rectangle'){
    selected=rectangle(s,a,b);
-   if(options.startRef)addConstraint(s,'coincident',{a:{entity:selected[0],point:'start'},b:options.startRef});
-   if(options.endRef)addConstraint(s,'coincident',{a:{entity:selected[1],point:'end'},b:options.endRef});
+   const applyRectangleRelation=(entity,point,rel)=>{
+    if(!rel)return;
+    if(rel.type==='coincident')addConstraint(s,'coincident',{a:{entity,point},b:rel.ref});
+    if(rel.type==='origin')addConstraint(s,'coincidentOrigin',{point:{entity,point}});
+    if(rel.type==='axis')addConstraint(s,'pointOnAxis',{point:{entity,point},axis:rel.axis});
+   };
+   applyRectangleRelation(selected[0],'start',options.startRelation||(options.startRef?{type:'coincident',ref:options.startRef}:null));
+   applyRectangleRelation(selected[1],'end',options.endRelation||(options.endRef?{type:'coincident',ref:options.endRef}:null));
   }else{let e;
    if(type==='point')e=sketchPoint(a);
    if(type==='line')e=line(a,b);
@@ -44,6 +52,8 @@ export function createSketchController(api){
       if(!rel)return;
       if(rel.type==='coincident')addConstraint(s,'coincident',{a:{entity:e.id,point:which},b:rel.ref});
       if(rel.type==='midpoint')addConstraint(s,'midpoint',{point:{entity:e.id,point:which},line:rel.line});
+      if(rel.type==='origin')addConstraint(s,'coincidentOrigin',{point:{entity:e.id,point:which}});
+      if(rel.type==='axis')addConstraint(s,'pointOnAxis',{point:{entity:e.id,point:which},axis:rel.axis});
     };
     applyInference('start',options.startRelation|| (options.startRef?{type:'coincident',ref:options.startRef}:null));
     applyInference('end',options.endRelation|| (options.endRef?{type:'coincident',ref:options.endRef}:null));
@@ -51,16 +61,30 @@ export function createSketchController(api){
     const rel=options.pointRelation||null;
     if(rel?.type==='coincident')addConstraint(s,'coincident',{a:{entity:e.id,point:'point'},b:rel.ref});
     if(rel?.type==='midpoint')addConstraint(s,'midpoint',{point:{entity:e.id,point:'point'},line:rel.line});
+    if(rel?.type==='origin')addConstraint(s,'coincidentOrigin',{point:{entity:e.id,point:'point'}});
+    if(rel?.type==='axis')addConstraint(s,'pointOnAxis',{point:{entity:e.id,point:'point'},axis:rel.axis});
    }else if(e.type==='circle'){
     const rel=options.centerRelation||(options.centerRef?{type:'coincident',ref:options.centerRef}:null);
     if(rel?.type==='coincident')addConstraint(s,'coincident',{a:{entity:e.id,point:'center'},b:rel.ref});
     if(rel?.type==='midpoint')addConstraint(s,'midpoint',{point:{entity:e.id,point:'center'},line:rel.line});
+    if(rel?.type==='origin')addConstraint(s,'coincidentOrigin',{point:{entity:e.id,point:'center'}});
+    if(rel?.type==='axis')addConstraint(s,'pointOnAxis',{point:{entity:e.id,point:'center'},axis:rel.axis});
+   }else if(e.type==='arc'){
+    for(const [which,rel] of [['start',options.startRelation],['end',options.endRelation]]){
+     if(!rel)continue;
+     const point={entity:e.id,point:which};
+     if(rel.type==='coincident')addConstraint(s,'coincident',{a:point,b:rel.ref});
+     if(rel.type==='origin')addConstraint(s,'coincidentOrigin',{point});
+     if(rel.type==='axis')addConstraint(s,'pointOnAxis',{point,axis:rel.axis});
+    }
    }else if(e.type==='bezier'){
     for(const [i,rel] of (options.controlRelations||[]).entries()){
       if(!rel)continue;
       const point={entity:e.id,point:`control:${i}`};
       if(rel.type==='coincident')addConstraint(s,'coincident',{a:point,b:rel.ref});
       if(rel.type==='midpoint')addConstraint(s,'midpoint',{point,line:rel.line});
+      if(rel.type==='origin')addConstraint(s,'coincidentOrigin',{point});
+      if(rel.type==='axis')addConstraint(s,'pointOnAxis',{point,axis:rel.axis});
     }
    }
   }points=[];
@@ -96,7 +120,7 @@ export function createSketchController(api){
   const old=s.dimensions.find(d=>d.entity===e.id&&d.type===type);
   if(old){old.value=v;old.driving=driving;}else addDimension(s,type,{entity:e.id,value:v,driving});
  },selected);}
- function movePoint(entity,which,p){return transact(s=>{
+ function movePoint(entity,which,p,relation=null){return transact(s=>{
   const e=getEntity(s,entity);
   if(s.constraints.some(c=>c.type==='fixed'&&c.entity===entity))throw Error('Entidade fixada: remova Fixar antes de mover.');
   if(e.type==='point')e.position=[...p];
@@ -107,6 +131,15 @@ export function createSketchController(api){
   }else if(which==='center')e.center=[...p];
   else if(which==='radius')e.radius=Math.hypot(p[0]-e.center[0],p[1]-e.center[1]);
   else if(e.type==='arc'){e[which==='start'?'startAngle':'endAngle']=Math.atan2(p[1]-e.center[1],p[0]-e.center[0]);}
+  if(relation&&which!=='radius'){
+   const point={entity,point:e.type==='point'?'point':which};
+   const duplicate=s.constraints.some(c=>(c.type==='coincidentOrigin'||c.type==='pointOnAxis')&&c.point?.entity===point.entity&&c.point?.point===point.point);
+   if(!duplicate){
+    if(relation.type==='origin')addConstraint(s,'coincidentOrigin',{point});
+    if(relation.type==='axis')addConstraint(s,'pointOnAxis',{point,axis:relation.axis});
+    if(relation.type==='coincident')addConstraint(s,'coincident',{a:point,b:relation.ref});
+   }
+  }
  },[entity]);}
  function select(entity,point,extend=false){
   if(!extend){selected=[];points=[];}
@@ -145,7 +178,7 @@ export function createSketchController(api){
  }
  function convert(){const o=api.object();if(!o?.sketch)return;api.history();delete o.sketch;selected=[];points=[];invalidate();api.changed();api.status('Sketch convertido em contornos. Desfazer restaura as entidades e restrições.');}
  function describe(){const s=native();if(!s)return {label:'Sketch vazio',state:'free',dof:0};if(statusCache?.source===s)return statusCache.value;statusCache={source:s,value:sketchStatus(s,lastSolution)};return statusCache.value;}
- function states(){const s=native();return s?entityStates(s,lastSolution):new Map();}
+ function states(){const s=native();if(!s)return new Map();if(statesCache?.document===s&&statesCache.solution===lastSolution)return statesCache.value;statesCache={document:s,solution:lastSolution,value:entityStates(s,lastSolution)};return statesCache.value;}
  function selectionInfo(){
   const s=native();if(!s||!selected.length)return {count:0,entities:[],primary:null,rules:[]};
   const entities=selected.map(id=>getEntity(s,id)),primary=entities.length===1?entities[0]:null;
@@ -154,3 +187,4 @@ export function createSketchController(api){
  }
  return {native,create,constrain,dimension,movePoint,select,setSelection,selectBox,clearSelection,remove,rules,removeRule,toggleConstruction,trim,extend,convert,describe,states,selectionInfo,reset:()=>{selected=[];points=[];lastSolution=null;invalidate();},selected:()=>selected,points:()=>points};
 }
+

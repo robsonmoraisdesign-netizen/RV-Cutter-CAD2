@@ -1,0 +1,476 @@
+/* RV Appearance Engine 14.28.11
+   Theme colors live only in src/theme-controller.mjs.
+   This layer maps semantic roles to every workspace surface/state. */
+
+:root{
+  --v4-bg:var(--rv-app-bg);
+  --v4-chrome:var(--rv-chrome);
+  --v4-surface:var(--rv-surface-1);
+  --v4-surface2:var(--rv-surface-2);
+  --v4-surface3:var(--rv-surface-3);
+  --v4-viewport:var(--rv-viewport-bg);
+  --v4-line:var(--rv-border-strong);
+  --v4-line2:var(--rv-border-subtle);
+  --v4-text:var(--rv-text-primary);
+  --v4-text2:var(--rv-text-secondary);
+  --v4-muted:var(--rv-text-muted);
+  --v4-brand:var(--rv-accent);
+  --v4-brand2:var(--rv-accent-hover);
+  --v4-brandSoft:var(--rv-accent-soft);
+  --v4-warm:var(--rv-warning);
+  --v4-danger:var(--rv-danger);
+  --v4-success:var(--rv-success);
+  --v4-shadow:var(--rv-shadow-elevation);
+
+  --rv-z-content:1;
+  --rv-z-floating:40;
+  --rv-z-popover:70;
+  --rv-z-toolbar:100;
+  --rv-z-modal:200;
+  --rv-z-critical:300;
+}
+
+
+body.ui-light,body.ui-dark{
+  --v4-bg:var(--rv-app-bg);
+  --v4-chrome:var(--rv-chrome);
+  --v4-surface:var(--rv-surface-1);
+  --v4-surface2:var(--rv-surface-2);
+  --v4-surface3:var(--rv-surface-3);
+  --v4-viewport:var(--rv-viewport-bg);
+  --v4-line:var(--rv-border-strong);
+  --v4-line2:var(--rv-border-subtle);
+  --v4-text:var(--rv-text-primary);
+  --v4-text2:var(--rv-text-secondary);
+  --v4-muted:var(--rv-text-muted);
+  --v4-brand:var(--rv-accent);
+  --v4-brand2:var(--rv-accent-hover);
+  --v4-brandSoft:var(--rv-accent-soft);
+  --v4-warm:var(--rv-warning);
+  --v4-danger:var(--rv-danger);
+  --v4-success:var(--rv-success);
+  --v4-shadow:var(--rv-shadow-elevation);
+}
+
+html[data-rv-theme="dark"]{color-scheme:dark}
+html[data-rv-theme="light"]{color-scheme:light}
+
+html,body{
+  background:var(--rv-app-bg)!important;
+  color:var(--rv-text-primary)!important;
+  accent-color:var(--rv-accent);
+}
+body *{caret-color:var(--rv-accent)}
+::selection{background:var(--rv-accent-soft);color:var(--rv-text-primary)}
+.rv-contrast-guard{color:var(--rv-auto-contrast)!important;fill:var(--rv-auto-contrast)!important}
+
+:where(button,input,select,textarea,summary,[tabindex]):focus-visible{
+  outline:2px solid var(--rv-focus)!important;
+  outline-offset:2px!important;
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--rv-focus) 20%,transparent)!important;
+}
+:where(button,input,select,textarea):disabled{
+  color:var(--rv-text-disabled)!important;
+  border-color:var(--rv-border-subtle)!important;
+  opacity:.62;
+}
+:where(input,select,textarea){
+  background:var(--rv-input-bg)!important;
+  color:var(--rv-text-primary)!important;
+  border-color:var(--rv-border-strong)!important;
+}
+:where(input,select,textarea)::placeholder{color:var(--rv-text-muted)!important;opacity:1}
+:where(option){background:var(--rv-surface-elevated);color:var(--rv-text-primary)}
+
+.app-header,.tool-rail-v4,.workspace .toolbar,.workspace footer,
+.onshape-ribbon,.sketch-commandbar{
+  background:var(--rv-chrome)!important;
+  color:var(--rv-text-primary)!important;
+  border-color:var(--rv-border-subtle)!important;
+}
+.project-drawer-v4,.right,.sketch-contextbar,.library-section,.project-card{
+  background:var(--rv-surface-1)!important;
+  color:var(--rv-text-primary)!important;
+  border-color:var(--rv-border-subtle)!important;
+}
+.workspace,#viewport{background:var(--rv-viewport-bg)!important}
+
+:where(.hint,.mini-label,.section-eyebrow,.library-status,.brand-copy small,
+.workspace-context-title span,.popover-title small,.sketch-context-hint,
+.metrics-hint,.coming-soon,.save-state,.count-badge,.cap){
+  color:var(--rv-text-muted)!important;
+}
+:where(h1,h2,h3,h4,strong,label,.workspace-context-title strong,.project-title-row #name){
+  color:var(--rv-text-primary);
+}
+
+:where(.workspace-tab,.rail-tool,.header-action,.icon-button,.command-button,
+.layer-actions button,.help-button,.feature-action,.sketch-tool-button,
+.sketch-shortcut-button,.measure-actions button,.object-quick-actions button){
+  color:var(--rv-text-secondary)!important;
+  border-color:var(--rv-border-subtle)!important;
+}
+:where(.workspace-tab,.rail-tool,.header-action,.icon-button,.command-button,
+.layer-actions button,.help-button,.feature-action,.sketch-tool-button,
+.sketch-shortcut-button,.measure-actions button,.object-quick-actions button):hover:not(:disabled){
+  background:var(--rv-hover-bg)!important;
+  color:var(--rv-text-primary)!important;
+  border-color:var(--rv-border-strong)!important;
+}
+:where(.workspace-tab.active,.rail-tool.active,.sketch-tool-button.active,
+.sketch-shortcut-button.active,.scope-v4-buttons button.active){
+  background:var(--rv-accent-soft)!important;
+  color:var(--rv-text-primary)!important;
+  border-color:color-mix(in srgb,var(--rv-accent) 48%,var(--rv-border-strong))!important;
+}
+
+:where(.primary,.big-action,.v4-actions #export,.right .primary,.feature-action.accent){
+  background:var(--rv-accent)!important;
+  color:var(--rv-text-on-accent)!important;
+  border-color:transparent!important;
+}
+:where(.primary,.big-action,.v4-actions #export,.right .primary,.feature-action.accent):hover:not(:disabled){
+  background:var(--rv-accent-hover)!important;
+  color:var(--rv-text-on-accent)!important;
+}
+.danger-quiet,.validation.error,#saveState[data-state="error"]{color:var(--rv-danger)!important}
+#saveState[data-state="dirty"],#saveState[data-state="saving"]{color:var(--rv-warning)!important}
+#saveState[data-state="saved"]{color:var(--rv-success)!important}
+
+:where(dialog,.command-palette-v4,.leave-project-dialog){
+  background:var(--rv-surface-elevated)!important;
+  color:var(--rv-text-primary)!important;
+  border-color:var(--rv-border-strong)!important;
+  box-shadow:var(--rv-shadow-elevation)!important;
+}
+:where(dialog,.command-palette-v4,.leave-project-dialog)::backdrop{
+  background:var(--rv-overlay-backdrop)!important;
+  backdrop-filter:blur(2px);
+}
+:where(.visual-popover,.sketch-menu-popover,.command-results,.sample-drawer[open]){
+  background:var(--rv-surface-elevated)!important;
+  color:var(--rv-text-primary)!important;
+  border-color:var(--rv-border-strong)!important;
+  box-shadow:var(--rv-shadow-elevation)!important;
+  z-index:var(--rv-z-popover)!important;
+}
+.popover-separator,.toolbar-divider,.sketch-toolbar-divider{background:var(--rv-border-subtle)!important}
+
+.project-drawer-v4 .object-search-wrap,
+.scope-v4-buttons,.command-button kbd,.onshape-ribbon .sketch-status-chip{
+  background:var(--rv-input-bg)!important;
+  color:var(--rv-text-secondary)!important;
+  border-color:var(--rv-border-subtle)!important;
+}
+.project-drawer-v4 .layer:hover{background:var(--rv-hover-bg)!important}
+.project-drawer-v4 .layer.active{
+  background:var(--rv-accent-soft)!important;
+  border-color:color-mix(in srgb,var(--rv-accent) 45%,var(--rv-border-strong))!important;
+}
+
+body.sketching #editor{background:var(--rv-sketch-bg)!important}
+.sketch-inline-dimension,.sketch-shortcut-palette,.sketch-diagnostics-popover{
+  background:var(--rv-surface-elevated)!important;
+  color:var(--rv-text-primary)!important;
+  border-color:var(--rv-border-strong)!important;
+  box-shadow:var(--rv-shadow-elevation)!important;
+}
+.sketch-status-chip{
+  background:var(--rv-surface-2)!important;
+  color:var(--rv-text-secondary)!important;
+  border-color:var(--rv-border-strong)!important;
+}
+.sketch-status-chip .status-dot{background:var(--rv-text-muted)!important}
+.sketch-status-chip[data-state="partial"] .status-dot{background:var(--rv-warning)!important}
+.sketch-status-chip[data-state="defined"] .status-dot{background:var(--rv-success)!important}
+.sketch-status-chip[data-state="free"] .status-dot{background:var(--rv-info)!important}
+.sketch-status-chip[data-state="conflict"] .status-dot{background:var(--rv-danger)!important}
+
+.measure-toggle.active{
+  background:var(--rv-accent-soft)!important;
+  color:var(--rv-text-primary)!important;
+  border-color:var(--rv-accent)!important;
+}
+.measure-panel{
+  background:var(--rv-surface-elevated)!important;
+  color:var(--rv-text-primary)!important;
+  border-color:var(--rv-border-strong)!important;
+  box-shadow:var(--rv-shadow-elevation)!important;
+  z-index:var(--rv-z-floating)!important;
+}
+.measure-points,.measure-grid>div,.measure-coordinates{
+  background:var(--rv-surface-2)!important;
+  border-color:var(--rv-border-subtle)!important;
+}
+.measure-points span,.measure-grid span,.measure-coordinates summary{color:var(--rv-text-muted)!important}
+.measure-grid strong,.measure-coordinates code{color:var(--rv-text-primary)!important}
+.measure-grid .axis-x strong{color:var(--rv-measure-x)!important}
+.measure-grid .axis-y strong{color:var(--rv-measure-y)!important}
+.measure-grid .axis-z strong{color:var(--rv-measure-z)!important}
+.measure-grid .measure-primary{
+  border-color:var(--rv-accent)!important;
+  background:var(--rv-accent-soft)!important;
+}
+.measure-grid .measure-primary strong{color:var(--rv-text-primary)!important}
+
+.dimension-editor{
+  background:var(--rv-surface-elevated)!important;
+  color:var(--rv-text-primary)!important;
+  border-color:var(--rv-focus)!important;
+  box-shadow:var(--rv-shadow-elevation)!important;
+  z-index:var(--rv-z-popover)!important;
+}
+.dimension-editor>span,.dimension-editor>div:nth-child(2)>span{color:var(--rv-text-muted)!important}
+.dimension-editor input{
+  background:var(--rv-input-bg)!important;
+  color:var(--rv-text-primary)!important;
+  border-color:var(--rv-border-strong)!important;
+}
+
+.presentation-styles-v4,.piece-mode-host{
+  background:color-mix(in srgb,var(--rv-surface-elevated) 94%,transparent)!important;
+  color:var(--rv-text-primary)!important;
+  border-color:var(--rv-border-strong)!important;
+  box-shadow:0 10px 30px var(--rv-shadow-color)!important;
+}
+.presentation-styles-v4 button,.piece-mode-host button{
+  color:var(--rv-text-secondary)!important;
+  border-color:var(--rv-border-subtle)!important;
+}
+.presentation-styles-v4 button.active,.piece-mode-host button.active{
+  color:var(--rv-text-primary)!important;
+  border-color:var(--rv-accent)!important;
+  background:var(--rv-accent-soft)!important;
+}
+
+/* Hierarchy rule: modal > chrome > popover > viewport overlays > content. */
+.app-header{z-index:var(--rv-z-toolbar)!important}
+.command-palette-v4,.leave-project-dialog,dialog{z-index:var(--rv-z-modal)}
+.visual-popover,.sketch-menu-popover{z-index:var(--rv-z-popover)!important}
+.measure-overlay{z-index:calc(var(--rv-z-floating) - 1)!important}
+.measure-panel,.dimension-editor{z-index:var(--rv-z-floating)!important}
+
+/* Never allow translucent controls to lose their text contrast in light mode. */
+:where(.visual-popover,.measure-panel,.dimension-editor,.sketch-menu-popover,
+.command-palette-v4,.leave-project-dialog,.presentation-styles-v4,.piece-mode-host){
+  backdrop-filter:blur(10px);
+}
+:where(.visual-popover,.measure-panel,.dimension-editor,.sketch-menu-popover,
+.command-palette-v4,.leave-project-dialog) :where(p,span,label,strong,small,button,summary){
+  text-shadow:none!important;
+}
+
+
+/* Highest-priority semantic remap for legacy 14.28.x high-contrast overrides. */
+body[data-rv-theme] .right .primary,
+body[data-rv-theme] .finish-sketch,
+body[data-rv-theme] .v4-actions #export{
+  background:var(--rv-accent)!important;
+  color:var(--rv-text-on-accent)!important;
+  border-color:transparent!important;
+}
+body[data-rv-theme] .brand-mark{background:var(--rv-accent)!important;color:var(--rv-text-on-accent)!important}
+body[data-rv-theme] .workspace-nav{
+  background:var(--rv-app-bg)!important;
+  border-color:var(--rv-border-subtle)!important;
+}
+body[data-rv-theme] .workspace-tab{color:var(--rv-text-muted)!important}
+body[data-rv-theme] .workspace-tab:hover{
+  background:var(--rv-hover-bg)!important;color:var(--rv-text-primary)!important
+}
+body[data-rv-theme] .workspace-tab.active{
+  background:var(--rv-active-bg)!important;color:var(--rv-text-primary)!important;
+  box-shadow:inset 0 0 0 1px var(--rv-border-strong)!important
+}
+body[data-rv-theme] :is(.v4-actions .header-action,.v4-actions .icon-button,.command-button,.workspace .view-actions>button,.workspace .visual-menu>summary){
+  background:var(--rv-surface-2)!important;border-color:var(--rv-border-strong)!important;color:var(--rv-text-secondary)!important
+}
+body[data-rv-theme] :is(.v4-actions .header-action,.v4-actions .icon-button,.command-button,.workspace .view-actions>button,.workspace .visual-menu>summary):hover{
+  background:var(--rv-hover-bg)!important;border-color:var(--rv-focus)!important;color:var(--rv-text-primary)!important
+}
+body[data-rv-theme] :is(.brand-copy strong,.workspace-context-title strong,.right>.config-heading h2,.outliner-heading h2,.viewport-title strong,.right h2){
+  color:var(--rv-text-primary)!important;text-shadow:none!important
+}
+body[data-rv-theme] :is(.brand-copy small,.workspace-context-title span,.section-eyebrow,.outliner-heading .section-eyebrow,.canvas-eyebrow,.viewport-title .canvas-eyebrow){
+  color:var(--rv-accent-hover)!important
+}
+body[data-rv-theme] .right>.config-heading{
+  background:var(--rv-chrome)!important;border-bottom-color:var(--rv-border-subtle)!important
+}
+body[data-rv-theme] .inspector-levels{
+  background:var(--rv-app-bg)!important;border-color:var(--rv-border-subtle)!important
+}
+body[data-rv-theme] .inspector-levels button{color:var(--rv-text-muted)!important}
+body[data-rv-theme] .inspector-levels button.active{
+  background:var(--rv-active-bg)!important;color:var(--rv-text-primary)!important;
+  box-shadow:inset 0 0 0 1px var(--rv-border-strong)!important
+}
+body[data-rv-theme] :is(.param-group,.option-card,.preset-box,.preset-block,.advanced-card){
+  background:var(--rv-surface-2)!important;border-color:var(--rv-border-subtle)!important
+}
+body[data-rv-theme] :is(.param-group>summary,.option-card>summary){color:var(--rv-text-secondary)!important}
+body[data-rv-theme] :is(.range-pair label,.field,.check,.hint){color:var(--rv-text-secondary)!important}
+body[data-rv-theme] :is(input,select,textarea){
+  background:var(--rv-input-bg)!important;border-color:var(--rv-border-strong)!important;color:var(--rv-text-primary)!important
+}
+body[data-rv-theme] :is(input,select,textarea):focus{
+  border-color:var(--rv-focus)!important;
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--rv-focus) 20%,transparent)!important
+}
+body[data-rv-theme] .layer{background:var(--rv-surface-1)!important;border-color:var(--rv-border-subtle)!important}
+body[data-rv-theme] .layer:hover{background:var(--rv-hover-bg)!important;border-color:var(--rv-border-strong)!important}
+body[data-rv-theme] .layer.active{
+  background:var(--rv-accent-soft)!important;border-color:var(--rv-accent)!important;
+  box-shadow:inset 3px 0 0 var(--rv-accent)!important
+}
+body[data-rv-theme] .layer.active :is(.layer-name,.layer-name strong){color:var(--rv-text-primary)!important}
+body[data-rv-theme] .object-search-wrap,
+body[data-rv-theme] .project-drawer-v4 #layers{
+  background:var(--rv-surface-1)!important;border-color:var(--rv-border-subtle)!important
+}
+body[data-rv-theme] .piece-mode-host .mode-block{
+  background:var(--rv-surface-elevated)!important;border-color:var(--rv-border-strong)!important;
+  box-shadow:var(--rv-shadow-elevation)!important
+}
+body[data-rv-theme] .piece-mode-host .mini-label{color:var(--rv-text-muted)!important}
+body[data-rv-theme] .piece-mode-host .mode-grid button{color:var(--rv-text-secondary)!important}
+body[data-rv-theme] .piece-mode-host .mode-grid button.active{
+  background:var(--rv-accent-soft)!important;border-color:var(--rv-accent)!important;color:var(--rv-text-primary)!important
+}
+body[data-rv-theme] .viewport-title{
+  background:var(--rv-surface-elevated)!important;border-color:var(--rv-border-strong)!important;
+  box-shadow:0 10px 26px var(--rv-shadow-color)!important
+}
+body[data-rv-theme] .viewport-title span{color:var(--rv-text-muted)!important}
+body[data-rv-theme] .view-badge{
+  background:var(--rv-surface-elevated)!important;border-color:var(--rv-border-strong)!important;color:var(--rv-text-secondary)!important
+}
+body[data-rv-theme] .visual-popover{
+  background:var(--rv-surface-elevated)!important;border-color:var(--rv-border-strong)!important;color:var(--rv-text-primary)!important;
+  box-shadow:var(--rv-shadow-elevation)!important
+}
+body[data-rv-theme] .visual-popover .popover-title strong{color:var(--rv-text-primary)!important}
+body[data-rv-theme] .visual-popover .popover-title small{color:var(--rv-text-muted)!important}
+body[data-rv-theme] :is(.app-header.v4-top,.workspace .toolbar,.project-drawer-v4,.right){background:var(--rv-chrome)!important}
+body[data-rv-theme] :is(.workspace .toolbar,.right,.project-drawer-v4){border-color:var(--rv-border-subtle)!important}
+
+/* Sketch semantic states. */
+body[data-rv-theme] #editor .sketch-entity-visible.entity-under{stroke:var(--rv-sketch-entity)!important}
+body[data-rv-theme] #editor .sketch-entity-visible.entity-defined{stroke:var(--rv-sketch-constrained)!important}
+body[data-rv-theme] #editor .sketch-entity-visible.entity-conflict{stroke:var(--rv-danger)!important}
+body[data-rv-theme] #editor .sketch-entity-visible.entity-selected{stroke:var(--rv-sketch-selected)!important}
+body[data-rv-theme] #editor .sketch-entity-hit:hover + .sketch-entity-visible{stroke:var(--rv-sketch-hover)!important}
+body[data-rv-theme] #editor .sketch-reference-awake{stroke:var(--rv-sketch-selected)!important}
+body[data-rv-theme] #editor .sketch-box-select{fill:var(--rv-accent-soft)!important;stroke:var(--rv-info)!important}
+body[data-rv-theme] #editor .sketch-box-select.crossing{fill:var(--rv-accent-soft)!important;stroke:var(--rv-sketch-constrained)!important}
+body[data-rv-theme] #editor .sketch-inference-icon{fill:var(--rv-sketch-constrained)!important;stroke:var(--rv-sketch-handle)!important}
+body[data-rv-theme] #editor .sketch-midpoint-marker{fill:var(--rv-sketch-handle)!important;stroke:var(--rv-sketch-constrained)!important}
+body[data-rv-theme] #editor .sketch-dimension{fill:var(--rv-sketch-dimension)!important;stroke:var(--rv-sketch-text-outline)!important;font-weight:750!important}
+body[data-rv-theme] #editor .sketch-dimension.driven{fill:var(--rv-sketch-dimension-driven)!important;stroke:var(--rv-sketch-text-outline)!important;font-weight:650!important}
+body[data-rv-theme] #editor .sketch-live-dimension{fill:var(--rv-sketch-live-dimension)!important;stroke:var(--rv-sketch-text-outline)!important;font-weight:750!important}
+body[data-rv-theme] #editor .sketch-constraint-badge{fill:var(--rv-sketch-constraint-text)!important;stroke:var(--rv-sketch-text-outline)!important;font-weight:850!important}
+body[data-rv-theme] #editor .sketch-inference-icon{fill:var(--rv-sketch-constraint-text)!important;stroke:var(--rv-sketch-text-outline)!important}
+body[data-rv-theme] #editor .sketch-bezier-polygon{stroke:var(--rv-sketch-construction)!important}
+body[data-rv-theme] #editor .sketch-bezier-control{fill:var(--rv-sketch-handle)!important;stroke:var(--rv-sketch-construction)!important}
+body[data-rv-theme] #editor .bezier-preview{stroke:var(--rv-sketch-selected)!important}
+body[data-rv-theme] #editor .sketch-point-visible{fill:var(--rv-sketch-entity)!important}
+body[data-rv-theme] #editor .sketch-point-visible.entity-defined{fill:var(--rv-sketch-constrained)!important}
+body[data-rv-theme] #editor .sketch-point-visible.entity-conflict{fill:var(--rv-danger)!important}
+body[data-rv-theme] #editor .sketch-point-visible.entity-selected{fill:var(--rv-sketch-selected)!important}
+body[data-rv-theme] #editor .sketch-point-hit:hover + .sketch-point-visible{
+  fill:var(--rv-sketch-hover)!important;stroke:var(--rv-sketch-hover)!important
+}
+
+
+/* 14.28.12 · Sketch readability pass — CAD canvas text and chrome are separate roles. */
+body[data-rv-theme].sketching .sketch-commandbar,
+body[data-rv-theme].sketching .sketch-contextbar{
+  color:var(--rv-text-primary)!important;
+}
+body[data-rv-theme].sketching .sketch-tool-button,
+body[data-rv-theme].sketching .v4-command-grid>button,
+body[data-rv-theme].sketching .reference-menu>button,
+body[data-rv-theme].sketching .constraint-menu>button{
+  font-size:10px!important;
+  font-weight:650!important;
+  color:var(--rv-text-secondary)!important;
+}
+body[data-rv-theme].sketching .sketch-tool-icon{font-size:18px!important}
+body[data-rv-theme].sketching .constraint-icon{
+  color:var(--rv-accent-hover)!important;
+  border-color:var(--rv-border-strong)!important;
+  font-weight:800!important;
+}
+body[data-rv-theme].sketching .sketch-show-constraints{
+  color:var(--rv-text-secondary)!important;
+  font-size:9.5px!important;
+  font-weight:600!important;
+}
+body[data-rv-theme].sketching .sketch-status-chip{
+  color:var(--rv-text-primary)!important;
+  font-size:10px!important;
+  font-weight:650!important;
+  min-width:150px!important;
+}
+body[data-rv-theme].sketching .sketch-contextbar #selection{
+  color:var(--rv-text-primary)!important;
+  font-size:10.5px!important;
+  font-weight:600!important;
+}
+body[data-rv-theme].sketching .sketch-context-hint{
+  color:var(--rv-text-secondary)!important;
+  font-size:9.5px!important;
+  font-weight:550!important;
+}
+body[data-rv-theme].sketching .sketch-inline-dimension{
+  background:var(--rv-surface-elevated)!important;
+  color:var(--rv-text-primary)!important;
+  border-color:var(--rv-focus)!important;
+}
+body[data-rv-theme].sketching .sketch-inline-dimension>span:first-child,
+body[data-rv-theme].sketching .sketch-inline-dimension>span:nth-child(3){
+  color:var(--rv-text-secondary)!important;
+  font-size:9.5px!important;
+  font-weight:650!important;
+}
+body[data-rv-theme].sketching .sketch-selection-meta{
+  color:var(--rv-text-secondary)!important;
+  font-size:11px!important;
+  line-height:1.55!important;
+}
+body[data-rv-theme].sketching .inspector-badge{
+  color:var(--rv-text-secondary)!important;
+  border-color:var(--rv-border-strong)!important;
+  font-size:9.5px!important;
+  font-weight:650!important;
+}
+body[data-rv-theme].sketching .sketch-dimension-row>span,
+body[data-rv-theme].sketching .sketch-driving small{
+  color:var(--rv-text-secondary)!important;
+  font-size:9.5px!important;
+}
+body[data-rv-theme].sketching .property-group-title .mini-label,
+body[data-rv-theme].sketching .sketch-menu-separator span{
+  color:var(--rv-text-secondary)!important;
+}
+body[data-rv-theme].sketching #editor .sketch-svg-text{
+  paint-order:stroke!important;
+  stroke-linejoin:round!important;
+}
+body[data-rv-theme].sketching #editor .sketch-dimension{
+  font-size:1.9%!important;
+  stroke-width:.0065!important;
+}
+body[data-rv-theme].sketching #editor .sketch-live-dimension{
+  font-size:1.85%!important;
+  stroke-width:.0065!important;
+}
+body[data-rv-theme].sketching #editor .sketch-constraint-badge,
+body[data-rv-theme].sketching #editor .sketch-inference-icon{
+  font-size:1.7%!important;
+  stroke-width:.0065!important;
+}
+body[data-rv-theme].sketching #editor .sketch-axis{
+  stroke:var(--rv-sketch-text-muted)!important;
+  opacity:.72!important;
+}

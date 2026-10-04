@@ -1,0 +1,36 @@
+name: RV Cutter 14.28.12 Browser Smoke
+
+on:
+  push:
+    branches:
+      - feature/14.28.12-sketch-clarity
+    paths:
+      - .github/workflows/RV_Cutter_14_28_12_Browser.yml
+      - app/**
+      - src/**
+      - qa-**
+      - package*.json
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Copy Manifold WASM
+        shell: node {0}
+        run: |
+          const fs=require('fs'),path=require('path');
+          function walk(dir){for(const name of fs.readdirSync(dir)){const p=path.join(dir,name),st=fs.statSync(p);if(st.isDirectory()){const r=walk(p);if(r)return r;}else if(name==='manifold.wasm')return p;}}
+          const wasm=walk(path.join(process.cwd(),'node_modules','manifold-3d'));if(!wasm)throw new Error('manifold.wasm not found');
+          fs.copyFileSync(wasm,path.join(process.cwd(),'app','manifold.wasm'));
+      - run: node qa-browser-cdp.cjs
