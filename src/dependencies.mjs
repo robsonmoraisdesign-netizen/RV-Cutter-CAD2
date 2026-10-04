@@ -1,5 +1,5 @@
 // Versioned dependency graph. Only plain data / typed arrays are retained: never WASM handles.
-export const ENGINE_VERSION='14.28.15';
+export const ENGINE_VERSION='14.28.16';
 const shape=['size','mirror','tolerance'];
 export const PARAMETRIC_GRAPH={
  source:{parents:[],params:shape},
@@ -10,7 +10,7 @@ export const PARAMETRIC_GRAPH={
  bladeSolid:{parents:['blade'],params:['base','height','rim','chamferHeight','bladeReinforcement','reinforcementHeight','reinforcementWidth']},
  art:{parents:['source'],params:['detailOffset','removeOutline','outlineBand','stampInset','mode','outlineOffset']},
  footprint:{parents:['outer'],params:['stampInset','stampExpansion']},
- cutter:{parents:['rim','bladeSolid'],params:['base','height','chamferHeight','bladeReinforcement','reinforcementHeight','reinforcementWidth','mode']},
+ cutter:{parents:['rim','bladeSolid'],params:['base','height','chamferHeight','bladeReinforcement','reinforcementHeight','reinforcementWidth','logoEnabled','logoText','logoFont','logoSize','logoHeight','logoPosition','logoOffset','mode']},
  stamp:{parents:['art','footprint'],params:['stampBase','base','relief','reliefInverted','mode']},
  integrated:{parents:['cutter','stamp'],params:['base','relief','reliefInverted']}
 };
