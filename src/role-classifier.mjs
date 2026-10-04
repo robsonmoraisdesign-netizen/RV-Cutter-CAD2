@@ -9,6 +9,7 @@ function normal(pts){const a=pts[0],u=pts[1].map((v,k)=>v-a[k]),v=pts[2].map((q,
 // so faces exactly on the relief outline are classified consistently.
 export function classifyDisplayRole(part,result,ids){
  const p=result.params,pts=triangle(part,ids),c=[0,0,0];for(const q of pts)for(let k=0;k<3;k++)c[k]+=q[k]/3;
+ if(p.logoEnabled&&result.logoOutline?.length&&c[2]<=p.base+p.logoHeight+.02&&insidePolys(result.logoOutline,c))return 'cutterBase';
  if(p.bladeReinforcement&&['Cortador','Cortador integrado'].includes(part.name)&&c[2]>p.base+.001&&c[2]<p.base+p.reinforcementHeight+.001&&normal(pts)[2]>.001&&!insidePolys(result.cuttingOutline,c))return 'reinforcement';
  if(part.name==='Cortador')return c[2]<=p.base+.001?'cutterBase':'blade';
  if(part.name==='Base do carimbo')return 'stampBase';
