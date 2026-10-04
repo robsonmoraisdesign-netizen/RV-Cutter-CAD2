@@ -12,8 +12,8 @@ const m=await kernel();
 const loops=[[[-.5,-.4],[.5,-.4],[.5,.4],[-.5,.4]]];
 const common={...defaults,mode:'cutter',size:50,mirror:false,logoText:'FIORI',logoFont:'helvetiker-bold',logoSize:6,logoHeight:.6,logoOffset:0};
 const plain=build(m,loops,{...common,logoEnabled:false});
-const bottom=build(m,loops,{...common,logoEnabled:true,logoPosition:270});
-const right=build(m,loops,{...common,logoEnabled:true,logoPosition:0});
+const bottom=build(m,loops,{...common,logoEnabled:true,logoPosition:0});
+const right=build(m,loops,{...common,logoEnabled:true,logoPosition:25});
 
 for(const [name,result] of [['bottom',bottom],['right',right]]){
  const part=result.parts[0];
@@ -23,8 +23,8 @@ for(const [name,result] of [['bottom',bottom],['right',right]]){
  assert.ok(result.logoOutline.length>0,name+' text outline must be available for display classification');
  assert.ok(part.volume>plain.parts[0].volume,name+' logo must add real printable volume');
 }
-assert.ok(bottom.parts[0].bounds.min[1]<plain.parts[0].bounds.min[1]-1,'270° must place logo on lower border');
-assert.ok(right.parts[0].bounds.max[0]>plain.parts[0].bounds.max[0]+1,'0° must place logo on right border');
+assert.ok(bottom.parts[0].bounds.min[1]<plain.parts[0].bounds.min[1]-1,'0% must place logo on lower border');
+assert.ok(right.parts[0].bounds.max[0]>plain.parts[0].bounds.max[0]+1,'25% must move logo along the perimeter to the right border');
 assert.ok(Math.abs(bottom.logoPlacement.angle)<5,'bottom logo must auto-align horizontally');
 assert.ok(Math.abs(Math.abs(right.logoPlacement.angle)-90)<5,'side logo must auto-rotate vertically with the border tangent');
 assert.ok(Math.abs(bottom.parts[0].bounds.max[2]-plain.parts[0].bounds.max[2])<1e-6,'logo height must stay below cutting edge');
