@@ -2,7 +2,7 @@ import {validateSketch} from './sketch/model.mjs';
 import {createLogoTextProfile,normalizeLogoText,LOGO_FONT_IDS} from './logo-text.mjs';
 import Module from 'manifold-3d';
 export async function kernel(options={}){const m=await Module(options);m.setup();return m;}
-export const defaults={size:75,wall:0.8,height:12.5,rim:4,base:2.5,relief:4.5,reliefInverted:false,reliefSeparate:false,reliefOut:4.5,reliefIn:1,clearance:0.9,detailOffset:0,outlineOffset:0,mode:'integrated',mirror:true,threshold:160,tolerance:0.04,stampBase:2.5,stampInset:0,stampExpansion:0,removeOutline:false,outlineBand:0.8,chamfer:false,tip:0.4,chamferHeight:2,bladeReinforcement:false,reinforcementHeight:2,reinforcementWidth:1.5,logoEnabled:false,logoText:'FIORI',logoFont:'helvetiker',logoSize:8,logoHeight:0.7,logoPosition:270,logoOffset:0,wallEdits:[],cornerRadius:2};
+export const defaults={size:75,wall:0.8,height:12.5,rim:4,base:2.5,relief:4.5,reliefInverted:false,reliefSeparate:false,reliefOut:4.5,reliefIn:1,clearance:0.9,detailOffset:0,outlineOffset:0,mode:'integrated',mirror:true,threshold:160,tolerance:0.04,stampBase:2.5,stampInset:0,stampExpansion:0,removeOutline:false,outlineBand:0.8,chamfer:false,tip:0.4,chamferHeight:2,bladeReinforcement:false,reinforcementHeight:2,reinforcementWidth:1.5,logoEnabled:false,logoText:'FIORI',logoFont:'helvetiker',logoSize:8,logoHeight:0.7,logoPosition:0,logoOffset:0,wallEdits:[],cornerRadius:2};
 export function area(p){return p.reduce((a,v,i)=>{const q=p[(i+1)%p.length];return a+v[0]*q[1]-q[0]*v[1]},0)/2;}
 export function simplify(p,eps){if(p.length<5)return p;const seg=(p,a,b)=>{let dx=b[0]-a[0],dy=b[1]-a[1],t=Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/(dx*dx+dy*dy||1)));return Math.hypot(p[0]-a[0]-t*dx,p[1]-a[1]-t*dy)};const rdp=a=>{let d=0,k=0;for(let i=1;i<a.length-1;i++){let v=seg(a[i],a[0],a.at(-1));if(v>d){d=v;k=i}}return d>eps?[...rdp(a.slice(0,k+1)).slice(0,-1),...rdp(a.slice(k))]:[a[0],a.at(-1)];};let k=1,d=0;for(let i=1;i<p.length;i++){const v=Math.hypot(p[i][0]-p[0][0],p[i][1]-p[0][1]);if(v>d){d=v;k=i}}return [...rdp(p.slice(0,k+1)).slice(0,-1),...rdp([...p.slice(k),p[0]]).slice(0,-1)];}
 export function normalize(loops){const all=loops.flat();if(!all.length)throw Error('Nenhum contorno fechado encontrado.');let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;for(const [x,y]of all){minX=Math.min(x,minX);maxX=Math.max(x,maxX);minY=Math.min(y,minY);maxY=Math.max(y,maxY)}const scale=Math.max(maxX-minX,maxY-minY);if(!(scale>0))throw Error('Arte sem dimensão.');return loops.map(p=>p.map(([x,y])=>[(x-(minX+maxX)/2)/scale,(y-(minY+maxY)/2)/scale]));}
@@ -55,43 +55,54 @@ function edgeLogoPlacement(poly,p){
  if(!profile)return null;
  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
  for(const [x,y] of poly){minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);}
- const center=[(minX+maxX)/2,(minY+maxY)/2],theta=p.logoPosition*Math.PI/180,d=[Math.cos(theta),Math.sin(theta)];
- const cross=(a,b)=>a[0]*b[1]-a[1]*b[0];
- let hit=null,best=-Infinity,tangent=[1,0];
- for(let i=0;i<poly.length;i++){
-  const a=poly[i],b=poly[(i+1)%poly.length],e=[b[0]-a[0],b[1]-a[1]],den=cross(d,e);
+ const center=[(minX+maxX)/2,(minY+maxY)/2],cross=(a,b)=>a[0]*b[1]-a[1]*b[0],n=poly.length;
+ // Anchor the perimeter at the visual bottom-center. This makes 0% predictable
+ // and lets the position control walk the real cutter border continuously.
+ const ray=[0,-1];let anchor=null,segment=0,best=-Infinity;
+ for(let i=0;i<n;i++){
+  const a=poly[i],b=poly[(i+1)%n],e=[b[0]-a[0],b[1]-a[1]],den=cross(ray,e);
   if(Math.abs(den)<1e-9)continue;
-  const ac=[a[0]-center[0],a[1]-center[1]],t=cross(ac,e)/den,u=cross(ac,d)/den;
-  if(t>=0&&u>=-1e-7&&u<=1+1e-7&&t>best){
-   best=t;hit=[center[0]+d[0]*t,center[1]+d[1]*t];
-   const len=Math.hypot(...e)||1;tangent=[e[0]/len,e[1]/len];
-  }
+  const ac=[a[0]-center[0],a[1]-center[1]],t=cross(ac,e)/den,u=cross(ac,ray)/den;
+  if(t>=0&&u>=-1e-7&&u<=1+1e-7&&t>best){best=t;anchor=[center[0],center[1]-t];segment=i;}
  }
- if(!hit){
-  let index=0;best=-Infinity;
-  for(let i=0;i<poly.length;i++){const q=poly[i],score=(q[0]-center[0])*d[0]+(q[1]-center[1])*d[1];if(score>best){best=score;index=i;}}
-  hit=poly[index].slice();const b=poly[(index+1)%poly.length],e=[b[0]-hit[0],b[1]-hit[1]],len=Math.hypot(...e)||1;tangent=[e[0]/len,e[1]/len];
+ if(!anchor){
+  let idx=0;for(let i=1;i<n;i++)if(poly[i][1]<poly[idx][1]||Math.abs(poly[i][1]-poly[idx][1])<1e-7&&Math.abs(poly[i][0]-center[0])<Math.abs(poly[idx][0]-center[0]))idx=i;
+  anchor=poly[idx].slice();segment=(idx+n-1)%n;
  }
- // Keep the baseline readable: automatic tangent rotation is restricted to [-90°, 90°].
- if(tangent[0]<0)tangent=[-tangent[0],-tangent[1]];
- const left=[-tangent[1],tangent[0]];
- let normal=left.slice();if(normal[0]*d[0]+normal[1]*d[1]<0)normal=[-normal[0],-normal[1]];
+ const forward=[anchor];
+ for(let step=1;step<=n;step++)forward.push(poly[(segment+step)%n].slice());
+ forward.push(anchor);
+ const firstVector=path=>{for(let i=1;i<path.length;i++){const dx=path[i][0]-path[0][0],dy=path[i][1]-path[0][1],l=Math.hypot(dx,dy);if(l>1e-8)return [dx/l,dy/l];}return [1,0];};
+ // Increasing position starts by moving from the bottom toward the right side.
+ let path=forward,ft=firstVector(forward);
+ if(ft[0]<-1e-6)path=forward.slice().reverse();
+ const lengths=[0];for(let i=1;i<path.length;i++)lengths.push(lengths.at(-1)+Math.hypot(path[i][0]-path[i-1][0],path[i][1]-path[i-1][1]));
+ const perimeter=lengths.at(-1)||1,target=perimeter*(p.logoPosition/100);
+ let k=1;while(k<lengths.length-1&&lengths[k]<target)k++;
+ const a=path[k-1],b=path[k],segLen=Math.max(1e-9,lengths[k]-lengths[k-1]),u=(target-lengths[k-1])/segLen;
+ const hit=[a[0]+(b[0]-a[0])*u,a[1]+(b[1]-a[1])*u],raw=[(b[0]-a[0])/segLen,(b[1]-a[1])/segLen];
+ let tangent=raw.slice();if(tangent[0]<0)tangent=[-tangent[0],-tangent[1]];
+ const left=[-tangent[1],tangent[0]],radial=[hit[0]-center[0],hit[1]-center[1]],rl=Math.hypot(...radial)||1;
+ let normal=[radial[0]/rl,radial[1]/rl];
+ // At concave points prefer the local normal that faces the same radial half-plane.
+ const localLeft=[-raw[1],raw[0]],localRight=[raw[1],-raw[0]];
+ normal=(localLeft[0]*normal[0]+localLeft[1]*normal[1])>(localRight[0]*normal[0]+localRight[1]*normal[1])?localLeft:localRight;
  const pad=Math.max(1,Math.min(2.5,p.logoSize*.16)),plaqueW=Math.max(6,profile.width+pad*2),plaqueD=Math.max(5,profile.height+pad*2);
  const overlap=Math.min(1.6,plaqueD*.34),offset=p.logoOffset;
  const plaqueCenter=[hit[0]+normal[0]*(plaqueD/2-overlap+offset),hit[1]+normal[1]*(plaqueD/2-overlap+offset)];
  const localToWorld=(q,c=plaqueCenter)=>[c[0]+q[0]*tangent[0]+q[1]*left[0],c[1]+q[0]*tangent[1]+q[1]*left[1]];
- const roundedRect=(w,h,r=Math.min(2,h*.28),n=5)=>{
-  const pts=[],corners=[[w/2-r,h/2-r,0],[ -w/2+r,h/2-r,Math.PI/2],[-w/2+r,-h/2+r,Math.PI],[w/2-r,-h/2+r,Math.PI*1.5]];
-  for(const [cx,cy,start] of corners)for(let i=0;i<=n;i++){const a=start+i*Math.PI/(2*n);pts.push([cx+Math.cos(a)*r,cy+Math.sin(a)*r]);}
+ const roundedRect=(w,h,r=Math.min(2,h*.28),steps=5)=>{
+  const pts=[],corners=[[w/2-r,h/2-r,0],[-w/2+r,h/2-r,Math.PI/2],[-w/2+r,-h/2+r,Math.PI],[w/2-r,-h/2+r,Math.PI*1.5]];
+  for(const [cx,cy,startAngle] of corners)for(let i=0;i<=steps;i++){const angle=startAngle+i*Math.PI/(2*steps);pts.push([cx+Math.cos(angle)*r,cy+Math.sin(angle)*r]);}
   return pts;
  };
  const plaque=roundedRect(plaqueW,plaqueD).map(q=>localToWorld(q));
- const innerEdge=plaqueD/2-overlap+offset-plaqueD/2,connectorLength=Math.max(.8,innerEdge+.9);
+ const innerEdge=offset-overlap,connectorLength=Math.max(.8,innerEdge+.9);
  const connectorCenter=[hit[0]+normal[0]*(connectorLength/2-.45),hit[1]+normal[1]*(connectorLength/2-.45)];
  const connectorW=Math.min(plaqueW*.72,Math.max(5,profile.width*.58));
  const connector=roundedRect(connectorW,connectorLength,Math.min(1.2,connectorLength*.28),4).map(q=>localToWorld(q,connectorCenter));
  const textLoops=profile.loops.map(loop=>loop.map(q=>localToWorld(q)));
- return {textLoops,plaque,connector,anchor:hit,tangent,normal,angle:Math.atan2(tangent[1],tangent[0])*180/Math.PI};
+ return {textLoops,plaque,connector,anchor:hit,tangent,normal,angle:Math.atan2(tangent[1],tangent[0])*180/Math.PI,position:p.logoPosition};
 }
 export function loft(m,lower,upper,z0,z1,floor=z0-1,intermediate=[]){
  const ccw=p=>area(p)>0?p.map(v=>v.slice()):p.slice().reverse().map(v=>v.slice());
@@ -114,7 +125,7 @@ export function migrateParams(params={}){const p={...defaults,...params,stampBas
  p.logoEnabled=!!p.logoEnabled;
  p.logoText=normalizeLogoText(p.logoText)||defaults.logoText;
  p.logoFont=LOGO_FONT_IDS.includes(p.logoFont)?p.logoFont:defaults.logoFont;
- p.logoPosition=((Number(p.logoPosition)||0)%360+360)%360;
+ p.logoPosition=Math.max(0,Math.min(100,Number(p.logoPosition)||0));
  if(!Number.isFinite(p.reliefOut))p.reliefOut=p.reliefInverted?defaults.relief:p.relief;
  if(!Number.isFinite(p.reliefIn))p.reliefIn=p.reliefInverted?p.relief:Math.min(1,Math.max(.1,(p.mode==='integrated'?p.base:p.stampBase)*.4));
  return p;}
