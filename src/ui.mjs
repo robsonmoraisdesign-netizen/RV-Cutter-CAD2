@@ -83,7 +83,7 @@ function applySavedColorPalette(id){
  const row=colorPaletteRows.find(p=>p.id===id);if(!row)return;
  applyColorSet(row.colors);status(`Paleta “${row.name}” aplicada.`);
 }
-const active=()=>state.objects.find(o=>o.id===state.activeId);let viewer,editor,isolatedId=null,hoveredObjectId=null,logoPickMode=false;const expandedObjects=new Set();const displayed=o=>!!o&&(isolatedId?o.id===isolatedId:o.visible!==false);
+const active=()=>state.objects.find(o=>o.id===state.activeId);let viewer,editor,isolatedId=null,hoveredObjectId=null,logoPickMode=false,logoPickStartPosition=null,logoDragHistory=false,logoDragLastBuild=0;const expandedObjects=new Set();const displayed=o=>!!o&&(isolatedId?o.id===isolatedId:o.visible!==false);
 const groups=[['Dimensões da peça',null,[['size','Tamanho máximo do desenho',10,300,.5],['outlineOffset','Expansão externa',0,10,.1]]],['Cortador','cutterBase',[['wall','Espessura da lâmina',.3,5,.05],['cornerRadius','Proteção de cantos',0,10,.1],['height','Altura total',4,50,.1],['rim','Largura da base de apoio',1,15,.1],['base','Altura da base do cortador',.5,10,.1]]],['Carimbo','stampBase',[['stampBase','Altura da base do carimbo',.5,15,.1],['stampExpansion','Expansão da base',0,10,.05],['stampInset','Recuo lateral da base',0,5,.05],['clearance','Folga entre cortador e carimbo',.1,5,.05]]],['Relevo','relief',[['detailOffset','Espessura dos detalhes',-.4,1.5,.05],['relief','Altura / profundidade do relevo',.05,20,.1]]]];
 const control=([id,label,min,max,step],role)=>`<div class="range-pair" data-param="${id}"><label for="${id}">${role?`<i class="swatch" data-color="${role}"></i>`:''}${label}</label><input id="${id}" type="number" step="${step}" value="${defaults[id]}" title="Digite livremente. A barra mantém apenas uma faixa prática de arraste."><input id="${id}Range" type="range" min="${min}" max="${max}" step="${step}" value="${Math.min(max,Math.max(min,defaults[id]))}" aria-label="${label}"></div>`;
 $('params').innerHTML=groups.map(([label,role,fields],index)=>`<details class="param-group" ${index<2?'open':''}><summary>${role?`<i class="swatch" data-color="${role}"></i>`:''}${label}</summary><div class="param-content">${fields.map(f=>control(f,role)).join('')}</div></details>`).join('');
@@ -324,7 +324,7 @@ for(const [number,range]of [['lineDelta','lineDeltaRange'],['offsetAmount','offs
 let generation=0,running=false,timer,sessionEpoch=0;const pendingBuildIds=new Set(),batchProtectedIds=new Set();
 const featureParams=o=>cutterFeature(o)?.params||o.params;const generatable=o=>hasManufacturingFeature(o)&&Array.isArray(o.loops)&&o.loops.length>0;const keyFor=o=>JSON.stringify([o.contourVersion||0,cutterFeature(o)?.id||null,featureParams(o)]);
 const builds=new WeakMap(),sourceRecords=new WeakMap();let cacheWrites=Promise.resolve();
-function resetSession(){logoPickMode=false;viewer?.setPlacementMode?.(false);clearTimeout(saveTimer);cancelAnimationFrame(appearanceFrame);appearanceFrame=0;importJob=null;$('importCandidates').replaceChildren();$('importDialog').close();lastSavedSignature=null;importRevision++;sessionEpoch++;generation++;clearTimeout(timer);pendingBuildIds.clear();batchProtectedIds.clear();running=false;const oldWorker=worker;worker=null;try{oldWorker?.terminate();}catch{}for(const p of pending.values()){clearTimeout(p.timer);p.reject(Object.assign(Error('Operação cancelada ao trocar de projeto.'),{name:'AbortError'}));}pending.clear();state.editingSketchId=null;document.body.classList.remove('sketching','presenting');if($('editor'))$('editor').toggleAttribute('hidden',true);if($('editTools'))$('editTools').hidden=true;if($('sketchInspector'))$('sketchInspector').hidden=true;if($('finishSketch'))$('finishSketch').hidden=true;viewer?.clear();wasEmpty=true;lastLayout='';}
+function resetSession(){logoPickMode=false;logoPickStartPosition=null;logoDragHistory=false;logoDragLastBuild=0;viewer?.setPlacementMode?.(false);clearTimeout(saveTimer);cancelAnimationFrame(appearanceFrame);appearanceFrame=0;importJob=null;$('importCandidates').replaceChildren();$('importDialog').close();lastSavedSignature=null;importRevision++;sessionEpoch++;generation++;clearTimeout(timer);pendingBuildIds.clear();batchProtectedIds.clear();running=false;const oldWorker=worker;worker=null;try{oldWorker?.terminate();}catch{}for(const p of pending.values()){clearTimeout(p.timer);p.reject(Object.assign(Error('Operação cancelada ao trocar de projeto.'),{name:'AbortError'}));}pending.clear();state.editingSketchId=null;document.body.classList.remove('sketching','presenting');if($('editor'))$('editor').toggleAttribute('hidden',true);if($('editTools'))$('editTools').hidden=true;if($('sketchInspector'))$('sketchInspector').hidden=true;if($('finishSketch'))$('finishSketch').hidden=true;viewer?.clear();wasEmpty=true;lastLayout='';}
 async function ensure(o){if(!hasManufacturingFeature(o))throw Error('Este Sketch ainda não possui uma função 3D. Use “Converter em cortador”.');if(!o.loops.length)throw Error('Feche um perfil no Sketch antes de gerar ou exportar.');syncRuntimeParams(o);const key=keyFor(o),epoch=sessionEpoch;if(o.result&&o.cacheKey===key)return o.result;const old=builds.get(o);if(old?.key===key&&old.epoch===epoch)return old.promise;
  const promise=(async()=>{let source=sourceRecords.get(o);if(!source||source.loops!==o.loops||source.revision!==(o.contourVersion||0)){source={loops:o.loops,revision:o.contourVersion||0,hash:await digest(JSON.stringify(o.loops))};sourceRecords.set(o,source);}const params=structuredClone(featureParams(o)),cacheKey=await digest(ENGINE_VERSION+source.hash+JSON.stringify(params));
  const current=()=>epoch===sessionEpoch&&state.objects.includes(o)&&key===keyFor(o);
@@ -358,17 +358,33 @@ function closeDimensionEditor(){if($('dimensionEditor'))$('dimensionEditor').hid
 function primaryDimension(o,axis){const m=measurements(o)?.primary;return m?.[axis]??NaN;}
 async function applyDimensionEdit(){const ed=$('dimensionEditor'),o=state.objects.find(x=>x.id===ed.dataset.objectId),axis=ed.dataset.axis,target=+$('dimensionValue').value;if(!o||!Number.isFinite(target)||target<=0){status('Informe uma medida válida em milímetros.');return;}const current=primaryDimension(o,axis);if(!Number.isFinite(current))return;if(axis==='z'&&['Carimbo','Base do carimbo','Relevo'].includes(o.result.parts[0]?.name)){status('A altura total do carimbo é resultante. Ajuste base e relevo nos parâmetros.');closeDimensionEditor();return;}history();generation++;clearTimeout(timer);$('busy').hidden=false;$('busy').textContent='Ajustando cota com precisão…';try{if(axis==='z'){o.params.height=Math.max(4,Math.min(50,target));await ensure(o);}else{let size0=o.params.size,dim0=current,size1=Math.max(10,Math.min(300,size0*target/dim0));o.params.size=size1;await ensure(o);let dim1=primaryDimension(o,axis);for(let i=0;i<2&&Math.abs(dim1-target)>.01;i++){const slope=Math.abs(size1-size0)>1e-6?(dim1-dim0)/(size1-size0):dim1/Math.max(size1,1);if(!Number.isFinite(slope)||Math.abs(slope)<1e-5)break;const size2=Math.max(10,Math.min(300,size1+(target-dim1)/slope));size0=size1;dim0=dim1;size1=size2;o.params.size=size1;await ensure(o);dim1=primaryDimension(o,axis);}}sync();refreshView();autosave();const final=primaryDimension(o,axis);status(`Cota ajustada: ${fmt(final)} mm${Math.abs(final-target)<=.02?'':' (limite geométrico aproximado)'}.`);}catch(e){status('Não foi possível ajustar a cota: '+e.message);}finally{$('busy').hidden=true;closeDimensionEditor();}}
 $('dimensionValue').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();applyDimensionEdit();}else if(e.key==='Escape'){e.preventDefault();closeDimensionEditor();}};$('dimensionApply').onclick=applyDimensionEdit;$('dimensionCancel').onclick=closeDimensionEditor;
-function setLogoPickMode(value){
- logoPickMode=!!value;viewer?.setPlacementMode?.(logoPickMode);const b=$('pickLogoPosition');if(b){b.classList.toggle('active',logoPickMode);b.textContent=logoPickMode?'Clique na borda do cortador…':'Escolher posição no modelo';}
- if(logoPickMode){const o=active();viewer?.focus?.(o?.id,true);status('Posicionar logo · clique na borda do cortador. A rotação será ajustada automaticamente.');}
+function setLogoPickMode(value,{restore=false}={}){
+ const next=!!value,o=active();
+ if(next&&!logoPickMode)logoPickStartPosition=Number.isFinite(+o?.params.logoPosition)?+o.params.logoPosition:null;
+ logoPickMode=next;viewer?.setPlacementMode?.(logoPickMode);
+ const b=$('pickLogoPosition');if(b){b.classList.toggle('active',logoPickMode);b.textContent=logoPickMode?'Arraste pela borda do cortador…':'Escolher posição no modelo';}
+ if(logoPickMode){viewer?.focus?.(o?.id,true);status('Posicionar logo · clique e arraste sobre o cortador. A logo acompanha a borda e gira automaticamente.');return;}
+ if(restore&&logoDragHistory&&o&&Number.isFinite(logoPickStartPosition)){o.params.logoPosition=logoPickStartPosition;if(state.history.length)state.history.pop();sync();generate([o.id]);autosave();}
+ logoPickStartPosition=null;logoDragHistory=false;logoDragLastBuild=0;
+}
+function applyLogoPlacement(evt){
+ const o=active(),valid=o&&evt.id===o.id&&evt.partIndex===0&&evt.point&&o.result?.logoPathOutline?.length;
+ if(!valid){
+  if(evt.phase==='end'&&logoDragHistory){sync();generate([o.id]);autosave();setLogoPickMode(false);status('Posição da logo aplicada na última borda válida.');return true;}
+  if(evt.phase!=='move')status('Clique e arraste sobre o corpo do cortador para posicionar a logo.');
+  return false;
+ }
+ const hit=edgePositionFromPoint(o.result.logoPathOutline,evt.point);if(!hit)return false;
+ if(!logoDragHistory){history();logoDragHistory=true;}
+ o.params.logoPosition=hit.position;const input=$('logoPosition'),range=$('logoPositionRange');if(input)input.value=hit.position.toFixed(2);if(range)range.value=hit.position;
+ const now=performance.now();if(evt.phase!=='move'||now-logoDragLastBuild>150){logoDragLastBuild=now;generate([o.id]);}
+ const orientation=$('logoOrientationStatus');if(orientation)orientation.textContent=`Movendo: ${fmt(hit.position,1)}% da borda · rotação automática recalculando…`;
+ if(evt.phase==='end'){sync();generate([o.id]);autosave();setLogoPickMode(false);status(`Logo posicionada em ${fmt(hit.position,1)}% da borda · rotação automática ativa.`);}
+ return true;
 }
 function handleViewerInteraction(evt){
+ if(evt.type==='placement'&&logoPickMode){applyLogoPlacement(evt);return;}
  if(evt.type==='hover'){setLayerHover(evt.id);return;}
- if(evt.type==='select'&&logoPickMode){
-  const o=active();if(!o||evt.id!==o.id||evt.partIndex!==0||!evt.point){status('Clique sobre o corpo do cortador para posicionar a logo.');return;}
-  const hit=edgePositionFromPoint(o.result?.logoPathOutline,evt.point);if(!hit){status('Não foi possível localizar a borda do cortador.');return;}
-  history();setParam('logoPosition',hit.position);setLogoPickMode(false);status(`Logo posicionada em ${fmt(hit.position,1)}% da borda · rotação automática ativa.`);return;
- }
  if(evt.type==='select'){if(evt.id)selectObject(evt.id);else setLayerHover(null);return;}
  if(evt.type==='focus'){if(evt.id)selectObject(evt.id);return;}
  if(evt.type==='dimension'){openDimensionEditor(evt);}
@@ -443,7 +459,7 @@ window.addEventListener('keydown',e=>{
   if(map[k]&&!e.ctrlKey&&!e.metaKey&&!e.altKey){e.preventDefault();activateSketchTool(map[k]);return;}
   if(e.key==='Delete'){editor.removeNode();return;}
  }
- if(e.key==='Escape'&&logoPickMode){e.preventDefault();setLogoPickMode(false);status('Posicionamento da logo cancelado.');return;}
+ if(e.key==='Escape'&&logoPickMode){e.preventDefault();setLogoPickMode(false,{restore:true});status('Posicionamento da logo cancelado.');return;}
  if(e.key==='Escape'&&isolatedId){isolatedId=null;sync();syncViewerVisibility();status('Isolamento encerrado.');}
  if(e.key.toLowerCase()==='f'&&active()&&!state.editingSketchId){e.preventDefault();viewer?.focus(state.activeId);}
 });
