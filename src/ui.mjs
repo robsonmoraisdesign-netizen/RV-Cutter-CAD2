@@ -361,9 +361,10 @@ $('dimensionValue').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();applyDi
 function setLogoPickMode(value,{restore=false}={}){
  const next=!!value,o=active();
  if(next&&!logoPickMode)logoPickStartPosition=Number.isFinite(+o?.params.logoPosition)?+o.params.logoPosition:null;
- logoPickMode=next;viewer?.setPlacementMode?.(logoPickMode);
+ logoPickMode=next;
  const b=$('pickLogoPosition');if(b){b.classList.toggle('active',logoPickMode);b.textContent=logoPickMode?'Arraste pela borda do cortador…':'Escolher posição no modelo';}
- if(logoPickMode){viewer?.focus?.(o?.id,true);status('Posicionar logo · clique e arraste sobre o cortador. A logo acompanha a borda e gira automaticamente.');return;}
+ if(logoPickMode){viewer?.focus?.(o?.id,true);viewer?.setPlacementMode?.(true);status('Posicionar logo · clique e arraste sobre o cortador. A logo acompanha a borda e gira automaticamente.');return;}
+ viewer?.setPlacementMode?.(false);
  if(restore&&logoDragHistory&&o&&Number.isFinite(logoPickStartPosition)){o.params.logoPosition=logoPickStartPosition;if(state.history.length)state.history.pop();sync();generate([o.id]);autosave();}
  logoPickStartPosition=null;logoDragHistory=false;logoDragLastBuild=0;
 }
