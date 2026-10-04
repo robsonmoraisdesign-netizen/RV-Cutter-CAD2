@@ -1,7 +1,8 @@
 import {validateSketch} from './sketch/model.mjs';
-import {createLogoTextProfile,normalizeLogoText,LOGO_FONT_IDS} from './logo-text.mjs';
 import Module from 'manifold-3d';
 export async function kernel(options={}){const m=await Module(options);m.setup();return m;}
+export const LOGO_FONT_IDS=Object.freeze(['helvetiker','helvetiker-bold','optimer']);
+const normalizeLogoText=value=>String(value??'').replace(/\s+/g,' ').trim().slice(0,32);
 export const defaults={size:75,wall:0.8,height:12.5,rim:4,base:2.5,relief:4.5,reliefInverted:false,reliefSeparate:false,reliefOut:4.5,reliefIn:1,clearance:0.9,detailOffset:0,outlineOffset:0,mode:'integrated',mirror:true,threshold:160,tolerance:0.04,stampBase:2.5,stampInset:0,stampExpansion:0,removeOutline:false,outlineBand:0.8,chamfer:false,tip:0.4,chamferHeight:2,bladeReinforcement:false,reinforcementHeight:2,reinforcementWidth:1.5,logoEnabled:false,logoText:'FIORI',logoFont:'helvetiker',logoSize:8,logoHeight:1.2,logoPosition:0,logoOffset:0,wallEdits:[],cornerRadius:2};
 export function area(p){return p.reduce((a,v,i)=>{const q=p[(i+1)%p.length];return a+v[0]*q[1]-q[0]*v[1]},0)/2;}
 export function simplify(p,eps){if(p.length<5)return p;const seg=(p,a,b)=>{let dx=b[0]-a[0],dy=b[1]-a[1],t=Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/(dx*dx+dy*dy||1)));return Math.hypot(p[0]-a[0]-t*dx,p[1]-a[1]-t*dy)};const rdp=a=>{let d=0,k=0;for(let i=1;i<a.length-1;i++){let v=seg(a[i],a[0],a.at(-1));if(v>d){d=v;k=i}}return d>eps?[...rdp(a.slice(0,k+1)).slice(0,-1),...rdp(a.slice(k))]:[a[0],a.at(-1)];};let k=1,d=0;for(let i=1;i<p.length;i++){const v=Math.hypot(p[i][0]-p[0][0],p[i][1]-p[0][1]);if(v>d){d=v;k=i}}return [...rdp(p.slice(0,k+1)).slice(0,-1),...rdp([...p.slice(k),p[0]]).slice(0,-1)];}
@@ -49,10 +50,9 @@ function densifyLoop(poly,maxLength=.6){
  return out;
 }
 
-function edgeLogoPlacement(poly,p){
+function edgeLogoPlacement(poly,p,profile){
  if(!p.logoEnabled||p.mode==='stamp')return null;
- const profile=createLogoTextProfile(p.logoText,p.logoFont,p.logoSize,10);
- if(!profile)return null;
+ if(!profile?.loops?.length)throw Error('Perfil vetorial da logo não foi preparado.');
  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
  for(const [x,y] of poly){minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);}
  const center=[(minX+maxX)/2,(minY+maxY)/2],cross=(a,b)=>a[0]*b[1]-a[1]*b[0],n=poly.length;
@@ -196,7 +196,7 @@ export function build(m,loops,params,ctx=null,options={}){const started=performa
   rimOuter=hold(new C(memo('rim',()=>silhouette(hold(C.union([hold(inner.offset(Math.max(p.rim,p.wall),'Round',2,roundSegments)),bladeOuter]))).toPolygons()),'EvenOdd'));
   cutterBaseSection=rimOuter;
   if(p.logoEnabled&&p.mode!=='stamp'){
-   const logo=edgeLogoPlacement(rimOuter.toPolygons()[0],p);
+   const logo=edgeLogoPlacement(rimOuter.toPolygons()[0],p,options.logoProfile);
    if(logo){logoPlacement={anchor:logo.anchor,tangent:logo.tangent,normal:logo.normal,angle:logo.angle};
     const plaque=hold(new C([logo.plaque],'EvenOdd')),connector=hold(new C([logo.connector],'EvenOdd'));
     cutterBaseSection=silhouette(hold(C.union([rimOuter,plaque,connector])));
