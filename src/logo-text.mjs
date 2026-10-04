@@ -2,12 +2,14 @@ import {FontLoader} from 'three/addons/loaders/FontLoader.js';
 import helvetikerRegular from 'three/examples/fonts/helvetiker_regular.typeface.json' with {type:'json'};
 import helvetikerBold from 'three/examples/fonts/helvetiker_bold.typeface.json' with {type:'json'};
 import optimerRegular from 'three/examples/fonts/optimer_regular.typeface.json' with {type:'json'};
+import gentilisRegular from 'three/examples/fonts/gentilis_regular.typeface.json' with {type:'json'};
 
 const loader=new FontLoader();
 const fonts={
  helvetiker:loader.parse(helvetikerRegular),
  'helvetiker-bold':loader.parse(helvetikerBold),
- optimer:loader.parse(optimerRegular)
+ optimer:loader.parse(optimerRegular),
+ gentilis:loader.parse(gentilisRegular)
 };
 
 export const LOGO_FONT_IDS=Object.freeze(Object.keys(fonts));
