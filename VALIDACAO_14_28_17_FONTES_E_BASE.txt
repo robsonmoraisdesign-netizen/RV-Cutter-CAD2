@@ -1,0 +1,75 @@
+RV CUTTER CAD 14.28.17 — FONTES E PROPORÇÃO DA BASE DA LOGO
+
+OBJETIVO
+- Aumentar a biblioteca de fontes da logo integrada à base do cortador.
+- Permitir diminuir a fonte sem obrigar a base a diminuir junto.
+- Dar controle independente para deixar a aba da marca mais larga e proporcional.
+
+NOVOS CONTROLES
+- Texto da logo.
+- Tipo da fonte.
+- Tamanho da fonte.
+- Altura 3D da fonte.
+- Largura extra da base.
+- Posição na borda.
+- Afastamento da borda.
+
+BIBLIOTECA
+- Sans Clean
+- Sans Bold
+- Humanista
+- Serif
+- Allerta Stencil
+- Arimo
+- Balthazar
+- Baumans
+- Bebas Neue
+- Comic Neue
+- Courier Prime
+- Didact Gothic
+- Droid Sans Mono
+- Inconsolata
+- Inter
+- Michroma
+- M PLUS Rounded 1c
+- Noto Sans
+- Noto Sans Chinese Simplified
+- Noto Sans Chinese Traditional
+- Noto Sans Japanese
+- Noto Sans Korean
+- Noto Serif
+
+LÓGICA DAS FONTES
+- O catálogo é único e compartilhado pela interface e pelo worker.
+- A fonte é rasterizada no worker e convertida em perfil vetorial.
+- Quando a família exata não estiver instalada no Windows, o RV usa um equivalente compatível definido no catálogo.
+- Nenhum arquivo de fonte é incorporado ao programa.
+
+LÓGICA DA BASE
+- logoSize controla apenas o tamanho do texto.
+- logoBaseWidthExtra controla apenas a largura adicional da aba.
+- A profundidade da aba continua derivada da altura do texto + margem vertical.
+- A largura final nunca fica menor que o necessário para acomodar o texto.
+- A aba continua unida ao cortador como um único corpo imprimível.
+
+INTERAÇÃO
+- Slider de tamanho da fonte atualiza a geometria.
+- Slider de largura extra atualiza a geometria.
+- Slider de posição mantém rotação automática em tempo real.
+- Clique e arraste no modelo 3D continua disponível.
+- A interface mostra base calculada e largura do texto.
+
+QA 14.28.17
+- Catálogo possui 20+ fontes e IDs únicos.
+- Todas as famílias solicitadas estão registradas.
+- Todos os estilos geram perfil vetorial ou fallback determinístico.
+- Fonte pequena + largura extra consegue produzir base maior que fonte grande em modo automático.
+- Aumentar largura da base não aumenta a profundidade da aba.
+- Cortador com logo permanece 1 corpo, fechado e manifold.
+- Migração limita largura extra a 0–40 mm.
+- A geometria continua independente do carimbo.
+
+STATUS DE BUILD
+- Código-fonte implementado na branch feature/14.28.17-logo-font-library.
+- QA dedicada adicionada à suíte.
+- A validação automática do GitHub depende da disponibilidade dos runners do repositório.
