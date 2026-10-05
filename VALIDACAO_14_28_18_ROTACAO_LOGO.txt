@@ -1,0 +1,57 @@
+RV CUTTER CAD 14.28.18 — CONTROLE DE ROTAÇÃO DA LOGO
+
+OBJETIVO
+- Corrigir logos que ficam inclinadas quando seguem apenas a tangente local da borda.
+- Manter a inteligência automática sem retirar o controle fino do usuário.
+- Permitir alinhamento global exato quando necessário.
+
+NOVOS PARÂMETROS
+- logoOrientationMode:
+  • auto
+  • autoOffset
+  • manual
+- logoRotationOffset:
+  • correção relativa de -45° a +45°
+  • resolução de interface: 0,1°
+- logoRotationAbsolute:
+  • ângulo global de -180° a +180°
+  • resolução de interface: 0,1°
+
+COMPORTAMENTO
+- Automática: final = tangente da borda.
+- Automática + ajuste fino: final = tangente da borda + correção.
+- Manual: final = ângulo global informado.
+- Em manual com 0°, a logo fica horizontal no sistema XY global do objeto.
+- Posição na borda e orientação continuam independentes.
+- O clique/arraste de posicionamento continua funcionando em todos os modos.
+
+GEOMETRIA
+- Texto e placa da logo usam o ângulo final.
+- O centro da placa continua posicionado pela normal externa da borda.
+- O conector estrutural passa a usar a normal externa de forma independente da rotação da placa.
+- Isso evita desconexão quando a logo é corrigida ou colocada em ângulo global.
+- A logo continua fundida à base do cortador.
+
+CACHE / PARAMETRIA
+- Os três parâmetros de rotação entram no nó cutter do grafo paramétrico.
+- O carimbo separado não depende da orientação da logo.
+
+VALIDAÇÃO EXECUTADA
+- Sintaxe dos módulos geometry.mjs, ui.mjs e dependencies.mjs verificada.
+- resolveLogoOrientation:
+  • tangente 7,4° + modo auto → 7,4°
+  • tangente 7,4° + correção -7,4° → 0°
+  • tangente 87° + manual 0° → 0°
+  • tangente 7,4° + manual 12° → 12°
+- Migração:
+  • correção +99° → +45°
+  • absoluto 540° → 180°
+  • modo inválido → autoOffset
+- Teste geométrico puro:
+  • borda inferior + correção 7,5° → final 7,5°
+  • borda direita automática ≈ 90° + manual 0° → final 0°
+  • conector continua sendo gerado separadamente da base rotacionada.
+- QA completa adicionada: qa142818-logo-rotation.mjs.
+
+STATUS
+- Implementado na branch feature/14.28.18-logo-rotation-control.
