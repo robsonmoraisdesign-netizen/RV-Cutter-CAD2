@@ -15,8 +15,8 @@ assert.equal(migrated.logoPosition,100,'perimeter position must be clamped');
 const geometrySource=fs.readFileSync('src/geometry.mjs','utf8'),workerSource=fs.readFileSync('src/worker.mjs','utf8'),viewerSource=fs.readFileSync('src/viewer.mjs','utf8'),uiSource=fs.readFileSync('src/ui.mjs','utf8'),htmlSource=fs.readFileSync('app/index.html','utf8');
 assert(!geometrySource.includes("from './logo-text.mjs'"),'font payload must not leak into shared geometry/UI bundle');
 assert(workerSource.includes("from './logo-text.mjs'")&&workerSource.includes('preparedLogoProfile'),'font vectorization must stay in the worker');
-assert(viewerSource.includes('setPlacementMode')&&viewerSource.includes("point:hit?.point")&&viewerSource.includes("phase:'move'"),'viewer must expose live model hit points for drag positioning');
-assert(uiSource.includes('edgePositionFromPoint')&&uiSource.includes('applyLogoPlacement')&&htmlSource.includes('pickLogoPosition'),'live 3D border picker wiring must remain available');
+assert(viewerSource.includes('setPlacementMode')&&viewerSource.includes("point:hit?.point")&&viewerSource.includes("phase:'move'")&&viewerSource.includes("'pointercancel'"),'viewer must expose live model hit points and cancel interrupted drags safely');
+assert(uiSource.includes('edgePositionFromPoint')&&uiSource.includes('applyLogoPlacement')&&uiSource.includes("evt.phase==='cancel'")&&htmlSource.includes('pickLogoPosition'),'live 3D border picker wiring and rollback must remain available');
 
 for(const font of LOGO_FONT_IDS){
  const profile=createLogoTextProfile('RV',font,6);
