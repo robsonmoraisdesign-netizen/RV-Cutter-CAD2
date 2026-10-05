@@ -1,4 +1,4 @@
-import {cloneSketch,sketchPoint,line,circle,arc,bezier,rectangle,addEntity,addConstraint,addDimension,getEntity,removeEntity} from './model.mjs';
+import {cloneSketch,sketchPoint,line,circle,arc,bezier,rectangle,addEntity,addConstraint,addDimension,getEntity,removeEntity,entityEndpoint,dimensionEntityIds} from './model.mjs';
 import {sketchFromObject,resolveDocument} from './document.mjs';
 import {sketchStatus,entityStates} from './diagnostics.mjs';
 import {trimEntity,extendLine,entityBounds} from './operations.mjs';
@@ -6,6 +6,28 @@ import {trimEntity,extendLine,entityBounds} from './operations.mjs';
 const radial=e=>['circle','arc'].includes(e.type);
 const lineLength=e=>Math.hypot(e.end[0]-e.start[0],e.end[1]-e.start[1]);
 const measuredValue=e=>e.type==='line'?lineLength(e):['circle','arc'].includes(e.type)?e.radius:null;
+const lineAngle=e=>Math.atan2(e.end[1]-e.start[1],e.end[0]-e.start[0]);
+const angleBetween=(a,b)=>Math.abs(Math.atan2(Math.sin(lineAngle(b)-lineAngle(a)),Math.cos(lineAngle(b)-lineAngle(a))))*180/Math.PI;
+const refPoint=(s,ref)=>entityEndpoint(getEntity(s,ref.entity),ref.point);
+function dimensionMeasure(s,spec){
+ if(spec.type==='lineLength')return lineLength(getEntity(s,spec.entity));
+ if(spec.type==='circleRadius'||spec.type==='arcRadius')return getEntity(s,spec.entity).radius;
+ if(spec.type==='circleDiameter'||spec.type==='arcDiameter')return getEntity(s,spec.entity).radius*2;
+ if(['pointDistance','horizontalDistance','verticalDistance'].includes(spec.type)){
+  const a=refPoint(s,spec.a),b=refPoint(s,spec.b),dx=b[0]-a[0],dy=b[1]-a[1];
+  return spec.type==='pointDistance'?Math.hypot(dx,dy):spec.type==='horizontalDistance'?Math.abs(dx):Math.abs(dy);
+ }
+ if(spec.type==='angleBetweenLines')return angleBetween(getEntity(s,spec.first),getEntity(s,spec.second));
+ return null;
+}
+function sameRef(a,b){return a?.entity===b?.entity&&a?.point===b?.point;}
+function sameDimension(d,spec){
+ if(d.type!==spec.type)return false;
+ if(spec.entity)return d.entity===spec.entity;
+ if(['pointDistance','horizontalDistance','verticalDistance'].includes(spec.type))return (sameRef(d.a,spec.a)&&sameRef(d.b,spec.b))||(sameRef(d.a,spec.b)&&sameRef(d.b,spec.a));
+ if(spec.type==='angleBetweenLines')return (d.first===spec.first&&d.second===spec.second)||(d.first===spec.second&&d.second===spec.first);
+ return false;
+}
 
 // Domain/controller shared by the existing SVG editor; no second editor or overlay app.
 export function createSketchController(api){
@@ -111,15 +133,35 @@ export function createSketchController(api){
    selected.forEach(entity=>addConstraint(s,type,{entity}));
   }
  },selected);}
- function dimension(value,driving=true){return transact(s=>{
-  if(selected.length!==1)throw Error('Selecione uma linha, círculo ou arco para cotar.');
-  const e=getEntity(s,selected[0]),type={line:'lineLength',circle:'circleRadius',arc:'arcRadius'}[e.type];
-  if(!type)throw Error('A cota direta desta fase suporta linha, círculo e arco.');
-  const v=driving?Number(value):measuredValue(e);
+ function dimensionSpec(options={}){
+  const s=native();if(!s)return null;
+  const explicit=options.type||null,entityIds=options.entities?.length?options.entities:[...selected],pointRefs=options.points?.length?options.points:[...points];
+  if(['pointDistance','horizontalDistance','verticalDistance'].includes(explicit)){
+   if(pointRefs.length!==2)throw Error('Selecione dois pontos para esta cota.');
+   return {type:explicit,a:structuredClone(pointRefs[0]),b:structuredClone(pointRefs[1]),...(options.position?{position:[...options.position]}:{})};
+  }
+  if(explicit==='angleBetweenLines'){
+   if(entityIds.length!==2)throw Error('Selecione duas linhas para a cota angular.');
+   const [a,b]=entityIds.map(id=>getEntity(s,id));if(a.type!=='line'||b.type!=='line')throw Error('Cota angular requer duas linhas.');
+   return {type:'angleBetweenLines',first:a.id,second:b.id,...(options.position?{position:[...options.position]}:{})};
+  }
+  if(entityIds.length!==1)throw Error('Selecione uma entidade ou duas referências compatíveis para cotar.');
+  const e=getEntity(s,entityIds[0]);let type=explicit;
+  if(explicit==='diameter')type=e.type==='circle'?'circleDiameter':e.type==='arc'?'arcDiameter':null;
+  if(!type)type={line:'lineLength',circle:'circleRadius',arc:'arcRadius'}[e.type];
+  if(!['lineLength','circleRadius','arcRadius','circleDiameter','arcDiameter'].includes(type))throw Error('Esta seleção não aceita o tipo de cota escolhido.');
+  return {type,entity:e.id,...(options.position?{position:[...options.position]}:{})};
+ }
+ function dimensionPreview(options={}){
+  const s=native(),spec=dimensionSpec(options);if(!s||!spec)return null;return {...structuredClone(spec),value:dimensionMeasure(s,spec),unit:spec.type==='angleBetweenLines'?'°':'mm'};
+ }
+ function dimension(value,driving=true,options={}){const preview=dimensionPreview(options);return transact(s=>{
+  const spec=dimensionSpec(options),measured=dimensionMeasure(s,spec),v=driving?Number(value):measured;
   if(!(v>0&&Number.isFinite(v)))throw Error('Informe uma cota maior que zero.');
-  const old=s.dimensions.find(d=>d.entity===e.id&&d.type===type);
-  if(old){old.value=v;old.driving=driving;}else addDimension(s,type,{entity:e.id,value:v,driving});
- },selected);}
+  const old=s.dimensions.find(d=>sameDimension(d,spec));
+  if(old){old.value=v;old.driving=driving;if(spec.position)old.position=[...spec.position];}
+  else addDimension(s,spec.type,{...spec,value:v,driving});
+ },dimensionEntityIds(preview));}
  function movePoint(entity,which,p,relation=null){return transact(s=>{
   const e=getEntity(s,entity);
   if(s.constraints.some(c=>c.type==='fixed'&&c.entity===entity))throw Error('Entidade fixada: remova Fixar antes de mover.');
@@ -155,7 +197,7 @@ export function createSketchController(api){
  }
  function clearSelection(){selected=[];points=[];statusCache=null;}
  function remove(){return transact(s=>{if(!selected.length)throw Error('Selecione uma entidade.');selected.forEach(id=>removeEntity(s,id));selected=[];points=[];});}
- function rules(){const s=native();if(!s)return [];return [...s.constraints,...s.dimensions].filter(c=>selected.includes(c.entity)||selected.includes(c.a?.entity)||selected.includes(c.b?.entity)||selected.includes(c.first)||selected.includes(c.second));}
+ function rules(){const s=native();if(!s)return [];return [...s.constraints.filter(c=>selected.includes(c.entity)||selected.includes(c.a?.entity)||selected.includes(c.b?.entity)||selected.includes(c.first)||selected.includes(c.second)),...s.dimensions.filter(d=>dimensionEntityIds(d).some(id=>selected.includes(id)))];}
  function removeRule(id){return transact(s=>{s.constraints=s.constraints.filter(c=>c.id!==id);s.dimensions=s.dimensions.filter(c=>c.id!==id);});}
  function toggleConstruction(){return transact(s=>{if(!selected.length)throw Error('Selecione uma entidade.');for(const id of selected){const e=getEntity(s,id);e.construction=!e.construction;}},selected);}
  function trim(entityId,clickPoint){
@@ -180,11 +222,12 @@ export function createSketchController(api){
  function describe(){const s=native();if(!s)return {label:'Sketch vazio',state:'free',dof:0};if(statusCache?.source===s)return statusCache.value;statusCache={source:s,value:sketchStatus(s,lastSolution)};return statusCache.value;}
  function states(){const s=native();if(!s)return new Map();if(statesCache?.document===s&&statesCache.solution===lastSolution)return statesCache.value;statesCache={document:s,solution:lastSolution,value:entityStates(s,lastSolution)};return statesCache.value;}
  function selectionInfo(){
-  const s=native();if(!s||!selected.length)return {count:0,entities:[],primary:null,rules:[]};
-  const entities=selected.map(id=>getEntity(s,id)),primary=entities.length===1?entities[0]:null;
-  const dim=primary?s.dimensions.find(d=>d.entity===primary.id):null;
-  return {count:entities.length,entities:structuredClone(entities),primary:primary?structuredClone(primary):null,value:primary?measuredValue(primary):null,dimension:dim?structuredClone(dim):null,rules:structuredClone(rules())};
+  const s=native();if(!s||!selected.length)return {count:0,entities:[],primary:null,rules:[],points:structuredClone(points)};
+  const entities=selected.map(id=>getEntity(s,id)),primary=entities.length===1?entities[0]:null,selectedSet=new Set(selected);
+  const dim=s.dimensions.find(d=>{const ids=dimensionEntityIds(d);return ids.length&&ids.every(id=>selectedSet.has(id));})||null;
+  const value=dim?dimensionMeasure(s,dim):primary?measuredValue(primary):null;
+  return {count:entities.length,entities:structuredClone(entities),primary:primary?structuredClone(primary):null,value,dimension:dim?structuredClone(dim):null,points:structuredClone(points),rules:structuredClone(rules())};
  }
- return {native,create,constrain,dimension,movePoint,select,setSelection,selectBox,clearSelection,remove,rules,removeRule,toggleConstruction,trim,extend,convert,describe,states,selectionInfo,reset:()=>{selected=[];points=[];lastSolution=null;invalidate();},selected:()=>selected,points:()=>points};
+ return {native,create,constrain,dimension,dimensionSpec,dimensionPreview,movePoint,select,setSelection,selectBox,clearSelection,remove,rules,removeRule,toggleConstruction,trim,extend,convert,describe,states,selectionInfo,reset:()=>{selected=[];points=[];lastSolution=null;invalidate();},selected:()=>selected,points:()=>points};
 }
 
