@@ -182,3 +182,6 @@ body.sketching #dimensions{display:none}
 }
 
 .font-preview{margin:-2px 0 10px;padding:9px 10px;border:1px dashed #304355;border-radius:7px;background:#0b141d;color:#e7f1fb;font-size:18px;line-height:1.15;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:38px;display:flex;align-items:center;justify-content:center;}
+
+#editor .sketch-dimension-guide{stroke:#516a70;stroke-width:1;stroke-dasharray:3 2;opacity:.82;pointer-events:none}
+#editor .sketch-dimension.preview{fill:#8b5e2d!important;opacity:.9;pointer-events:none}
