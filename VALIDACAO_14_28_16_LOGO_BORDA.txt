@@ -1,0 +1,56 @@
+RV CUTTER CAD 14.28.16 — LOGO PARAMÉTRICA NA BASE
+
+OBJETIVO
+- Integrar uma marca textual à base do cortador, como no modelo de referência.
+- A logo pertence ao cortador e não altera a arte/relevo que marca o alimento.
+
+PARÂMETROS
+- Ativar/desativar logo.
+- Texto.
+- Tipo da fonte (Sans Clean, Sans Bold, Humanista e Serif).
+- Tamanho da fonte em XY.
+- Altura 3D da fonte.
+- Posição ao longo da borda em porcentagem.
+- Afastamento em relação à borda.
+- Posicionamento direto no modelo 3D: botão “Escolher posição no modelo”, seguido de clique sobre o cortador.
+
+COMPORTAMENTO INTELIGENTE
+- 0% começa no centro inferior do cortador.
+- O avanço percorre o comprimento real da borda, começando pela lateral direita.
+- A orientação vem da tangente local da borda.
+- O lado externo é identificado testando os dois lados do contorno real, inclusive em reentrâncias.
+- O clique no corpo do cortador é projetado para o ponto mais próximo da borda e convertido para a mesma posição percentual usada pelo slider.
+- Quando necessário, o texto gira 180° automaticamente para permanecer legível.
+- A aba arredondada e o conector são gerados parametricamente e unidos à base.
+- O texto é geometria real elevada e entra no STL.
+
+ARQUITETURA
+- Novo módulo: src/logo-text.mjs (fontes e conversão texto → perfil, carregado no worker)
+- Geometria: src/geometry.mjs (recebe somente o perfil vetorial preparado)
+- Cache/dependências: src/dependencies.mjs
+- Classificação visual: src/role-classifier.mjs
+- Inspector/controles: src/ui.mjs + app/index.html
+- Teste dedicado: qa142816-edge-logo.mjs
+- ENGINE_VERSION: 14.28.16
+
+REFERÊNCIA OBSERVADA
+- O STL fornecido contém dois corpos: cortador e carimbo.
+- A aba da marca está fisicamente fundida ao corpo do cortador.
+- A referência usa uma aba arredondada inferior e texto elevado; a implementação segue essa lógica.
+
+VALIDAÇÃO PROGRAMADA
+- Perfil vetorial válido para todas as fontes embarcadas.
+- Texto vazio, fonte inválida e posição fora da faixa são normalizados com segurança.
+- A geometria do carimbo permanece idêntica quando apenas a logo da base muda.
+- Mapeamento do clique 3D: centro inferior=0%, lateral direita=25%, topo=50%, lateral esquerda=75% em perfil retangular de controle.
+- Nenhum JSON de fonte é embarcado no bundle principal; a vetorização ocorre no worker via OffscreenCanvas, com fallback geométrico e cache de perfis.
+- Logo inferior permanece horizontal.
+- Logo lateral gira automaticamente para orientação vertical.
+- A aba aumenta o envelope no lado esperado.
+- Cortador com logo permanece um único corpo fechado e manifold.
+- A logo adiciona volume real sem ultrapassar a altura da lâmina.
+
+CI
+- Os workflows Development CI e Source Policy foram disparados.
+- No estado observado, os jobs encerraram antes de receber um runner (runner_id=0 e lista de steps vazia).
+- Portanto esse resultado de CI não é utilizado como evidência de falha do código; a validação automática deverá ser repetida quando o runner voltar a iniciar normalmente.

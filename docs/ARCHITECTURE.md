@@ -116,3 +116,30 @@ Regras desta fase:
 A unidade primária de autoria passa a ser o **Sketch**. Funções paramétricas referenciam o Sketch e produzem corpos/peças. “Cortador de biscoito” é a primeira Feature (`cookie-cutter`), não o tipo do projeto. A árvore do projeto deve representar explicitamente Sketch → Feature → Body e futuras Features devem entrar nesse modelo sem criar editores paralelos.
 
 O workspace de Modelo é permanente. Editar um Sketch é um **estado contextual do mesmo espaço gráfico**, com toolbar/inspector próprios, e não um workspace 2D independente. Projetos legados são migrados por adaptador e o motor de geometria existente permanece atrás da Feature Cortador durante a transição.
+
+
+## 14.28.16 — Logo paramétrica na base
+
+A marca do fabricante é uma propriedade da Feature `cookie-cutter`, não parte da arte que marca o alimento. O texto é convertido em contornos vetoriais por `src/logo-text.mjs` e entra no mesmo pipeline Manifold da base do cortador.
+
+```text
+logoText / logoFont / logoSize / logoHeight
+                    +
+logoPosition (%) / logoOffset
+                    ↓
+          perfil vetorial do texto
+                    ↓
+borda real da base → posição por comprimento de arco
+                    ↓
+       tangente local + rotação legível
+                    ↓
+ aba de apoio + conector + texto elevado
+                    ↓
+        união booleana com a base
+                    ↓
+          um único corpo imprimível
+```
+
+A posição 0% é ancorada no centro inferior da borda externa; o avanço percorre a borda continuamente, começando pela lateral direita. A rotação é derivada da tangente local e é invertida em 180° quando necessário para impedir texto de cabeça para baixo. Alterações de logo invalidam apenas o nó de cortador/integrado; lâmina e perfis independentes permanecem reutilizáveis pelo grafo paramétrico.
+
+A conversão texto→perfil fica no `worker` (`src/logo-text.mjs`). O worker rasteriza o texto com fontes do sistema em `OffscreenCanvas`, vetoriza o resultado e entrega apenas o perfil 2D para `src/geometry.mjs` por `options.logoProfile`. Assim a interface não carrega arquivos de fonte ou JSONs extras; um fallback geométrico determinístico mantém QA e ambientes sem canvas funcionais. O worker mantém um cache pequeno dos perfis por texto/fonte/tamanho.
