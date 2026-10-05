@@ -1,4 +1,4 @@
-import {cloneSketch,getEntity,validateSketch,entityEndpoint} from './model.mjs';
+import {cloneSketch,getEntity,validateSketch,entityEndpoint,dimensionEntityIds} from './model.mjs';
 
 const EPS=1e-7;
 const dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
@@ -40,6 +40,13 @@ function projectPointOnLine(p,e){
 function pointLineDistance(p,e){
   const q=projectPointOnLine(p,e);return dist(p,q);
 }
+
+const angleDegrees=(a,b)=>{
+  const d=Math.atan2(Math.sin(lineAngle(b)-lineAngle(a)),Math.cos(lineAngle(b)-lineAngle(a)));
+  let deg=Math.abs(d)*180/Math.PI;if(deg>180)deg=360-deg;return deg;
+};
+function dimensionPoint(sketch,ref){return entityEndpoint(getEntity(sketch,ref.entity),ref.point);}
+function setDimensionPoint(sketch,ref,p){setPoint(getEntity(sketch,ref.entity),ref.point,p);}
 
 function snapshotEntity(e){return structuredClone(e);}
 function restoreEntity(target,saved){for(const k of Object.keys(target))delete target[k];Object.assign(target,structuredClone(saved));}
@@ -98,12 +105,27 @@ function applyConstraint(sketch,c){
 
 function applyDimension(sketch,d){
   if(d.driving===false)return;
-  const e=getEntity(sketch,d.entity);
   if(d.type==='lineLength'){
-    const dx=e.end[0]-e.start[0],dy=e.end[1]-e.start[1],len=Math.hypot(dx,dy),ux=len>EPS?dx/len:1,uy=len>EPS?dy/len:0;
+    const e=getEntity(sketch,d.entity),dx=e.end[0]-e.start[0],dy=e.end[1]-e.start[1],len=Math.hypot(dx,dy),ux=len>EPS?dx/len:1,uy=len>EPS?dy/len:0;
     e.end=[e.start[0]+ux*d.value,e.start[1]+uy*d.value];return;
   }
-  if(d.type==='circleRadius'||d.type==='arcRadius'){e.radius=d.value;return;}
+  if(d.type==='circleRadius'||d.type==='arcRadius'){getEntity(sketch,d.entity).radius=d.value;return;}
+  if(d.type==='circleDiameter'||d.type==='arcDiameter'){getEntity(sketch,d.entity).radius=d.value/2;return;}
+  if(['pointDistance','horizontalDistance','verticalDistance'].includes(d.type)){
+    const a=dimensionPoint(sketch,d.a),b=dimensionPoint(sketch,d.b),dx=b[0]-a[0],dy=b[1]-a[1];
+    if(d.type==='horizontalDistance'){
+      const sign=Math.abs(dx)>EPS?Math.sign(dx):1;setDimensionPoint(sketch,d.b,[a[0]+sign*d.value,b[1]]);return;
+    }
+    if(d.type==='verticalDistance'){
+      const sign=Math.abs(dy)>EPS?Math.sign(dy):1;setDimensionPoint(sketch,d.b,[b[0],a[1]+sign*d.value]);return;
+    }
+    const len=Math.hypot(dx,dy),ux=len>EPS?dx/len:1,uy=len>EPS?dy/len:0;
+    setDimensionPoint(sketch,d.b,[a[0]+ux*d.value,a[1]+uy*d.value]);return;
+  }
+  if(d.type==='angleBetweenLines'){
+    const a=getEntity(sketch,d.first),b=getEntity(sketch,d.second),delta=Math.atan2(Math.sin(lineAngle(b)-lineAngle(a)),Math.cos(lineAngle(b)-lineAngle(a))),sign=Math.abs(delta)>EPS?Math.sign(delta):1,target=lineAngle(a)+sign*d.value*Math.PI/180;
+    setLineAngle(b,closestEquivalentAngle(target,lineAngle(b)));return;
+  }
   throw Error(`Cota não suportada: ${d.type}`);
 }
 
@@ -128,15 +150,24 @@ function constraintResidual(sketch,c){
   if(c.type==='tangent'){const [a,b]=pair(sketch,c),ln=a.type==='line'?a:b,curve=radial(a)?a:b;return Math.abs(pointLineDistance(curve.center,ln)-curve.radius);}
   return 0;
 }
+function dimensionResidual(sketch,d){
+  if(d.driving===false)return 0;
+  if(d.type==='lineLength'){const e=getEntity(sketch,d.entity);return Math.abs(dist(e.start,e.end)-d.value);}
+  if(d.type==='circleRadius'||d.type==='arcRadius')return Math.abs(getEntity(sketch,d.entity).radius-d.value);
+  if(d.type==='circleDiameter'||d.type==='arcDiameter')return Math.abs(getEntity(sketch,d.entity).radius*2-d.value);
+  if(['pointDistance','horizontalDistance','verticalDistance'].includes(d.type)){
+    const a=dimensionPoint(sketch,d.a),b=dimensionPoint(sketch,d.b);
+    if(d.type==='horizontalDistance')return Math.abs(Math.abs(b[0]-a[0])-d.value);
+    if(d.type==='verticalDistance')return Math.abs(Math.abs(b[1]-a[1])-d.value);
+    return Math.abs(dist(a,b)-d.value);
+  }
+  if(d.type==='angleBetweenLines')return Math.abs(angleDegrees(getEntity(sketch,d.first),getEntity(sketch,d.second))-d.value);
+  return 0;
+}
 function residual(sketch){
   let r=0;
   for(const c of sketch.constraints)r=Math.max(r,constraintResidual(sketch,c));
-  for(const d of sketch.dimensions){
-    if(d.driving===false)continue;
-    const e=getEntity(sketch,d.entity);
-    if(d.type==='lineLength')r=Math.max(r,Math.abs(dist(e.start,e.end)-d.value));
-    else r=Math.max(r,Math.abs(e.radius-d.value));
-  }
+  for(const d of sketch.dimensions)r=Math.max(r,dimensionResidual(sketch,d));
   return r;
 }
 function constraintEntityIds(c){
@@ -151,13 +182,17 @@ export function solveSketch(input,{maxIterations=240,tolerance=1e-6,changedIds=n
   validateSketch(input);
   if (!Number.isInteger(maxIterations)||maxIterations<1||maxIterations>1000||!Number.isFinite(tolerance)||tolerance<=0)throw Error('Opções do solver inválidas.');
   const sketch=cloneSketch(input),affected=new Set(changedIds||sketch.entities.map(e=>e.id));
-  let grew=true;while(grew){grew=false;for(const c of sketch.constraints){const ids=constraintEntityIds(c);if(ids.some(id=>affected.has(id)))for(const id of ids)if(!affected.has(id)){affected.add(id);grew=true;}}}
-  const touches=c=>constraintEntityIds(c).some(id=>affected.has(id));
+  let grew=true;while(grew){
+    grew=false;
+    const relations=[...sketch.constraints.map(c=>constraintEntityIds(c)),...sketch.dimensions.map(d=>dimensionEntityIds(d))];
+    for(const ids of relations)if(ids.some(id=>affected.has(id)))for(const id of ids)if(!affected.has(id)){affected.add(id);grew=true;}
+  }
+  const touches=c=>constraintEntityIds(c).some(id=>affected.has(id)),touchesDimension=d=>dimensionEntityIds(d).some(id=>affected.has(id));
   const fixed=new Map();for(const c of sketch.constraints)if(c.type==='fixed')fixed.set(c.entity,c.geometry||snapshotEntity(getEntity(sketch,c.entity)));
 
   let iterations=0,last=Infinity;
   for(;iterations<maxIterations;iterations++){
-    for(const d of sketch.dimensions)if(affected.has(d.entity))applyDimension(sketch,d);
+    for(const d of sketch.dimensions)if(touchesDimension(d))applyDimension(sketch,d);
     for(const c of sketch.constraints)if(c.type!=='fixed'&&touches(c))applyConstraint(sketch,c);
     applyFixed(sketch,fixed);
     const r=residual(sketch);
