@@ -1,17 +1,12 @@
-export const LOGO_FONT_IDS=Object.freeze(['helvetiker','helvetiker-bold','optimer','gentilis']);
-const FONT_STYLES={
- helvetiker:{family:'Arial, Helvetica, sans-serif',weight:600,stretch:1},
- 'helvetiker-bold':{family:'Arial Black, Arial, Helvetica, sans-serif',weight:900,stretch:1.02},
- optimer:{family:'Trebuchet MS, Arial, sans-serif',weight:600,stretch:.98},
- gentilis:{family:'Georgia, Times New Roman, serif',weight:700,stretch:1}
-};
+import {LOGO_FONT_IDS,logoFontStyle} from './logo-font-catalog.mjs';
+export {LOGO_FONT_IDS} from './logo-font-catalog.mjs';
 
 export function normalizeLogoText(value){
  return String(value??'').replace(/\s+/g,' ').trim().slice(0,32);
 }
 
 function fallbackProfile(text,fontId,size){
- const style=FONT_STYLES[fontId]||FONT_STYLES.helvetiker,h=size,w=h*.62*style.stretch,gap=h*.15,loops=[];let x=0;
+ const style=logoFontStyle(fontId),h=size,w=h*.62*style.stretch,gap=h*.15,loops=[];let x=0;
  for(const ch of text){if(ch===' '){x+=w*.7;continue;}const width=/[ilI1]/.test(ch)?w*.42:/[mwMW]/.test(ch)?w*1.25:w;loops.push([[x,0],[x+width,0],[x+width,h],[x,h]]);x+=width+gap;}
  if(!loops.length)return null;
  const minX=loops[0][0][0],maxX=Math.max(...loops.flat().map(p=>p[0])),cx=(minX+maxX)/2,cy=h/2;
@@ -39,7 +34,7 @@ export function createLogoTextProfile(value,fontId='helvetiker',size=8,curveSegm
  const physicalSize=Number(size);if(!Number.isFinite(physicalSize)||physicalSize<=0)throw Error('Tamanho da logo inválido.');
  fontId=LOGO_FONT_IDS.includes(fontId)?fontId:'helvetiker';
  if(typeof OffscreenCanvas==='undefined')return fallbackProfile(text,fontId,physicalSize);
- const style=FONT_STYLES[fontId]||FONT_STYLES.helvetiker,px=Math.max(96,Math.min(280,Math.round(physicalSize*24))),pad=Math.ceil(px*.38);
+ const style=logoFontStyle(fontId),px=Math.max(96,Math.min(280,Math.round(physicalSize*24))),pad=Math.ceil(px*.38);
  const probe=new OffscreenCanvas(16,16),probeCtx=probe.getContext('2d',{willReadFrequently:true});if(!probeCtx)return fallbackProfile(text,fontId,physicalSize);
  probeCtx.font=`${style.weight} ${px}px ${style.family}`;const measured=probeCtx.measureText(text),width=Math.max(8,Math.ceil(measured.width*style.stretch));
  const canvas=new OffscreenCanvas(width+pad*2,Math.ceil(px*1.8)+pad*2),ctx=canvas.getContext('2d',{willReadFrequently:true});if(!ctx)return fallbackProfile(text,fontId,physicalSize);
