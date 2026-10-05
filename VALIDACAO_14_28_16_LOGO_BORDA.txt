@@ -7,7 +7,7 @@ OBJETIVO
 PARÂMETROS
 - Ativar/desativar logo.
 - Texto.
-- Tipo da fonte (Helvetiker, Helvetiker Bold, Optimer e Gentilis).
+- Tipo da fonte (Sans Clean, Sans Bold, Humanista e Serif).
 - Tamanho da fonte em XY.
 - Altura 3D da fonte.
 - Posição ao longo da borda em porcentagem.
@@ -43,7 +43,7 @@ VALIDAÇÃO PROGRAMADA
 - Texto vazio, fonte inválida e posição fora da faixa são normalizados com segurança.
 - A geometria do carimbo permanece idêntica quando apenas a logo da base muda.
 - Mapeamento do clique 3D: centro inferior=0%, lateral direita=25%, topo=50%, lateral esquerda=75% em perfil retangular de controle.
-- Os JSONs de fonte ficam fora do bundle principal da UI; a vetorização ocorre no worker com cache de perfis.
+- Nenhum JSON de fonte é embarcado no bundle principal; a vetorização ocorre no worker via OffscreenCanvas, com fallback geométrico e cache de perfis.
 - Logo inferior permanece horizontal.
 - Logo lateral gira automaticamente para orientação vertical.
 - A aba aumenta o envelope no lado esperado.
