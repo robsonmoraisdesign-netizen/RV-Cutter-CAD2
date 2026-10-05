@@ -73,3 +73,16 @@ STATUS DE BUILD
 - Código-fonte implementado na branch feature/14.28.17-logo-font-library.
 - QA dedicada adicionada à suíte.
 - A validação automática do GitHub depende da disponibilidade dos runners do repositório.
+
+
+VALIDAÇÃO EXECUTADA NESTA REVISÃO
+- Sintaxe verificada para ui.mjs, geometry.mjs, dependencies.mjs, logo-text.mjs e logo-font-catalog.mjs.
+- Catálogo executado em isolamento: 23 IDs únicos e 23 perfis válidos no fallback determinístico.
+- Migração executada em isolamento: Inter preservado; largura extra -5 → 0 mm; 99 → 40 mm; fonte inválida → padrão.
+- Cálculo de posicionamento/base executado sem Manifold para perfil de controle:
+  • base automática = 10 × 6 mm;
+  • mesma fonte com +22 mm de largura = 32 × 6 mm;
+  • diferença de largura = exatamente 22 mm;
+  • profundidade permaneceu em 6 mm;
+  • rotação inferior permaneceu em 0°.
+- Isso confirma a separação lógica entre tamanho do texto e largura da aba antes do teste completo de malha.
