@@ -424,18 +424,20 @@ export function createEditor(svg,api){
   if(tool==='dimension'){
    const doc=sketch.native(),raw=nativePoint(q),explicit=explicitHandle&&entity?{entity,point:e.target.dataset.handle}:pickDimensionPoint(q,10);
    if(explicit){
-    dimensionDraft??={points:[],entities:[]};dimensionDraft.points??=[];
-    if(!dimensionDraft.points.some(p=>p.entity===explicit.entity&&p.point===explicit.point))dimensionDraft.points.push({entity:explicit.entity,point:explicit.point});
+    const starting=!dimensionDraft||!dimensionDraft.points?.length;if(starting){sketch.clearSelection();dimensionDraft={points:[],entities:[]};}
+    dimensionDraft.points??=[];if(!dimensionDraft.points.some(p=>p.entity===explicit.entity&&p.point===explicit.point))dimensionDraft.points.push({entity:explicit.entity,point:explicit.point});
     if(dimensionDraft.points.length>2)dimensionDraft.points=dimensionDraft.points.slice(-2);dimensionDraft.entities=[];dimensionDraft.hoverPosition=raw;
+    sketch.select(explicit.entity,explicit.point,!starting);
     api.status(dimensionDraft.points.length===1?'Cota: selecione o segundo ponto.':'Cota: mova o cursor e clique no vazio para posicionar.');render();return;
    }
    if(entity){
     const ent=doc?.entities?.find(x=>x.id===entity);if(!ent)return;
-    dimensionDraft??={points:[],entities:[]};dimensionDraft.points=[];dimensionDraft.entities??=[];
+    const starting=!dimensionDraft||!dimensionDraft.entities?.length;if(starting){sketch.clearSelection();dimensionDraft={points:[],entities:[]};}
+    dimensionDraft.points=[];dimensionDraft.entities??=[];
     if(ent.type==='line'){
      if(!dimensionDraft.entities.includes(entity))dimensionDraft.entities.push(entity);if(dimensionDraft.entities.length>2)dimensionDraft.entities=dimensionDraft.entities.slice(-2);
     }else dimensionDraft.entities=[entity];
-    dimensionDraft.hoverPosition=raw;
+    dimensionDraft.hoverPosition=raw;sketch.select(entity,null,!starting&&ent.type==='line');
     api.status(dimensionDraft.entities.length===2?'Cota angular: clique no vazio para posicionar.':'Cota: clique no vazio para posicionar.');render();return;
    }
    const options=resolveDimensionDraft(doc,raw);
