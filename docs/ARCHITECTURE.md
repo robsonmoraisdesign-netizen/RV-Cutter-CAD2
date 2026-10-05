@@ -143,3 +143,28 @@ borda real da base → posição por comprimento de arco
 A posição 0% é ancorada no centro inferior da borda externa; o avanço percorre a borda continuamente, começando pela lateral direita. A rotação é derivada da tangente local e é invertida em 180° quando necessário para impedir texto de cabeça para baixo. Alterações de logo invalidam apenas o nó de cortador/integrado; lâmina e perfis independentes permanecem reutilizáveis pelo grafo paramétrico.
 
 A conversão texto→perfil fica no `worker` (`src/logo-text.mjs`). O worker rasteriza o texto com fontes do sistema em `OffscreenCanvas`, vetoriza o resultado e entrega apenas o perfil 2D para `src/geometry.mjs` por `options.logoProfile`. Assim a interface não carrega arquivos de fonte ou JSONs extras; um fallback geométrico determinístico mantém QA e ambientes sem canvas funcionais. O worker mantém um cache pequeno dos perfis por texto/fonte/tamanho.
+
+
+## 14.28.17 — Biblioteca de fontes e base independente
+
+A logo da base passa a separar explicitamente **tipografia** de **geometria da aba**. O tamanho das letras continua em `logoSize`, enquanto `logoBaseWidthExtra` adiciona largura somente à base que sustenta a marca. Assim uma palavra pequena pode ficar centralizada em uma aba visualmente mais larga, sem aumentar as letras.
+
+A lista de fontes é centralizada em `src/logo-font-catalog.mjs`. O mesmo catálogo alimenta a interface e o worker, evitando ids duplicados ou divergência entre o nome escolhido e a geometria gerada. As famílias inspiradas na lista do Onshape incluem Allerta Stencil, Arimo, Balthazar, Baumans, Bebas Neue, Comic Neue, Courier Prime, Didact Gothic, Droid Sans Mono, Inconsolata, Inter, Michroma, M PLUS Rounded 1c, Noto Sans e variações CJK, além de Noto Serif.
+
+O worker continua responsável pela vetorização do texto. Ele usa `OffscreenCanvas` e a melhor família disponível no Windows; quando a família exata não existe, o catálogo define um fallback visual compatível. Nenhum arquivo de fonte é incorporado ao projeto. O perfil resultante continua sendo uma geometria vetorial real usada pelo Manifold.
+
+```text
+logoFont + logoSize
+        ↓
+perfil vetorial do texto
+        ↓
+textWidth / textHeight ───────────┐
+                                  ├─→ aba final
+logoBaseWidthExtra ───────────────┘
+        ↓
+posição + tangente automática
+        ↓
+união booleana com a base do cortador
+```
+
+A UI mostra uma prévia tipográfica e também as dimensões calculadas da base e do texto, para que a proporção possa ser ajustada visualmente sem acoplar largura da aba ao tamanho da fonte.

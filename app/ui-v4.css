@@ -433,3 +433,5 @@ input:focus,select:focus{border-color:#2bd3b3!important;box-shadow:0 0 0 2px rgb
   .piece-mode-host{left:12px!important;right:12px!important;transform:none!important;max-width:none!important}
   #pieceModeHost:not([hidden])~.viewport-title{top:96px!important}
 }
+
+.right .font-preview{background:var(--v4-bg)!important;border-color:var(--v4-line)!important;color:var(--v4-text)!important;}

@@ -1,11 +1,11 @@
 {
   "name": "rv-cutter-cad-source",
-  "version": "14.28.16",
+  "version": "14.28.17",
   "description": "RV Cutter CAD — desktop runtime fix for 3D, Worker/WASM and native export",
   "main": "app/main.cjs",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "node qa13-geometry.mjs && node qa14-bevel.mjs && node qa14-corners.mjs && node qa148-expansion-linked.mjs && node qa148-runtime-worker.mjs && node qa14-export-center.mjs && node qa13-catalog.cjs && node qa1422-inverted-relief-volume.mjs && node qa14282-relief-separated.mjs && node qa14285-cad-display.mjs && node qa-sketch-phase1.mjs && node qa-sketch-integration.mjs && node qa1417-catalog.cjs && node qa-source-version.cjs && node qa-project-transition.mjs && node qa-sketch-constraints.mjs && node qa-sketch-ui-contract.cjs && node qa-sketch-snapping.mjs && node qa-ui-v4-contract.cjs && node qa142811-theme-engine.mjs && node qa142812-sketch-clarity.mjs && node qa-sketch-phase2.mjs && node qa-project-features.mjs && node qa142813-blade-reinforcement.mjs && node qa142813-reinforcement-visual.mjs && node qa142813-color-palettes.mjs && node qa142814-appearance-sketch.mjs && node qa142815-review.mjs && node qa142816-edge-logo.mjs",
+    "test": "node qa13-geometry.mjs && node qa14-bevel.mjs && node qa14-corners.mjs && node qa148-expansion-linked.mjs && node qa148-runtime-worker.mjs && node qa14-export-center.mjs && node qa13-catalog.cjs && node qa1422-inverted-relief-volume.mjs && node qa14282-relief-separated.mjs && node qa14285-cad-display.mjs && node qa-sketch-phase1.mjs && node qa-sketch-integration.mjs && node qa1417-catalog.cjs && node qa-source-version.cjs && node qa-project-transition.mjs && node qa-sketch-constraints.mjs && node qa-sketch-ui-contract.cjs && node qa-sketch-snapping.mjs && node qa-ui-v4-contract.cjs && node qa142811-theme-engine.mjs && node qa142812-sketch-clarity.mjs && node qa-sketch-phase2.mjs && node qa-project-features.mjs && node qa142813-blade-reinforcement.mjs && node qa142813-reinforcement-visual.mjs && node qa142813-color-palettes.mjs && node qa142814-appearance-sketch.mjs && node qa142815-review.mjs && node qa142816-edge-logo.mjs && node qa142817-logo-font-library.mjs",
     "start": "electron app"
   },
   "keywords": [],
