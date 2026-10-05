@@ -1,0 +1,68 @@
+RV CUTTER CAD 14.28.19 — SKETCH / COTAS COMPLETAS
+
+CONTEXTO RECUPERADO
+- Continuação feita em outro chat em 04/10/2026.
+- Fluxo desejado baseado nos vídeos do Sketch/Onshape.
+- Cotas adicionais: horizontal, vertical, distância entre pontos, diâmetro e ângulo.
+- Fluxo: selecionar referência(s) → clicar no vazio para posicionar → digitar valor → clicar na cota para editar.
+- Edição de cota não deve reenquadrar ou deslocar a câmera.
+
+FONTE 14.28.19
+- model.mjs:
+  • lineLength
+  • circleRadius / arcRadius
+  • circleDiameter / arcDiameter
+  • pointDistance
+  • horizontalDistance
+  • verticalDistance
+  • angleBetweenLines
+  • referências múltiplas via dimensionEntityIds()
+- solver.mjs:
+  • resolve todas as cotas acima
+  • propagação incremental considera as entidades ligadas pela cota
+- diagnostics.mjs:
+  • cotas de múltiplas referências participam dos componentes e dos graus de liberdade
+- controller.mjs:
+  • dimensionSpec()
+  • dimensionPreview()
+  • edição preserva tipo de cota já existente
+- editor.mjs:
+  • seleção de referências
+  • posicionamento no espaço vazio
+  • linhas auxiliares persistentes
+  • clique no texto da cota para editar
+  • unidade mm / graus
+  • sem chamada de fit() durante edição
+
+VALIDAÇÃO EXECUTADA
+- Sintaxe OK:
+  • src/sketch/model.mjs
+  • src/sketch/document.mjs
+  • src/sketch/solver.mjs
+  • src/sketch/diagnostics.mjs
+  • src/sketch/controller.mjs
+  • src/editor.mjs
+- Solver executado isoladamente:
+  • distância 3-4-5 alterada para 10 mm → ponto final [6, 8], residual 0
+  • distância horizontal 12 mm → X final 12, residual 0
+  • diâmetro 20 mm → raio 10 mm, residual 0
+  • ângulo 30° → 30°, residual numérico ~3,55e-15
+- QA adicionada: qa142819-sketch-dimensions.mjs
+
+RUNTIME WINDOWS
+- Base portátil: pacote Windows x64 autocontido 14.28.16 já validado.
+- Runtime 14.28.19 recebeu:
+  • Worker geométrico atualizado para fontes, largura de base e rotação da logo
+  • camada de compatibilidade do Sketch para o novo fluxo de cotas quando o bundle completo não expõe dimensionPreview()
+  • a camada se desativa automaticamente em builds completos do fonte 14.28.19
+- Worker real testado com manifold.wasm:
+  • logo automática: 1 corpo, 0 open edges, 0 nonmanifold
+  • ajuste fino 7,5°: 1 corpo, 0 open edges, 0 nonmanifold
+  • manual global 0° em borda direita (~90°): final 0°, 1 corpo fechado
+  • largura extra 30 mm: base aumentada sem alterar o texto
+  • cálculo reporta version 14.28.19
+- Biblioteca de fontes do runtime: 23 opções.
+
+LIMITAÇÃO DE AMBIENTE
+- Não foi possível executar o .exe Windows nativamente neste contêiner Linux.
+- Validação do pacote inclui sintaxe JS, worker/WASM real, integridade ZIP e inspeção PE do executável.
