@@ -200,3 +200,32 @@ logoRotationAbsolute ─────────┘
 ```
 
 Os três novos parâmetros entram no grafo paramétrico do nó `cutter`, portanto trocar o modo ou o ângulo invalida somente a parte necessária do cortador e não altera o carimbo separado.
+
+
+## 14.28.19 — Cotas completas no Sketch
+
+A ferramenta **Cota (D)** passa do modelo de cota imediata de uma única entidade para o fluxo CAD observado na referência Onshape:
+
+1. selecionar uma entidade ou as referências;
+2. mover o cursor;
+3. clicar no espaço vazio para posicionar a cota;
+4. digitar o valor;
+5. clicar posteriormente no texto da cota para editar sem reenquadrar a câmera.
+
+Tipos persistentes suportados no documento paramétrico:
+
+- `lineLength`;
+- `circleRadius` / `arcRadius`;
+- `circleDiameter` / `arcDiameter`;
+- `pointDistance`;
+- `horizontalDistance`;
+- `verticalDistance`;
+- `angleBetweenLines`.
+
+Cotas com duas referências participam do grafo incremental do solver e do diagnóstico de graus de liberdade. `dimensionEntityIds()` centraliza a descoberta das entidades afetadas para remoção, seleção, propagação incremental e diagnóstico.
+
+A posição visual da anotação é persistida em `dimension.position`. O editor desenha linhas auxiliares e o texto da cota no próprio SVG. O clique no texto usa o id da cota, não apenas o id da entidade, permitindo múltiplos tipos de dimensão sem ambiguidade. Cotas angulares mantêm unidade em graus; as demais usam milímetros.
+
+A escolha inteligente entre distância direta, horizontal e vertical usa a posição onde o usuário coloca a anotação. Diâmetro é a opção radial usada pelo fluxo de canvas; raio continua compatível no documento e no inspector legado.
+
+A edição de cota altera somente a geometria/solver e não chama `fit()`, preservando o zoom, pan e enquadramento do Sketch durante a edição.
