@@ -1,4 +1,4 @@
-import {entityEndpoint} from './model.mjs';
+import {entityEndpoint,dimensionEntityIds} from './model.mjs';
 
 const fields=e=>e.type==='point'?['position.0','position.1']:e.type==='line'?['start.0','start.1','end.0','end.1']:e.type==='circle'?['center.0','center.1','radius']:e.type==='arc'?['center.0','center.1','radius','startAngle','endAngle']:e.type==='bezier'?e.points.flatMap((_,i)=>[`points.${i}.0`,`points.${i}.1`]):[];
 const read=(o,key)=>key.split('.').reduce((v,k)=>v[k],o);
@@ -35,7 +35,16 @@ function equations(s){
   else if(c.type==='tangent'){const [a,b]=pair(byId,c),ln=a.type==='line'?a:b,curve=radial(a)?a:b;v.push(Math.abs(pointLineSigned(curve.center,ln))-curve.radius);}
  }
  for(const d of s.dimensions)if(d.driving!==false){
-  const e=byId.get(d.entity);v.push(d.type==='lineLength'?Math.hypot(e.end[0]-e.start[0],e.end[1]-e.start[1])-d.value:e.radius-d.value);
+  if(d.type==='lineLength'){const e=byId.get(d.entity);v.push(Math.hypot(e.end[0]-e.start[0],e.end[1]-e.start[1])-d.value);}
+  else if(d.type==='circleRadius'||d.type==='arcRadius')v.push(byId.get(d.entity).radius-d.value);
+  else if(d.type==='circleDiameter'||d.type==='arcDiameter')v.push(byId.get(d.entity).radius*2-d.value);
+  else if(['pointDistance','horizontalDistance','verticalDistance'].includes(d.type)){
+   const a=entityEndpoint(byId.get(d.a.entity),d.a.point),b=entityEndpoint(byId.get(d.b.entity),d.b.point),dx=b[0]-a[0],dy=b[1]-a[1];
+   v.push((d.type==='pointDistance'?Math.hypot(dx,dy):d.type==='horizontalDistance'?Math.abs(dx):Math.abs(dy))-d.value);
+  }else if(d.type==='angleBetweenLines'){
+   const a=byId.get(d.first),b=byId.get(d.second),aa=Math.atan2(a.end[1]-a.start[1],a.end[0]-a.start[0]),ab=Math.atan2(b.end[1]-b.start[1],b.end[0]-b.start[0]),delta=Math.abs(Math.atan2(Math.sin(ab-aa),Math.cos(ab-aa)))*180/Math.PI;
+   v.push(delta-d.value);
+  }
  }
  return v;
 }
@@ -61,8 +70,8 @@ function components(sketch){
   const ids=new Set([remaining.keys().next().value]);let grow=true;
   while(grow){
    grow=false;
-   for(const c of sketch.constraints){
-    const connected=links(c);
+   const relations=[...sketch.constraints.map(links),...sketch.dimensions.map(dimensionEntityIds)];
+   for(const connected of relations){
     if(connected.some(id=>ids.has(id)))for(const id of connected)if(remaining.has(id)&&!ids.has(id)){ids.add(id);grow=true;}
    }
   }
@@ -72,7 +81,7 @@ function components(sketch){
 }
 function componentReport(sketch,ids){
  const entities=[...ids].map(id=>sketch.entities.find(e=>e.id===id)).filter(Boolean);
- const s={entities:structuredClone(entities),constraints:sketch.constraints.filter(c=>links(c).some(id=>ids.has(id))),dimensions:sketch.dimensions.filter(d=>ids.has(d.entity))};
+ const s={entities:structuredClone(entities),constraints:sketch.constraints.filter(c=>links(c).some(id=>ids.has(id))),dimensions:sketch.dimensions.filter(d=>dimensionEntityIds(d).some(id=>ids.has(id)))};
  const vars=s.entities.flatMap(e=>fields(e).map(key=>({e,key}))),base=equations(s);
  if(vars.length>256||base.length>512)return {dof:null,exact:false};
  const rows=base.map(()=>[]);
