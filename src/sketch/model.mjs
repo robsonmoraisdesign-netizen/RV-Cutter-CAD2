@@ -3,6 +3,8 @@ const id = (prefix='sk') => `${prefix}-${globalThis.crypto.randomUUID()}`;
 const TYPES = new Set(['point','line','circle','arc','bezier']);
 const PAIR_LINE = new Set(['parallel','perpendicular','collinear']);
 const PAIR_RADIAL = new Set(['concentric']);
+const ENTITY_DIMENSIONS = Object.freeze({lineLength:'line',circleRadius:'circle',arcRadius:'arc',circleDiameter:'circle',arcDiameter:'arc'});
+const POINT_DIMENSIONS = new Set(['pointDistance','horizontalDistance','verticalDistance']);
 const finite = n => Number.isFinite(n) && Math.abs(n) <= 1e6;
 const point = p => {
   if (!Array.isArray(p) || p.length !== 2 || !p.every(finite)) throw Error('Ponto inválido.');
@@ -55,11 +57,17 @@ export function rectangle(sketch,a,b,options={}) {
   });
   Object.assign(sketch,s);return lines.map(e=>e.id);
 }
+export function dimensionEntityIds(d) {
+  if (!d) return [];
+  if (POINT_DIMENSIONS.has(d.type)) return [d.a?.entity,d.b?.entity].filter(Boolean);
+  if (d.type==='angleBetweenLines') return [d.first,d.second].filter(Boolean);
+  return d.entity?[d.entity]:[];
+}
 export function removeEntity(sketch,entityId) {
   getEntity(sketch,entityId);
   sketch.entities=sketch.entities.filter(e=>e.id!==entityId);
   sketch.constraints=sketch.constraints.filter(c=>![c.entity,c.a?.entity,c.b?.entity,c.point?.entity,c.line,c.first,c.second].includes(entityId));
-  sketch.dimensions=sketch.dimensions.filter(d=>d.entity!==entityId);
+  sketch.dimensions=sketch.dimensions.filter(d=>!dimensionEntityIds(d).includes(entityId));
 }
 export function entityEndpoint(entity,which) {
   if(entity.type==='point'&&which==='point')return [...entity.position];
@@ -145,9 +153,22 @@ export function validateSketch(s) {
     } else throw Error('Restrição não suportada: '+c.type);
   }
   for (const d of s.dimensions) {
-    const e=getEntity(s,d.entity);
     if (!finite(d.value)||d.value<=0) throw Error('Valor de cota inválido.');
-    if ({lineLength:'line',circleRadius:'circle',arcRadius:'arc'}[d.type]!==e.type) throw Error('Cota incompatível com a entidade.');
+    if (d.position!==undefined) point(d.position);
+    if (ENTITY_DIMENSIONS[d.type]) {
+      const e=getEntity(s,d.entity);
+      if (ENTITY_DIMENSIONS[d.type]!==e.type) throw Error('Cota incompatível com a entidade.');
+    } else if (POINT_DIMENSIONS.has(d.type)) {
+      if(!d.a||!d.b)throw Error('Cota entre pontos requer duas referências.');
+      const pa=entityEndpoint(getEntity(s,d.a.entity),d.a.point),pb=entityEndpoint(getEntity(s,d.b.entity),d.b.point);
+      if(d.a.entity===d.b.entity&&d.a.point===d.b.point)throw Error('Selecione dois pontos diferentes.');
+      if(!pa.every(finite)||!pb.every(finite))throw Error('Referência de ponto inválida.');
+    } else if(d.type==='angleBetweenLines') {
+      if(typeof d.first!=='string'||typeof d.second!=='string'||d.first===d.second)throw Error('Cota angular requer duas linhas diferentes.');
+      const a=getEntity(s,d.first),b=getEntity(s,d.second);
+      if(a.type!=='line'||b.type!=='line')throw Error('Cota angular requer duas linhas.');
+      if(d.value>180)throw Error('A cota angular deve ficar entre 0° e 180°.');
+    } else throw Error('Tipo de cota não suportado: '+d.type);
   }
   return true;
 }
