@@ -107,7 +107,7 @@ function edgeLogoPlacement(poly,p,profile){
  const connectorW=Math.min(plaqueW*.72,Math.max(5,profile.width*.58));
  const connector=roundedRect(connectorW,connectorLength,Math.min(1.2,connectorLength*.28),4).map(q=>localToWorld(q,connectorCenter));
  const textLoops=profile.loops.map(loop=>loop.map(q=>localToWorld(q)));
- return {textLoops,plaque,connector,anchor:hit,tangent,normal,angle:Math.atan2(tangent[1],tangent[0])*180/Math.PI,position:p.logoPosition};
+ return {textLoops,plaque,connector,anchor:hit,tangent,normal,angle:Math.atan2(tangent[1],tangent[0])*180/Math.PI,position:p.logoPosition,baseWidth:plaqueW,baseDepth:plaqueD,textWidth:profile.width,textHeight:profile.height};
 }
 export function edgePositionFromPoint(poly,point){
  if(!Array.isArray(poly)||poly.length<3||!Array.isArray(point)||point.length<2)return null;
@@ -221,7 +221,7 @@ export function build(m,loops,params,ctx=null,options={}){const started=performa
   cutterBaseSection=rimOuter;
   if(p.logoEnabled&&p.mode!=='stamp'){
    const logo=edgeLogoPlacement(rimOuter.toPolygons()[0],p,options.logoProfile);
-   if(logo){logoPlacement={anchor:logo.anchor,tangent:logo.tangent,normal:logo.normal,angle:logo.angle};
+   if(logo){logoPlacement={anchor:logo.anchor,tangent:logo.tangent,normal:logo.normal,angle:logo.angle,position:logo.position,baseWidth:logo.baseWidth,baseDepth:logo.baseDepth,textWidth:logo.textWidth,textHeight:logo.textHeight};
     const plaque=hold(new C([logo.plaque],'EvenOdd')),connector=hold(new C([logo.connector],'EvenOdd'));
     cutterBaseSection=silhouette(hold(C.union([rimOuter,plaque,connector])));
     const logoSection=hold(new C(logo.textLoops,'EvenOdd'));logoOutline=logo.textLoops;
