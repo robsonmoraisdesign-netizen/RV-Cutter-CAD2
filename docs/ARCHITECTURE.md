@@ -168,3 +168,35 @@ união booleana com a base do cortador
 ```
 
 A UI mostra uma prévia tipográfica e também as dimensões calculadas da base e do texto, para que a proporção possa ser ajustada visualmente sem acoplar largura da aba ao tamanho da fonte.
+
+
+## 14.28.18 — Rotação manual e correção fina da logo
+
+A orientação da logo passa a ser um parâmetro explícito e independente da posição ao longo da borda. O cálculo continua obtendo a tangente local da borda, mas `resolveLogoOrientation()` decide o ângulo final conforme três modos:
+
+- `auto`: usa somente a tangente local.
+- `autoOffset`: soma `logoRotationOffset` à tangente local. A correção fina é limitada a ±45°.
+- `manual`: ignora a tangente para a orientação visual e usa `logoRotationAbsolute` no sistema XY global do objeto.
+
+O padrão é `autoOffset` com correção 0°, portanto projetos antigos continuam com o mesmo resultado geométrico. O modo manual em 0° mantém a marca horizontal em relação aos eixos globais do objeto, mesmo quando a borda local está inclinada.
+
+A posição da aba continua derivada da normal externa da borda. A rotação final afeta o texto e a placa da logo; o conector estrutural é calculado separadamente na direção da normal externa, mantendo sobreposição robusta entre a placa rotacionada e a base do cortador.
+
+```text
+borda real
+   ↓
+tangente automática ──────────┐
+                              ├─ auto → final
+logoRotationOffset ───────────┤
+                              ├─ autoOffset → tangente + correção
+logoRotationAbsolute ─────────┘
+                                 manual → ângulo global
+                                      ↓
+                         base + texto rotacionados
+                                      ↓
+                    conector radial independente
+                                      ↓
+                         união booleana manifold
+```
+
+Os três novos parâmetros entram no grafo paramétrico do nó `cutter`, portanto trocar o modo ou o ângulo invalida somente a parte necessária do cortador e não altera o carimbo separado.
