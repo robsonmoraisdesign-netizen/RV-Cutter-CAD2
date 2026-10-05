@@ -136,6 +136,15 @@ export function createSketchController(api){
  function dimensionSpec(options={}){
   const s=native();if(!s)return null;
   const explicit=options.type||null,entityIds=options.entities?.length?options.entities:[...selected],pointRefs=options.points?.length?options.points:[...points];
+  if(!explicit&&!options.entities&&!options.points){
+   const selectedSet=new Set(selected),existing=s.dimensions.find(d=>{const ids=dimensionEntityIds(d);return ids.length&&ids.every(id=>selectedSet.has(id))&&ids.every(id=>selectedSet.has(id));});
+   if(existing){
+    const base={type:existing.type,...(existing.position?{position:[...existing.position]}:{})};
+    if(['pointDistance','horizontalDistance','verticalDistance'].includes(existing.type))return {...base,a:structuredClone(existing.a),b:structuredClone(existing.b)};
+    if(existing.type==='angleBetweenLines')return {...base,first:existing.first,second:existing.second};
+    return {...base,entity:existing.entity};
+   }
+  }
   if(['pointDistance','horizontalDistance','verticalDistance'].includes(explicit)){
    if(pointRefs.length!==2)throw Error('Selecione dois pontos para esta cota.');
    return {type:explicit,a:structuredClone(pointRefs[0]),b:structuredClone(pointRefs[1]),...(options.position?{position:[...options.position]}:{})};
