@@ -384,7 +384,7 @@ function applyLogoPlacement(evt){
  return true;
 }
 function handleViewerInteraction(evt){
- if(evt.type==='placement'&&logoPickMode){applyLogoPlacement(evt);return;}
+ if(evt.type==='placement'&&logoPickMode){if(evt.phase==='cancel'){setLogoPickMode(false,{restore:true});status('Posicionamento da logo interrompido e restaurado.');return;}applyLogoPlacement(evt);return;}
  if(evt.type==='hover'){setLayerHover(evt.id);return;}
  if(evt.type==='select'){if(evt.id)selectObject(evt.id);else setLayerHover(null);return;}
  if(evt.type==='focus'){if(evt.id)selectObject(evt.id);return;}
