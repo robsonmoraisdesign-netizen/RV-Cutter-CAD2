@@ -329,18 +329,21 @@ export function createEditor(svg,api){
   const chip=$('sketchStatusChip'),statusText=$('sketchStatus');
   if(statusText)statusText.textContent=status.label+(status.dof!==null&&status.state!=='defined'?' · '+status.dof+' GL':'');
   if(chip){chip.dataset.state=status.state;chip.title=status.dof===null?'Diagnóstico aproximado':`${status.dof} graus de liberdade restantes`;}
-  const title=$('sketchSelectionTitle'),meta=$('sketchSelectionMeta'),dim=$('sketchDimension'),driving=$('sketchDriving'),apply=$('applySketchDimension');
+  const title=$('sketchSelectionTitle'),meta=$('sketchSelectionMeta'),dim=$('sketchDimension'),dimUnit=$('sketchDimensionUnit'),driving=$('sketchDriving'),apply=$('applySketchDimension');
   if(title)title.textContent=info.count===0?'Nada selecionado':info.count===1?entityName(info.primary):`${info.count} entidades`;
   if(meta){
    if(info.count===0)meta.textContent='Selecione a geometria diretamente no canvas. As linhas possuem uma área de captura ampliada.';
+   else if(info.dimension)meta.textContent=`${dimensionLabel(info.dimension.type)} atual: ${Number(info.dimension.value).toFixed(2)} ${info.dimension.type==='angleBetweenLines'?'°':'mm'}`;
    else if(info.count===1){
     const e=info.primary;
     meta.textContent=e.type==='point'?`Ponto: X ${e.position[0].toFixed(2)} · Y ${e.position[1].toFixed(2)} mm`:e.type==='line'?`Comprimento atual: ${info.value.toFixed(2)} mm`:e.type==='circle'?`Raio atual: ${info.value.toFixed(2)} mm`:e.type==='arc'?`Raio do arco: ${info.value.toFixed(2)} mm`:`Bézier de grau ${Math.max(1,e.points.length-1)} · ${e.points.length} pontos de controle`;
-   }else meta.textContent='Seleção múltipla pronta para restrições entre entidades.';
+   }else meta.textContent='Seleção múltipla pronta para restrições entre entidades ou para editar uma cota existente.';
   }
-  if(dim){const canDimension=info.count===1&&Number.isFinite(info.value);dim.disabled=!canDimension;if(canDimension&&!dim.matches(':focus'))dim.value=(info.dimension?.value??info.value).toFixed(2);}
-  if(driving){driving.disabled=info.count!==1||!Number.isFinite(info.value);driving.checked=info.dimension?.driving!==false;}
-  if(apply)apply.disabled=info.count!==1||!Number.isFinite(info.value);
+  const canDimension=(info.count===1&&Number.isFinite(info.value))||!!info.dimension;
+  if(dim){dim.disabled=!canDimension;if(canDimension&&!dim.matches(':focus'))dim.value=Number(info.dimension?.value??info.value).toFixed(2);}
+  if(dimUnit)dimUnit.textContent=info.dimension?.type==='angleBetweenLines'?'°':'mm';
+  if(driving){driving.disabled=!canDimension;driving.checked=info.dimension?.driving!==false;}
+  if(apply)apply.disabled=!canDimension;
   const rules=$('sketchRules');if(rules){const previous=rules.value;rules.replaceChildren();for(const c of sketch.rules()){const option=document.createElement('option');option.value=c.id;option.textContent=ruleName(c.type)+(c.value!==undefined?' · '+c.value.toFixed(2)+' mm':'');rules.appendChild(option);}if([...rules.options].some(o=>o.value===previous))rules.value=previous;}
   const construction=$('toggleConstruction');if(construction){construction.disabled=!info.count;construction.classList.toggle('active',!!info.entities.length&&info.entities.every(e=>e.construction));}
   const del=$('deleteSketchEntity');if(del)del.disabled=!info.count;
