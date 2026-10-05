@@ -10,6 +10,30 @@ export function normalizeLogoText(value){
  return String(value??'').replace(/\s+/g,' ').trim().slice(0,32);
 }
 
+function fallbackProfile(text,fontId,size){
+ const style=FONT_STYLES[fontId]||FONT_STYLES.helvetiker,h=size,w=h*.62*style.stretch,gap=h*.15,loops=[];let x=0;
+ for(const ch of text){if(ch===' '){x+=w*.7;continue;}const width=/[ilI1]/.test(ch)?w*.42:/[mwMW]/.test(ch)?w*1.25:w;loops.push([[x,0],[x+width,0],[x+width,h],[x,h]]);x+=width+gap;}
+ if(!loops.length)return null;
+ const minX=loops[0][0][0],maxX=Math.max(...loops.flat().map(p=>p[0])),cx=(minX+maxX)/2,cy=h/2;
+ return {text,font:fontId,size,loops:loops.map(poly=>poly.map(([px,py])=>[px-cx,py-cy])),width:maxX-minX,height:h,fallback:true};
+}
+
+function traceRaster(data,w,h,threshold=160){
+ const val=(x,y)=>{if(x<=0||y<=0||x>=w-1||y>=h-1)return 255;const i=(y*w+x)*4,a=data[i+3]/255;return (data[i]*.2126+data[i+1]*.7152+data[i+2]*.0722)*a+255*(1-a)};
+ const links=new Map(),coords=new Map(),H=(x,y)=>`h${x},${y}`,V=(x,y)=>`v${x},${y}`;
+ const table={1:[[3,0]],2:[[0,1]],3:[[3,1]],4:[[1,2]],6:[[0,2]],7:[[3,2]],8:[[2,3]],9:[[2,0]],11:[[2,1]],12:[[1,3]],13:[[1,0]],14:[[0,3]]};
+ const add=(a,b)=>{if(!links.has(a))links.set(a,[]);if(!links.has(b))links.set(b,[]);links.get(a).push(b);links.get(b).push(a);};
+ for(let y=0;y<h-1;y++)for(let x=0;x<w-1;x++){
+  const v=[val(x,y),val(x+1,y),val(x+1,y+1),val(x,y+1)],code=v.reduce((n,a,i)=>n+(a<threshold?(1<<i):0),0);if(!code||code===15)continue;
+  const keys=[H(x,y),V(x+1,y),H(x,y+1),V(x,y)],interp=(a,b)=>(threshold-a)/(b-a||1),xy=[[x+interp(v[0],v[1]),y],[x+1,y+interp(v[1],v[2])],[x+interp(v[3],v[2]),y+1],[x,y+interp(v[0],v[3])]];
+  let pairs=table[code];if(code===5||code===10){const c=v.reduce((sum,n)=>sum+n)/4<threshold;pairs=(code===5)===c?[[0,1],[2,3]]:[[3,0],[1,2]];}
+  for(const [a,b] of pairs){coords.set(keys[a],xy[a]);coords.set(keys[b],xy[b]);add(keys[a],keys[b]);}
+ }
+ const seen=new Set(),loops=[];
+ for(const start of links.keys()){if(seen.has(start))continue;let cur=start,prev=null,p=[];while(!seen.has(cur)){seen.add(cur);p.push(coords.get(cur));const ns=links.get(cur),next=ns.find(n=>n!==prev);prev=cur;cur=next;if(!cur)break;}if(cur===start&&p.length>=6)loops.push(p);}
+ return loops;
+}
+
 export function createLogoTextProfile(value,fontId='helvetiker',size=8,curveSegments=8){
  const text=normalizeLogoText(value);
  if(!text)return null;
