@@ -78,9 +78,10 @@ function edgeLogoPlacement(poly,p,profile){
  if(ft[0]<-1e-6)path=forward.slice().reverse();
  const lengths=[0];for(let i=1;i<path.length;i++)lengths.push(lengths.at(-1)+Math.hypot(path[i][0]-path[i-1][0],path[i][1]-path[i-1][1]));
  const perimeter=lengths.at(-1)||1,target=perimeter*(p.logoPosition/100);
- let k=1;while(k<lengths.length-1&&lengths[k]<target)k++;
- const a=path[k-1],b=path[k],segLen=Math.max(1e-9,lengths[k]-lengths[k-1]),u=(target-lengths[k-1])/segLen;
- const hit=[a[0]+(b[0]-a[0])*u,a[1]+(b[1]-a[1])*u],raw=[(b[0]-a[0])/segLen,(b[1]-a[1])/segLen];
+ const atArc=arc=>{arc=((arc%perimeter)+perimeter)%perimeter;let i=1;while(i<lengths.length-1&&lengths[i]<arc)i++;const a=path[i-1],b=path[i],seg=Math.max(1e-9,lengths[i]-lengths[i-1]),u=(arc-lengths[i-1])/seg;return [a[0]+(b[0]-a[0])*u,a[1]+(b[1]-a[1])*u];};
+ const hit=atArc(target),smoothWindow=Math.max(.35,Math.min(2.5,(p.logoSize||8)*.12,perimeter*.015)),before=atArc(target-smoothWindow),after=atArc(target+smoothWindow),dx=after[0]-before[0],dy=after[1]-before[1],dl=Math.hypot(dx,dy);
+ let raw;
+ if(dl>1e-8)raw=[dx/dl,dy/dl];else{let k=1;while(k<lengths.length-1&&lengths[k]<target)k++;const a=path[k-1],b=path[k],seg=Math.max(1e-9,lengths[k]-lengths[k-1]);raw=[(b[0]-a[0])/seg,(b[1]-a[1])/seg];}
  let tangent=raw.slice();if(tangent[0]<0)tangent=[-tangent[0],-tangent[1]];
  const left=[-tangent[1],tangent[0]],radial=[hit[0]-center[0],hit[1]-center[1]],rl=Math.hypot(...radial)||1;
  const radialNormal=[radial[0]/rl,radial[1]/rl],localLeft=[-raw[1],raw[0]],localRight=[raw[1],-raw[0]],probe=Math.max(.03,(p.size||75)*.0008);
