@@ -1,27 +1,10 @@
-import {FontLoader} from 'three/addons/loaders/FontLoader.js';
-import helvetikerRegular from 'three/examples/fonts/helvetiker_regular.typeface.json' with {type:'json'};
-import helvetikerBold from 'three/examples/fonts/helvetiker_bold.typeface.json' with {type:'json'};
-import optimerRegular from 'three/examples/fonts/optimer_regular.typeface.json' with {type:'json'};
-import gentilisRegular from 'three/examples/fonts/gentilis_regular.typeface.json' with {type:'json'};
-
-const loader=new FontLoader();
-const fonts={
- helvetiker:loader.parse(helvetikerRegular),
- 'helvetiker-bold':loader.parse(helvetikerBold),
- optimer:loader.parse(optimerRegular),
- gentilis:loader.parse(gentilisRegular)
+export const LOGO_FONT_IDS=Object.freeze(['helvetiker','helvetiker-bold','optimer','gentilis']);
+const FONT_STYLES={
+ helvetiker:{family:'Arial, Helvetica, sans-serif',weight:600,stretch:1},
+ 'helvetiker-bold':{family:'Arial Black, Arial, Helvetica, sans-serif',weight:900,stretch:1.02},
+ optimer:{family:'Trebuchet MS, Arial, sans-serif',weight:600,stretch:.98},
+ gentilis:{family:'Georgia, Times New Roman, serif',weight:700,stretch:1}
 };
-
-export const LOGO_FONT_IDS=Object.freeze(Object.keys(fonts));
-
-function cleanPoints(points){
- const out=points.map(p=>[p.x,p.y]).filter(p=>p.every(Number.isFinite));
- if(out.length>2){
-  const a=out[0],b=out.at(-1);
-  if(Math.hypot(a[0]-b[0],a[1]-b[1])<1e-7)out.pop();
- }
- return out;
-}
 
 export function normalizeLogoText(value){
  return String(value??'').replace(/\s+/g,' ').trim().slice(0,32);
