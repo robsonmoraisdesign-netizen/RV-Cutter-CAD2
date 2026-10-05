@@ -360,7 +360,7 @@ export function createEditor(svg,api){
   if(nativeCount){
    for(const e of n.entities){
     const chosen=sketch.selected().includes(e.id);appendEntityShape(e,n,o,stateMap.get(e.id)||'under',chosen);
-    if(chosen&&tool==='select'){
+    if(chosen&&['select','dimension'].includes(tool)){
      const handles=e.type==='point'?[['point',e.position]]:e.type==='line'?[['start',e.start],['end',e.end]]:e.type==='bezier'?e.points.map((p,i)=>[`control:${i}`,p]):[['center',e.center],['radius',[e.center[0]+e.radius,e.center[1]]]];
      if(e.type==='arc')for(const key of ['start','end']){const a=e[key+'Angle'];handles.push([key,[e.center[0]+Math.cos(a)*e.radius,e.center[1]+Math.sin(a)*e.radius]]);}
      for(const [key,p] of handles){const cc=localPoint(p,n);svg.appendChild(el('circle',{cx:cc[0],cy:-cc[1],r:view[2]*.006,fill:sketch.points().some(p=>p.entity===e.id&&p.point===key)?themeColor('warning'):themeColor('sketchHandle'),stroke:themeColor('sketchConstrained'),'stroke-width':1,'vector-effect':'non-scaling-stroke','data-entity':e.id,'data-handle':key}));}
@@ -384,38 +384,65 @@ export function createEditor(svg,api){
   }
   renderBezierDraft(n);renderBox();renderInference(n);renderReferenceDock(o);updateInspector(n);
   const selection=$('selection');
-  if(selection)selection.textContent=drag?.kind==='box-select'?(drag.end?.[0]<drag.start[0]?'Seleção cruzada: toca a janela para selecionar.':'Seleção por janela: a entidade precisa ficar dentro.'):region?'Região selecionada para edição de contorno.':sketch.selected().length?`${sketch.selected().length} entidade(s) selecionada(s) · Shift adiciona à seleção`:selected>=0?`Contorno ${selected+1} · ${o.loops[selected]?.length||0} pontos`:tool==='trim'?'Trim: clique no trecho que deseja remover.':tool==='extend'?'Extend: clique perto da extremidade que deseja prolongar.':tool==='dimension'?'Cota: clique em uma linha, círculo ou arco.':tool==='bezier'?(bezierClicks.length?'Bézier: continue clicando · duplo clique ou Enter conclui.':'Bézier: clique para iniciar a curva.'):tool==='point'?'Ponto: clique para posicionar · Shift suprime inferências.':'Clique para selecionar · arraste no vazio para seleção por janela.';
+  if(selection)selection.textContent=drag?.kind==='box-select'?(drag.end?.[0]<drag.start[0]?'Seleção cruzada: toca a janela para selecionar.':'Seleção por janela: a entidade precisa ficar dentro.'):region?'Região selecionada para edição de contorno.':sketch.selected().length?`${sketch.selected().length} entidade(s) selecionada(s) · Shift adiciona à seleção`:selected>=0?`Contorno ${selected+1} · ${o.loops[selected]?.length||0} pontos`:tool==='trim'?'Trim: clique no trecho que deseja remover.':tool==='extend'?'Extend: clique perto da extremidade que deseja prolongar.':tool==='dimension'?(dimensionDraft?'Cota: escolha a próxima referência ou clique no vazio para posicionar.':'Cota: selecione entidade, dois pontos ou duas linhas.'):tool==='bezier'?(bezierClicks.length?'Bézier: continue clicando · duplo clique ou Enter conclui.':'Bézier: clique para iniciar a curva.'):tool==='point'?'Ponto: clique para posicionar · Shift suprime inferências.':'Clique para selecionar · arraste no vazio para seleção por janela.';
  }
- function reset(){view=[-.65,-.65,1.3,1.3];selected=-1;node=-1;region=null;drag=null;arcClicks=[];bezierClicks=[];bezierHover=null;hoveredEntity=null;hoveredLoop=null;inference=null;sketch.reset();closeInlineDimension();render();}
+ function reset(){view=[-.65,-.65,1.3,1.3];selected=-1;node=-1;region=null;drag=null;arcClicks=[];bezierClicks=[];bezierHover=null;hoveredEntity=null;hoveredLoop=null;inference=null;clearDimensionDraft();sketch.reset();closeInlineDimension();render();}
  async function operate(op){const o=api.object();if(!o||!contourMode())return;const original=o.loops;try{api.status('Aplicando edição vetorial…');const loops=await api.request({action:'edit',loops:original,op:{...op,size:o.params.size}});if(api.object()?.id!==o.id||o.loops!==original){api.status('Edição cancelada porque o objeto mudou.');return;}api.history();delete o.sketch;o.loops=loops;selected=-1;node=-1;api.changed();render();}catch(e){api.status(e.message);}}
 
- function closeInlineDimension(){const box=$('sketchInlineDimension');if(box)box.hidden=true;}
- function openInlineDimension(entityId,clientX,clientY){
-  sketch.select(entityId);render();const info=sketch.selectionInfo();if(info.count!==1||!Number.isFinite(info.value)){api.status('Cota direta disponível para linha, círculo e arco nesta fase.');return;}
-  const box=$('sketchInlineDimension'),input=$('sketchInlineDimensionValue'),label=$('sketchInlineDimensionLabel'),vp=$('viewport').getBoundingClientRect();
-  label.textContent=info.primary.type==='line'?'Comprimento':info.primary.type==='circle'?'Raio':'Raio do arco';
-  input.value=(info.dimension?.value??info.value).toFixed(2);
-  box.style.left=Math.max(8,Math.min(vp.width-210,clientX-vp.left+10))+'px';box.style.top=Math.max(62,Math.min(vp.height-60,clientY-vp.top-18))+'px';box.hidden=false;
+ function closeInlineDimension(){const box=$('sketchInlineDimension');if(box)box.hidden=true;dimensionEditContext=null;}
+ function dimensionLabel(type){return ({lineLength:'Comprimento',circleRadius:'Raio',arcRadius:'Raio do arco',circleDiameter:'Diâmetro',arcDiameter:'Diâmetro do arco',pointDistance:'Distância',horizontalDistance:'Distância horizontal',verticalDistance:'Distância vertical',angleBetweenLines:'Ângulo'}[type]||'Cota');}
+ function openInlineDimensionOptions(options,clientX,clientY,existing=null){
+  let preview;try{preview=existing?{...existing,unit:existing.type==='angleBetweenLines'?'°':'mm'}:sketch.dimensionPreview(options);}catch(e){api.status(e.message);return;}
+  if(!preview||!Number.isFinite(preview.value)){api.status('Não foi possível medir esta seleção.');return;}
+  dimensionEditContext={options:dimensionOptionsFromRecord(existing)||options,existingId:existing?.id||null};
+  const box=$('sketchInlineDimension'),input=$('sketchInlineDimensionValue'),label=$('sketchInlineDimensionLabel'),unit=$('sketchInlineDimensionUnit'),vp=$('viewport').getBoundingClientRect();
+  label.textContent=dimensionLabel(preview.type);if(unit)unit.textContent=preview.unit||'mm';input.value=Number(preview.value).toFixed(2);
+  box.style.left=Math.max(8,Math.min(vp.width-220,clientX-vp.left+10))+'px';box.style.top=Math.max(62,Math.min(vp.height-60,clientY-vp.top-18))+'px';box.hidden=false;
   requestAnimationFrame(()=>{input.focus();input.select();});
+ }
+ function openInlineDimension(entityId,clientX,clientY){
+  sketch.clearSelection();sketch.select(entityId);render();const info=sketch.selectionInfo();if(info.count!==1||!Number.isFinite(info.value)){api.status('Selecione uma linha, círculo ou arco.');return;}
+  openInlineDimensionOptions({entities:[entityId]},clientX,clientY,info.dimension||null);
  }
  function applyInlineDimension(){
   const value=+$('sketchInlineDimensionValue').value;if(!Number.isFinite(value)||value<=0){api.status('Informe uma cota válida.');return;}
-  sketch.dimension(value,$('sketchDriving')?.checked!==false);closeInlineDimension();render();
+  if(!dimensionEditContext?.options){api.status('Escolha as referências da cota novamente.');return;}
+  const ok=sketch.dimension(value,$('sketchDriving')?.checked!==false,dimensionEditContext.options);if(ok){clearDimensionDraft();closeInlineDimension();render();}
  }
  if($('sketchInlineDimensionApply'))$('sketchInlineDimensionApply').onclick=applyInlineDimension;
- if($('sketchInlineDimensionValue'))$('sketchInlineDimensionValue').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();applyInlineDimension();}else if(e.key==='Escape'){e.preventDefault();closeInlineDimension();}};
+ if($('sketchInlineDimensionValue'))$('sketchInlineDimensionValue').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();applyInlineDimension();}else if(e.key==='Escape'){e.preventDefault();closeInlineDimension();clearDimensionDraft();render();}};
  if($('showSketchConstraints'))$('showSketchConstraints').onchange=render;
 
  svg.onpointerdown=e=>{
   const reference=e.target.closest?.('[data-reference-object]');if(reference){e.preventDefault();api.activateObject?.(reference.dataset.referenceObject);return;}
   const o=api.object();if(!o)return;svg.setPointerCapture(e.pointerId);const q=point(e),n=e.target.dataset.node;let l=e.target.dataset.loop,entity=e.target.dataset.entity;const explicitHandle=e.target.dataset.handle!==undefined;if(!explicitHandle&&n===undefined&&['select','trim','extend','dimension'].includes(tool))entity=pickEntity(q,8)||entity;if(l===undefined&&['select','move'].includes(tool)){const hit=pickLoop(q);if(hit!==null)l=hit;}
   if(e.button===1||e.button===2){drag={kind:'pan',x:e.clientX,y:e.clientY,view:[...view]};return;}
-  if(e.target.dataset.dimensionEntity){openInlineDimension(e.target.dataset.dimensionEntity,e.clientX,e.clientY);return;}
+  if(e.target.dataset.dimensionId){const d=sketch.native()?.dimensions?.find(x=>x.id===e.target.dataset.dimensionId);if(d){openInlineDimensionOptions(dimensionOptionsFromRecord(d),e.clientX,e.clientY,d);return;}}
+  if(tool==='dimension'){
+   const doc=sketch.native(),raw=nativePoint(q),explicit=explicitHandle&&entity?{entity,point:e.target.dataset.handle}:pickDimensionPoint(q,10);
+   if(explicit){
+    dimensionDraft??={points:[],entities:[]};dimensionDraft.points??=[];
+    if(!dimensionDraft.points.some(p=>p.entity===explicit.entity&&p.point===explicit.point))dimensionDraft.points.push({entity:explicit.entity,point:explicit.point});
+    if(dimensionDraft.points.length>2)dimensionDraft.points=dimensionDraft.points.slice(-2);dimensionDraft.entities=[];dimensionDraft.hoverPosition=raw;
+    api.status(dimensionDraft.points.length===1?'Cota: selecione o segundo ponto.':'Cota: mova o cursor e clique no vazio para posicionar.');render();return;
+   }
+   if(entity){
+    const ent=doc?.entities?.find(x=>x.id===entity);if(!ent)return;
+    dimensionDraft??={points:[],entities:[]};dimensionDraft.points=[];dimensionDraft.entities??=[];
+    if(ent.type==='line'){
+     if(!dimensionDraft.entities.includes(entity))dimensionDraft.entities.push(entity);if(dimensionDraft.entities.length>2)dimensionDraft.entities=dimensionDraft.entities.slice(-2);
+    }else dimensionDraft.entities=[entity];
+    dimensionDraft.hoverPosition=raw;
+    api.status(dimensionDraft.entities.length===2?'Cota angular: clique no vazio para posicionar.':'Cota: clique no vazio para posicionar.');render();return;
+   }
+   const options=resolveDimensionDraft(doc,raw);
+   if(options){dimensionDraft.position=[...raw];openInlineDimensionOptions(options,e.clientX,e.clientY);render();return;}
+   api.status('Cota: selecione uma entidade, dois pontos ou duas linhas.');return;
+  }
   if(entity&&tool==='trim'){
    const seen=new Set([entity]);sketch.trim(entity,nativePoint(q));drag={kind:'trim-sweep',seen};hoveredEntity=null;inference=null;render();return;
   }
   if(entity&&tool==='extend'){sketch.extend(entity,nativePoint(q));hoveredEntity=null;inference=null;render();return;}
-  if(entity&&tool==='dimension'){openInlineDimension(entity,e.clientX,e.clientY);return;}
   if(tool==='point'){
    const raw=nativePoint(q),snap=e.shiftKey?{point:raw,relation:null}:snapNative(raw,sketch.native());
    sketch.create('point',snap.point,null,null,{pointRelation:snap.relation});inference=null;render();return;
@@ -454,7 +481,9 @@ export function createEditor(svg,api){
  svg.onpointermove=e=>{
   const o=api.object();if(!o)return;
   const q=point(e),previousEntity=hoveredEntity,previousLoop=hoveredLoop;hoveredLoop=['select','move'].includes(tool)?pickLoop(q):null;hoveredEntity=['select','trim','extend','dimension'].includes(tool)?(pickEntity(q,8)||e.target?.dataset?.entity||null):(e.target?.dataset?.entity||null);
-  if(!drag){if(previousEntity===hoveredEntity&&previousLoop===hoveredLoop&&!(tool==='bezier'&&bezierClicks.length))return;if(tool==='bezier'&&bezierClicks.length){const raw=nativePoint(q),snap=e.shiftKey?{point:raw,relation:null}:snapNative(raw,sketch.native());bezierHover={point:snap.point,relation:snap.relation};inference=snap.relation?{...snap,point:snap.point,type:snap.relation.type}:null;}render();return;}
+  if(!drag){
+   if(tool==='dimension'&&dimensionDraft){dimensionDraft.hoverPosition=nativePoint(q);render();return;}
+   if(previousEntity===hoveredEntity&&previousLoop===hoveredLoop&&!(tool==='bezier'&&bezierClicks.length))return;if(tool==='bezier'&&bezierClicks.length){const raw=nativePoint(q),snap=e.shiftKey?{point:raw,relation:null}:snapNative(raw,sketch.native());bezierHover={point:snap.point,relation:snap.relation};inference=snap.relation?{...snap,point:snap.point,type:snap.relation.type}:null;}render();return;}
   if(drag.kind==='primitive'){updatePrimitiveDraft(q,{suppress:e.shiftKey||drag.suppress});render();return;}
   if(drag.kind==='trim-sweep'){
    const hit=document.elementFromPoint(e.clientX,e.clientY)?.closest?.('[data-entity]'),id=hit?.dataset?.entity;
@@ -503,7 +532,7 @@ export function createEditor(svg,api){
   if(ok)api.status(`Bézier criada · grau ${Math.max(1,points.length-1)} · ${points.length} pontos de controle.`);
   bezierClicks=[];bezierHover=null;inference=null;render();return ok;
  }
- function setTool(t){tool=t;arcClicks=[];bezierClicks=[];bezierHover=null;drag=null;inference=null;closeInlineDimension();render();}
+ function setTool(t){tool=t;arcClicks=[];bezierClicks=[];bezierHover=null;drag=null;inference=null;if(t!=='dimension')clearDimensionDraft();closeInlineDimension();render();}
  window.addEventListener('rv-theme-change',()=>render());
  return {
   sketch,render,reset,fit:()=>{view=[-.65,-.65,1.3,1.3];render()},
