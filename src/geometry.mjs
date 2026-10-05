@@ -1,9 +1,9 @@
 import {validateSketch} from './sketch/model.mjs';
+import {LOGO_FONT_IDS} from './logo-font-catalog.mjs';
 import Module from 'manifold-3d';
 export async function kernel(options={}){const m=await Module(options);m.setup();return m;}
-export const LOGO_FONT_IDS=Object.freeze(['helvetiker','helvetiker-bold','optimer','gentilis']);
 const normalizeLogoText=value=>String(value??'').replace(/\s+/g,' ').trim().slice(0,32);
-export const defaults={size:75,wall:0.8,height:12.5,rim:4,base:2.5,relief:4.5,reliefInverted:false,reliefSeparate:false,reliefOut:4.5,reliefIn:1,clearance:0.9,detailOffset:0,outlineOffset:0,mode:'integrated',mirror:true,threshold:160,tolerance:0.04,stampBase:2.5,stampInset:0,stampExpansion:0,removeOutline:false,outlineBand:0.8,chamfer:false,tip:0.4,chamferHeight:2,bladeReinforcement:false,reinforcementHeight:2,reinforcementWidth:1.5,logoEnabled:false,logoText:'FIORI',logoFont:'helvetiker',logoSize:8,logoHeight:1.2,logoPosition:0,logoOffset:0,wallEdits:[],cornerRadius:2};
+export const defaults={size:75,wall:0.8,height:12.5,rim:4,base:2.5,relief:4.5,reliefInverted:false,reliefSeparate:false,reliefOut:4.5,reliefIn:1,clearance:0.9,detailOffset:0,outlineOffset:0,mode:'integrated',mirror:true,threshold:160,tolerance:0.04,stampBase:2.5,stampInset:0,stampExpansion:0,removeOutline:false,outlineBand:0.8,chamfer:false,tip:0.4,chamferHeight:2,bladeReinforcement:false,reinforcementHeight:2,reinforcementWidth:1.5,logoEnabled:false,logoText:'FIORI',logoFont:'helvetiker',logoSize:8,logoHeight:1.2,logoBaseWidthExtra:0,logoPosition:0,logoOffset:0,wallEdits:[],cornerRadius:2};
 export function area(p){return p.reduce((a,v,i)=>{const q=p[(i+1)%p.length];return a+v[0]*q[1]-q[0]*v[1]},0)/2;}
 export function simplify(p,eps){if(p.length<5)return p;const seg=(p,a,b)=>{let dx=b[0]-a[0],dy=b[1]-a[1],t=Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/(dx*dx+dy*dy||1)));return Math.hypot(p[0]-a[0]-t*dx,p[1]-a[1]-t*dy)};const rdp=a=>{let d=0,k=0;for(let i=1;i<a.length-1;i++){let v=seg(a[i],a[0],a.at(-1));if(v>d){d=v;k=i}}return d>eps?[...rdp(a.slice(0,k+1)).slice(0,-1),...rdp(a.slice(k))]:[a[0],a.at(-1)];};let k=1,d=0;for(let i=1;i<p.length;i++){const v=Math.hypot(p[i][0]-p[0][0],p[i][1]-p[0][1]);if(v>d){d=v;k=i}}return [...rdp(p.slice(0,k+1)).slice(0,-1),...rdp([...p.slice(k),p[0]]).slice(0,-1)];}
 export function normalize(loops){const all=loops.flat();if(!all.length)throw Error('Nenhum contorno fechado encontrado.');let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;for(const [x,y]of all){minX=Math.min(x,minX);maxX=Math.max(x,maxX);minY=Math.min(y,minY);maxY=Math.max(y,maxY)}const scale=Math.max(maxX-minX,maxY-minY);if(!(scale>0))throw Error('Arte sem dimensão.');return loops.map(p=>p.map(([x,y])=>[(x-(minX+maxX)/2)/scale,(y-(minY+maxY)/2)/scale]));}
@@ -92,7 +92,7 @@ function edgeLogoPlacement(poly,p,profile){
  let normal;
  if(leftInside!==rightInside)normal=leftInside?localRight:localLeft;
  else normal=(localLeft[0]*radialNormal[0]+localLeft[1]*radialNormal[1])>(localRight[0]*radialNormal[0]+localRight[1]*radialNormal[1])?localLeft:localRight;
- const pad=Math.max(1,Math.min(2.5,p.logoSize*.16)),plaqueW=Math.max(6,profile.width+pad*2),plaqueD=Math.max(5,profile.height+pad*2);
+ const pad=Math.max(1,Math.min(2.5,p.logoSize*.16)),plaqueW=Math.max(6,profile.width+pad*2+p.logoBaseWidthExtra),plaqueD=Math.max(5,profile.height+pad*2);
  const overlap=Math.min(1.6,plaqueD*.34),offset=p.logoOffset;
  const plaqueCenter=[hit[0]+normal[0]*(plaqueD/2-overlap+offset),hit[1]+normal[1]*(plaqueD/2-overlap+offset)];
  const localToWorld=(q,c=plaqueCenter)=>[c[0]+q[0]*tangent[0]+q[1]*left[0],c[1]+q[0]*tangent[1]+q[1]*left[1]];
@@ -147,16 +147,18 @@ export function migrateParams(params={}){const p={...defaults,...params,stampBas
  p.logoText=normalizeLogoText(p.logoText)||defaults.logoText;
  p.logoFont=LOGO_FONT_IDS.includes(p.logoFont)?p.logoFont:defaults.logoFont;
  p.logoPosition=Math.max(0,Math.min(100,Number(p.logoPosition)||0));
+ p.logoBaseWidthExtra=Math.max(0,Math.min(40,Number(p.logoBaseWidthExtra)||0));
  if(!Number.isFinite(p.reliefOut))p.reliefOut=p.reliefInverted?defaults.relief:p.relief;
  if(!Number.isFinite(p.reliefIn))p.reliefIn=p.reliefInverted?p.relief:Math.min(1,Math.max(.1,(p.mode==='integrated'?p.base:p.stampBase)*.4));
  return p;}
 export function build(m,loops,params,ctx=null,options={}){const started=performance.now(),p=migrateParams(params),keep=[];const hold=x=>(keep.push(x),x);const C=m.CrossSection,M=m.Manifold;
- const finite=['size','wall','height','rim','base','stampBase','stampInset','stampExpansion','outlineBand','tip','chamferHeight','reinforcementHeight','reinforcementWidth','logoSize','logoHeight','logoPosition','logoOffset','clearance','detailOffset','outlineOffset','tolerance','cornerRadius','relief'];
+ const finite=['size','wall','height','rim','base','stampBase','stampInset','stampExpansion','outlineBand','tip','chamferHeight','reinforcementHeight','reinforcementWidth','logoSize','logoHeight','logoBaseWidthExtra','logoPosition','logoOffset','clearance','detailOffset','outlineOffset','tolerance','cornerRadius','relief'];
  for(const k of finite)if(!Number.isFinite(p[k]))throw Error(`Valor inválido em ${k}: informe um número finito.`);
  const positive=[['size',.1],['wall',.01],['height',.05],['base',.01],['stampBase',.01],['outlineBand',.001],['tip',.001],['chamferHeight',.001],['reinforcementHeight',.001],['reinforcementWidth',.001],['logoSize',1],['logoHeight',.05],['tolerance',.0001],['relief',.001]];
  for(const [k,lo]of positive)if(p[k]<lo)throw Error(`Valor inválido em ${k}: use um valor maior ou igual a ${lo}.`);
  if(p.rim<0||p.cornerRadius<0||p.clearance<0)throw Error('Base de apoio, proteção de cantos e folga não podem ser negativas.');
  if(p.logoOffset< -3||p.logoOffset>20)throw Error('O afastamento da logo deve ficar entre -3 e 20 mm.');
+ if(p.logoBaseWidthExtra<0||p.logoBaseWidthExtra>40)throw Error('A largura extra da base da logo deve ficar entre 0 e 40 mm.');
  if(p.logoEnabled&&p.mode!=='stamp'&&p.base+p.logoHeight>=p.height)throw Error('A altura da logo deve terminar abaixo da borda de corte.');
  const reliefBase=p.mode==='integrated'?p.base:p.stampBase;
  if(p.mode!=='stamp'&&p.base>=p.height)throw Error('A base do cortador deve ser menor que a altura total.');
