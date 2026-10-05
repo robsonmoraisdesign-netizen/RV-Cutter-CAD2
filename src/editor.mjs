@@ -3,7 +3,7 @@ import {simplify} from './geometry.mjs';
 import {themeColor} from './theme-controller.mjs';
 
 export function createEditor(svg,api){
- let view=[-.65,-.65,1.3,1.3],tool='select',selected=-1,node=-1,region=null,drag=null,hoveredEntity=null,hoveredLoop=null,inference=null,bezierClicks=[],bezierHover=null;
+ let view=[-.65,-.65,1.3,1.3],tool='select',selected=-1,node=-1,region=null,drag=null,hoveredEntity=null,hoveredLoop=null,inference=null,bezierClicks=[],bezierHover=null,dimensionDraft=null,dimensionEditContext=null;
  const NS='http://www.w3.org/2000/svg';
  const el=(tag,attrs)=>{const o=document.createElementNS(NS,tag);Object.entries(attrs).forEach(([k,v])=>v!==undefined&&v!==null&&o.setAttribute(k,v));return o;};
  const sketch=createSketchController(api);let arcClicks=[];
@@ -39,6 +39,46 @@ export function createEditor(svg,api){
   for(const e of doc.entities){const d=entityDistance(p,e);if(d<bestD){bestD=d;best=e;}}
   return best?.id||null;
  };
+
+ const dimensionPointRefs=e=>{
+  if(e.type==='point')return [['point',e.position]];
+  if(e.type==='line')return [['start',e.start],['end',e.end]];
+  if(e.type==='circle')return [['center',e.center]];
+  if(e.type==='arc')return [['start',[e.center[0]+Math.cos(e.startAngle)*e.radius,e.center[1]+Math.sin(e.startAngle)*e.radius]],['end',[e.center[0]+Math.cos(e.endAngle)*e.radius,e.center[1]+Math.sin(e.endAngle)*e.radius]],['center',e.center]];
+  if(e.type==='bezier')return [['start',e.points[0]],['end',e.points.at(-1)]];
+  return [];
+ };
+ const pickDimensionPoint=(q,pixels=11)=>{
+  const o=api.object(),doc=sketch.native(),rect=svg.getBoundingClientRect();if(!o||!doc?.entities?.length||!rect.width||!rect.height)return null;
+  const p=nativePoint(q),limit=o.params.size*Math.max(view[2]/rect.width,view[3]/rect.height)*pixels;let best=null,bestD=limit;
+  for(const e of doc.entities)for(const [pointName,pos] of dimensionPointRefs(e)){const d=Math.hypot(pos[0]-p[0],pos[1]-p[1]);if(d<bestD){bestD=d;best={entity:e.id,point:pointName,position:[...pos]};}}
+  return best;
+ };
+ const dimensionOptionsFromRecord=d=>{
+  if(!d)return null;const base={type:d.type,...(d.position?{position:[...d.position]}:{})};
+  if(['pointDistance','horizontalDistance','verticalDistance'].includes(d.type))return {...base,points:[structuredClone(d.a),structuredClone(d.b)]};
+  if(d.type==='angleBetweenLines')return {...base,entities:[d.first,d.second]};
+  return {...base,entities:[d.entity]};
+ };
+ const inferPointDimensionType=(a,b,placement)=>{
+  const dx=b[0]-a[0],dy=b[1]-a[1];if(Math.abs(dy)<1e-7)return 'horizontalDistance';if(Math.abs(dx)<1e-7)return 'verticalDistance';
+  const mid=[(a[0]+b[0])/2,(a[1]+b[1])/2],ox=Math.abs(placement[0]-mid[0]),oy=Math.abs(placement[1]-mid[1]);
+  if(oy>ox*1.35)return 'horizontalDistance';if(ox>oy*1.35)return 'verticalDistance';return 'pointDistance';
+ };
+ function resolveDimensionDraft(n,placement=null){
+  if(!dimensionDraft)return null;const pos=placement||dimensionDraft.position||dimensionDraft.hoverPosition;
+  if(dimensionDraft.points?.length===2){
+   const a=dimensionDraft.points[0],b=dimensionDraft.points[1],pa=dimensionPointRefs(n.entities.find(e=>e.id===a.entity)).find(x=>x[0]===a.point)?.[1],pb=dimensionPointRefs(n.entities.find(e=>e.id===b.entity)).find(x=>x[0]===b.point)?.[1];if(!pa||!pb||!pos)return null;
+   const type=dimensionDraft.type||inferPointDimensionType(pa,pb,pos);return {type,points:[a,b],position:[...pos]};
+  }
+  if(dimensionDraft.entities?.length===2)return pos?{type:'angleBetweenLines',entities:[...dimensionDraft.entities],position:[...pos]}:null;
+  if(dimensionDraft.entities?.length===1){
+   const e=n.entities.find(x=>x.id===dimensionDraft.entities[0]);if(!e||!pos)return null;
+   return {type:e.type==='circle'||e.type==='arc'?'diameter':'lineLength',entities:[e.id],position:[...pos]};
+  }
+  return null;
+ }
+ function clearDimensionDraft(){dimensionDraft=null;dimensionEditContext=null;}
 
  // Hit tolerance is measured in screen pixels, independently of zoom or model size.
  const pickLoop=(q,pixels=8)=>{
@@ -179,17 +219,36 @@ export function createEditor(svg,api){
   svg.appendChild(el('circle',{cx:ox,cy:oy,r:view[2]*.0045,class:'sketch-origin'+(originActive?' datum-active':''),'vector-effect':'non-scaling-stroke','data-datum':'origin'}));
  }
  function renderDimensions(n,o){
+  const addGuide=(a,b,cls='sketch-dimension-guide')=>svg.appendChild(el('line',{x1:a[0],y1:-a[1],x2:b[0],y2:-b[1],class:cls,'vector-effect':'non-scaling-stroke','pointer-events':'none'}));
+  const pointOf=ref=>{const e=n.entities.find(x=>x.id===ref?.entity),pair=e?dimensionPointRefs(e).find(x=>x[0]===ref.point):null;return pair?.[1]||null;};
   for(const d of n.dimensions||[]){
-   const e=n.entities.find(x=>x.id===d.entity);if(!e)continue;
-   let p;
-   if(e.type==='line'){
-    const a=localPoint(e.start,n),b=localPoint(e.end,n),mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2,dx=b[0]-a[0],dy=b[1]-a[1],len=Math.hypot(dx,dy)||1;
-    p=[mx-dy/len*view[3]*.025,my+dx/len*view[3]*.025];
-   }else{
-    const cc=localPoint(e.center,n);p=[cc[0]+e.radius/o.params.size+view[2]*.018,cc[1]+view[3]*.012];
-   }
-   const text=(d.driving===false?'[':'')+Number(d.value).toFixed(2)+' mm'+(d.driving===false?']':'');
-   addText(text,p,{class:'sketch-dimension'+(d.driving===false?' driven':''),style:`font-size:${view[2]*.020}px`,'data-dimension-entity':e.id,'data-entity':e.id});
+   let labelPos=d.position?[...d.position]:null,unit=d.type==='angleBetweenLines'?'°':'mm',prefix='',associated=[];
+   if(d.entity)associated=[d.entity];else if(d.first)associated=[d.first,d.second];else if(d.a)associated=[d.a.entity,d.b.entity];
+   if(d.type==='lineLength'){
+    const e=n.entities.find(x=>x.id===d.entity);if(!e)continue;const a=e.start,b=e.end,dx=b[0]-a[0],dy=b[1]-a[1],len=Math.hypot(dx,dy)||1,norm=[-dy/len,dx/len];
+    labelPos??=[(a[0]+b[0])/2+norm[0]*o.params.size*.035,(a[1]+b[1])/2+norm[1]*o.params.size*.035];
+    const off=(labelPos[0]-(a[0]+b[0])/2)*norm[0]+(labelPos[1]-(a[1]+b[1])/2)*norm[1],aa=[a[0]+norm[0]*off,a[1]+norm[1]*off],bb=[b[0]+norm[0]*off,b[1]+norm[1]*off];addGuide(localPoint(a,n),localPoint(aa,n));addGuide(localPoint(b,n),localPoint(bb,n));addGuide(localPoint(aa,n),localPoint(bb,n));
+   }else if(['circleRadius','arcRadius','circleDiameter','arcDiameter'].includes(d.type)){
+    const e=n.entities.find(x=>x.id===d.entity);if(!e)continue;labelPos??=[e.center[0]+e.radius*1.35,e.center[1]+e.radius*.35];const vx=labelPos[0]-e.center[0],vy=labelPos[1]-e.center[1],len=Math.hypot(vx,vy)||1,ux=vx/len,uy=vy/len;
+    if(d.type.includes('Diameter')){prefix='Ø ';const a=[e.center[0]-ux*e.radius,e.center[1]-uy*e.radius],b=[e.center[0]+ux*e.radius,e.center[1]+uy*e.radius];addGuide(localPoint(a,n),localPoint(b,n));}
+    else{prefix='R ';addGuide(localPoint(e.center,n),localPoint([e.center[0]+ux*e.radius,e.center[1]+uy*e.radius],n));}
+   }else if(['pointDistance','horizontalDistance','verticalDistance'].includes(d.type)){
+    const a=pointOf(d.a),b=pointOf(d.b);if(!a||!b)continue;labelPos??=[(a[0]+b[0])/2,(a[1]+b[1])/2+o.params.size*.035];
+    if(d.type==='horizontalDistance'){
+     const y=labelPos[1],aa=[a[0],y],bb=[b[0],y];addGuide(localPoint(a,n),localPoint(aa,n));addGuide(localPoint(b,n),localPoint(bb,n));addGuide(localPoint(aa,n),localPoint(bb,n));
+    }else if(d.type==='verticalDistance'){
+     const x=labelPos[0],aa=[x,a[1]],bb=[x,b[1]];addGuide(localPoint(a,n),localPoint(aa,n));addGuide(localPoint(b,n),localPoint(bb,n));addGuide(localPoint(aa,n),localPoint(bb,n));
+    }else{addGuide(localPoint(a,n),localPoint(b,n));}
+   }else if(d.type==='angleBetweenLines'){
+    const a=n.entities.find(x=>x.id===d.first),b=n.entities.find(x=>x.id===d.second);if(!a||!b)continue;const intersect=(()=>{const p=a.start,r=[a.end[0]-a.start[0],a.end[1]-a.start[1]],q=b.start,ss=[b.end[0]-b.start[0],b.end[1]-b.start[1]],cross=r[0]*ss[1]-r[1]*ss[0];if(Math.abs(cross)<1e-9)return [(lineMid(a)[0]+lineMid(b)[0])/2,(lineMid(a)[1]+lineMid(b)[1])/2];const t=((q[0]-p[0])*ss[1]-(q[1]-p[1])*ss[0])/cross;return [p[0]+t*r[0],p[1]+t*r[1]];})();labelPos??=[intersect[0]+o.params.size*.05,intersect[1]+o.params.size*.05];
+    addGuide(localPoint(intersect,n),localPoint(labelPos,n));
+   }else continue;
+   const p=localPoint(labelPos,n),text=(d.driving===false?'[':'')+prefix+Number(d.value).toFixed(2)+unit+(d.driving===false?']':'');
+   addText(text,p,{class:'sketch-dimension'+(d.driving===false?' driven':''),style:`font-size:${view[2]*.020}px`,'data-dimension-id':d.id,'data-entity':associated[0]||''});
+  }
+  const draftOptions=resolveDimensionDraft(n,dimensionDraft?.hoverPosition||dimensionDraft?.position);
+  if(draftOptions){
+   try{const preview=sketch.dimensionPreview(draftOptions),p=localPoint(draftOptions.position,n),prefix=preview.type.includes('Diameter')?'Ø ':'';addText(prefix+Number(preview.value).toFixed(2)+(preview.unit||'mm'),p,{class:'sketch-dimension preview',style:`font-size:${view[2]*.020}px`});}catch{}
   }
  }
  function renderConstraints(n){
