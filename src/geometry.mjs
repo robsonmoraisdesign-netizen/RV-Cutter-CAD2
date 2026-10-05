@@ -3,7 +3,7 @@ import {LOGO_FONT_IDS} from './logo-font-catalog.mjs';
 import Module from 'manifold-3d';
 export async function kernel(options={}){const m=await Module(options);m.setup();return m;}
 const normalizeLogoText=value=>String(value??'').replace(/\s+/g,' ').trim().slice(0,32);
-export const defaults={size:75,wall:0.8,height:12.5,rim:4,base:2.5,relief:4.5,reliefInverted:false,reliefSeparate:false,reliefOut:4.5,reliefIn:1,clearance:0.9,detailOffset:0,outlineOffset:0,mode:'integrated',mirror:true,threshold:160,tolerance:0.04,stampBase:2.5,stampInset:0,stampExpansion:0,removeOutline:false,outlineBand:0.8,chamfer:false,tip:0.4,chamferHeight:2,bladeReinforcement:false,reinforcementHeight:2,reinforcementWidth:1.5,logoEnabled:false,logoText:'FIORI',logoFont:'helvetiker',logoSize:8,logoHeight:1.2,logoBaseWidthExtra:0,logoPosition:0,logoOffset:0,wallEdits:[],cornerRadius:2};
+export const defaults={size:75,wall:0.8,height:12.5,rim:4,base:2.5,relief:4.5,reliefInverted:false,reliefSeparate:false,reliefOut:4.5,reliefIn:1,clearance:0.9,detailOffset:0,outlineOffset:0,mode:'integrated',mirror:true,threshold:160,tolerance:0.04,stampBase:2.5,stampInset:0,stampExpansion:0,removeOutline:false,outlineBand:0.8,chamfer:false,tip:0.4,chamferHeight:2,bladeReinforcement:false,reinforcementHeight:2,reinforcementWidth:1.5,logoEnabled:false,logoText:'FIORI',logoFont:'helvetiker',logoSize:8,logoHeight:1.2,logoBaseWidthExtra:0,logoPosition:0,logoOffset:0,logoOrientationMode:'autoOffset',logoRotationOffset:0,logoRotationAbsolute:0,wallEdits:[],cornerRadius:2};
 export function area(p){return p.reduce((a,v,i)=>{const q=p[(i+1)%p.length];return a+v[0]*q[1]-q[0]*v[1]},0)/2;}
 export function simplify(p,eps){if(p.length<5)return p;const seg=(p,a,b)=>{let dx=b[0]-a[0],dy=b[1]-a[1],t=Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/(dx*dx+dy*dy||1)));return Math.hypot(p[0]-a[0]-t*dx,p[1]-a[1]-t*dy)};const rdp=a=>{let d=0,k=0;for(let i=1;i<a.length-1;i++){let v=seg(a[i],a[0],a.at(-1));if(v>d){d=v;k=i}}return d>eps?[...rdp(a.slice(0,k+1)).slice(0,-1),...rdp(a.slice(k))]:[a[0],a.at(-1)];};let k=1,d=0;for(let i=1;i<p.length;i++){const v=Math.hypot(p[i][0]-p[0][0],p[i][1]-p[0][1]);if(v>d){d=v;k=i}}return [...rdp(p.slice(0,k+1)).slice(0,-1),...rdp([...p.slice(k),p[0]]).slice(0,-1)];}
 export function normalize(loops){const all=loops.flat();if(!all.length)throw Error('Nenhum contorno fechado encontrado.');let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;for(const [x,y]of all){minX=Math.min(x,minX);maxX=Math.max(x,maxX);minY=Math.min(y,minY);maxY=Math.max(y,maxY)}const scale=Math.max(maxX-minX,maxY-minY);if(!(scale>0))throw Error('Arte sem dimensão.');return loops.map(p=>p.map(([x,y])=>[(x-(minX+maxX)/2)/scale,(y-(minY+maxY)/2)/scale]));}
@@ -50,6 +50,15 @@ function densifyLoop(poly,maxLength=.6){
  return out;
 }
 
+const LOGO_ORIENTATION_MODES=Object.freeze(['auto','autoOffset','manual']);
+const normalizeAngle=angle=>{let a=(Number(angle)||0)%360;if(a>180)a-=360;if(a<=-180)a+=360;return a;};
+export function resolveLogoOrientation(autoAngle,params={}){
+ const mode=LOGO_ORIENTATION_MODES.includes(params.logoOrientationMode)?params.logoOrientationMode:'autoOffset';
+ const automatic=normalizeAngle(autoAngle),offset=Math.max(-45,Math.min(45,Number(params.logoRotationOffset)||0)),absolute=normalizeAngle(params.logoRotationAbsolute);
+ const finalAngle=mode==='manual'?absolute:mode==='autoOffset'?normalizeAngle(automatic+offset):automatic;
+ return {mode,autoAngle:automatic,rotationOffset:offset,rotationAbsolute:absolute,finalAngle};
+}
+
 function edgeLogoPlacement(poly,p,profile){
  if(!p.logoEnabled||p.mode==='stamp')return null;
  if(!profile?.loops?.length)throw Error('Perfil vetorial da logo não foi preparado.');
@@ -82,8 +91,9 @@ function edgeLogoPlacement(poly,p,profile){
  const hit=atArc(target),smoothWindow=Math.max(.35,Math.min(2.5,(p.logoSize||8)*.12,perimeter*.015)),before=atArc(target-smoothWindow),after=atArc(target+smoothWindow),dx=after[0]-before[0],dy=after[1]-before[1],dl=Math.hypot(dx,dy);
  let raw;
  if(dl>1e-8)raw=[dx/dl,dy/dl];else{let k=1;while(k<lengths.length-1&&lengths[k]<target)k++;const a=path[k-1],b=path[k],seg=Math.max(1e-9,lengths[k]-lengths[k-1]);raw=[(b[0]-a[0])/seg,(b[1]-a[1])/seg];}
- let tangent=raw.slice();if(tangent[0]<0)tangent=[-tangent[0],-tangent[1]];
- const left=[-tangent[1],tangent[0]],radial=[hit[0]-center[0],hit[1]-center[1]],rl=Math.hypot(...radial)||1;
+ let autoTangent=raw.slice();if(autoTangent[0]<0)autoTangent=[-autoTangent[0],-autoTangent[1]];
+ const autoAngle=Math.atan2(autoTangent[1],autoTangent[0])*180/Math.PI,orientation=resolveLogoOrientation(autoAngle,p),finalRad=orientation.finalAngle*Math.PI/180;
+ const tangent=[Math.cos(finalRad),Math.sin(finalRad)],left=[-tangent[1],tangent[0]],radial=[hit[0]-center[0],hit[1]-center[1]],rl=Math.hypot(...radial)||1;
  const radialNormal=[radial[0]/rl,radial[1]/rl],localLeft=[-raw[1],raw[0]],localRight=[raw[1],-raw[0]],probe=Math.max(.03,(p.size||75)*.0008);
  const leftInside=contains(poly,[hit[0]+localLeft[0]*probe,hit[1]+localLeft[1]*probe]);
  const rightInside=contains(poly,[hit[0]+localRight[0]*probe,hit[1]+localRight[1]*probe]);
@@ -102,12 +112,13 @@ function edgeLogoPlacement(poly,p,profile){
   return pts;
  };
  const plaque=roundedRect(plaqueW,plaqueD).map(q=>localToWorld(q));
- const innerEdge=offset-overlap,connectorLength=Math.max(.8,innerEdge+.9);
+ const innerEdge=offset-overlap,connectorLength=Math.max(.8,innerEdge+plaqueD*.55+.9);
  const connectorCenter=[hit[0]+normal[0]*(connectorLength/2-.45),hit[1]+normal[1]*(connectorLength/2-.45)];
- const connectorW=Math.min(plaqueW*.72,Math.max(5,profile.width*.58));
- const connector=roundedRect(connectorW,connectorLength,Math.min(1.2,connectorLength*.28),4).map(q=>localToWorld(q,connectorCenter));
+ const connectorW=Math.min(plaqueW*.72,Math.max(5,profile.width*.58)),bridgeTangent=[-normal[1],normal[0]],bridgeLeft=[-bridgeTangent[1],bridgeTangent[0]];
+ const bridgeToWorld=(q,c=connectorCenter)=>[c[0]+q[0]*bridgeTangent[0]+q[1]*bridgeLeft[0],c[1]+q[0]*bridgeTangent[1]+q[1]*bridgeLeft[1]];
+ const connector=roundedRect(connectorW,connectorLength,Math.min(1.2,connectorLength*.28),4).map(q=>bridgeToWorld(q));
  const textLoops=profile.loops.map(loop=>loop.map(q=>localToWorld(q)));
- return {textLoops,plaque,connector,anchor:hit,tangent,normal,angle:Math.atan2(tangent[1],tangent[0])*180/Math.PI,position:p.logoPosition,baseWidth:plaqueW,baseDepth:plaqueD,textWidth:profile.width,textHeight:profile.height};
+ return {textLoops,plaque,connector,anchor:hit,tangent,normal,angle:orientation.finalAngle,autoAngle:orientation.autoAngle,finalAngle:orientation.finalAngle,orientationMode:orientation.mode,rotationOffset:orientation.rotationOffset,rotationAbsolute:orientation.rotationAbsolute,position:p.logoPosition,baseWidth:plaqueW,baseDepth:plaqueD,textWidth:profile.width,textHeight:profile.height};
 }
 export function edgePositionFromPoint(poly,point){
  if(!Array.isArray(poly)||poly.length<3||!Array.isArray(point)||point.length<2)return null;
@@ -148,17 +159,22 @@ export function migrateParams(params={}){const p={...defaults,...params,stampBas
  p.logoFont=LOGO_FONT_IDS.includes(p.logoFont)?p.logoFont:defaults.logoFont;
  p.logoPosition=Math.max(0,Math.min(100,Number(p.logoPosition)||0));
  p.logoBaseWidthExtra=Math.max(0,Math.min(40,Number(p.logoBaseWidthExtra)||0));
+ p.logoOrientationMode=LOGO_ORIENTATION_MODES.includes(p.logoOrientationMode)?p.logoOrientationMode:defaults.logoOrientationMode;
+ p.logoRotationOffset=Math.max(-45,Math.min(45,Number(p.logoRotationOffset)||0));
+ p.logoRotationAbsolute=normalizeAngle(p.logoRotationAbsolute);
  if(!Number.isFinite(p.reliefOut))p.reliefOut=p.reliefInverted?defaults.relief:p.relief;
  if(!Number.isFinite(p.reliefIn))p.reliefIn=p.reliefInverted?p.relief:Math.min(1,Math.max(.1,(p.mode==='integrated'?p.base:p.stampBase)*.4));
  return p;}
 export function build(m,loops,params,ctx=null,options={}){const started=performance.now(),p=migrateParams(params),keep=[];const hold=x=>(keep.push(x),x);const C=m.CrossSection,M=m.Manifold;
- const finite=['size','wall','height','rim','base','stampBase','stampInset','stampExpansion','outlineBand','tip','chamferHeight','reinforcementHeight','reinforcementWidth','logoSize','logoHeight','logoBaseWidthExtra','logoPosition','logoOffset','clearance','detailOffset','outlineOffset','tolerance','cornerRadius','relief'];
+ const finite=['size','wall','height','rim','base','stampBase','stampInset','stampExpansion','outlineBand','tip','chamferHeight','reinforcementHeight','reinforcementWidth','logoSize','logoHeight','logoBaseWidthExtra','logoPosition','logoOffset','logoRotationOffset','logoRotationAbsolute','clearance','detailOffset','outlineOffset','tolerance','cornerRadius','relief'];
  for(const k of finite)if(!Number.isFinite(p[k]))throw Error(`Valor inválido em ${k}: informe um número finito.`);
  const positive=[['size',.1],['wall',.01],['height',.05],['base',.01],['stampBase',.01],['outlineBand',.001],['tip',.001],['chamferHeight',.001],['reinforcementHeight',.001],['reinforcementWidth',.001],['logoSize',1],['logoHeight',.05],['tolerance',.0001],['relief',.001]];
  for(const [k,lo]of positive)if(p[k]<lo)throw Error(`Valor inválido em ${k}: use um valor maior ou igual a ${lo}.`);
  if(p.rim<0||p.cornerRadius<0||p.clearance<0)throw Error('Base de apoio, proteção de cantos e folga não podem ser negativas.');
  if(p.logoOffset< -3||p.logoOffset>20)throw Error('O afastamento da logo deve ficar entre -3 e 20 mm.');
  if(p.logoBaseWidthExtra<0||p.logoBaseWidthExtra>40)throw Error('A largura extra da base da logo deve ficar entre 0 e 40 mm.');
+ if(!LOGO_ORIENTATION_MODES.includes(p.logoOrientationMode))throw Error('Modo de orientação da logo inválido.');
+ if(p.logoRotationOffset< -45||p.logoRotationOffset>45)throw Error('A correção fina da logo deve ficar entre -45° e +45°.');
  if(p.logoEnabled&&p.mode!=='stamp'&&p.base+p.logoHeight>=p.height)throw Error('A altura da logo deve terminar abaixo da borda de corte.');
  const reliefBase=p.mode==='integrated'?p.base:p.stampBase;
  if(p.mode!=='stamp'&&p.base>=p.height)throw Error('A base do cortador deve ser menor que a altura total.');
@@ -221,7 +237,7 @@ export function build(m,loops,params,ctx=null,options={}){const started=performa
   cutterBaseSection=rimOuter;
   if(p.logoEnabled&&p.mode!=='stamp'){
    const logo=edgeLogoPlacement(rimOuter.toPolygons()[0],p,options.logoProfile);
-   if(logo){logoPlacement={anchor:logo.anchor,tangent:logo.tangent,normal:logo.normal,angle:logo.angle,position:logo.position,baseWidth:logo.baseWidth,baseDepth:logo.baseDepth,textWidth:logo.textWidth,textHeight:logo.textHeight};
+   if(logo){logoPlacement={anchor:logo.anchor,tangent:logo.tangent,normal:logo.normal,angle:logo.angle,autoAngle:logo.autoAngle,finalAngle:logo.finalAngle,orientationMode:logo.orientationMode,rotationOffset:logo.rotationOffset,rotationAbsolute:logo.rotationAbsolute,position:logo.position,baseWidth:logo.baseWidth,baseDepth:logo.baseDepth,textWidth:logo.textWidth,textHeight:logo.textHeight};
     const plaque=hold(new C([logo.plaque],'EvenOdd')),connector=hold(new C([logo.connector],'EvenOdd'));
     cutterBaseSection=silhouette(hold(C.union([rimOuter,plaque,connector])));
     const logoSection=hold(new C(logo.textLoops,'EvenOdd'));logoOutline=logo.textLoops;
