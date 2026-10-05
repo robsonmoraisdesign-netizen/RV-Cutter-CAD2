@@ -35,35 +35,21 @@ function traceRaster(data,w,h,threshold=160){
 }
 
 export function createLogoTextProfile(value,fontId='helvetiker',size=8,curveSegments=8){
- const text=normalizeLogoText(value);
- if(!text)return null;
- const font=fonts[fontId]||fonts.helvetiker;
- const physicalSize=Number(size);
- if(!Number.isFinite(physicalSize)||physicalSize<=0)throw Error('Tamanho da logo inválido.');
- const shapes=font.generateShapes(text,physicalSize);
- const loops=[];
- for(const shape of shapes){
-  const extracted=shape.extractPoints(Math.max(4,Math.min(24,Math.round(curveSegments))));
-  const contour=cleanPoints(extracted.shape);
-  if(contour.length>=3)loops.push(contour);
-  for(const hole of extracted.holes||[]){
-   const poly=cleanPoints(hole);
-   if(poly.length>=3)loops.push(poly);
-  }
- }
- if(!loops.length)throw Error('A fonte selecionada não gerou contornos para este texto.');
- let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
- for(const [x,y] of loops.flat()){
-  minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);
- }
- const cx=(minX+maxX)/2,cy=(minY+maxY)/2;
- const centered=loops.map(poly=>poly.map(([x,y])=>[x-cx,y-cy]));
- return {
-  text,
-  font:fonts[fontId]?fontId:'helvetiker',
-  size:physicalSize,
-  loops:centered,
-  width:maxX-minX,
-  height:maxY-minY
- };
+ const text=normalizeLogoText(value);if(!text)return null;
+ const physicalSize=Number(size);if(!Number.isFinite(physicalSize)||physicalSize<=0)throw Error('Tamanho da logo inválido.');
+ fontId=LOGO_FONT_IDS.includes(fontId)?fontId:'helvetiker';
+ if(typeof OffscreenCanvas==='undefined')return fallbackProfile(text,fontId,physicalSize);
+ const style=FONT_STYLES[fontId]||FONT_STYLES.helvetiker,px=Math.max(96,Math.min(280,Math.round(physicalSize*24))),pad=Math.ceil(px*.38);
+ const probe=new OffscreenCanvas(16,16),probeCtx=probe.getContext('2d',{willReadFrequently:true});if(!probeCtx)return fallbackProfile(text,fontId,physicalSize);
+ probeCtx.font=`${style.weight} ${px}px ${style.family}`;const measured=probeCtx.measureText(text),width=Math.max(8,Math.ceil(measured.width*style.stretch));
+ const canvas=new OffscreenCanvas(width+pad*2,Math.ceil(px*1.8)+pad*2),ctx=canvas.getContext('2d',{willReadFrequently:true});if(!ctx)return fallbackProfile(text,fontId,physicalSize);
+ ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle='#000';ctx.textAlign='left';ctx.textBaseline='alphabetic';ctx.font=`${style.weight} ${px}px ${style.family}`;
+ const baseline=pad+px*1.25;ctx.save();ctx.translate(pad,0);ctx.scale(style.stretch,1);ctx.fillText(text,0,baseline);ctx.restore();
+ const loops=traceRaster(ctx.getImageData(0,0,canvas.width,canvas.height).data,canvas.width,canvas.height,160).filter(poly=>poly.length>=6);
+ if(!loops.length)return fallbackProfile(text,fontId,physicalSize);
+ let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;for(const [x,y] of loops.flat()){minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);}
+ const rasterH=maxY-minY;if(!(rasterH>0))return fallbackProfile(text,fontId,physicalSize);
+ const scale=physicalSize/rasterH,cx=(minX+maxX)/2,cy=(minY+maxY)/2;
+ const simplified=loops.map(poly=>{const out=[];const stride=Math.max(1,Math.round(poly.length/Math.max(24,curveSegments*18)));for(let i=0;i<poly.length;i+=stride)out.push([(poly[i][0]-cx)*scale,(cy-poly[i][1])*scale]);return out;}).filter(poly=>poly.length>=3);
+ return {text,font:fontId,size:physicalSize,loops:simplified,width:(maxX-minX)*scale,height:physicalSize,fallback:false};
 }
