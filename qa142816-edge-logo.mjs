@@ -31,10 +31,14 @@ const run=params=>build(m,loops,params,null,{logoProfile:params.logoEnabled?crea
 const plain=run({...common,logoEnabled:false});
 const bottom=run({...common,logoEnabled:true,logoPosition:0});
 const right=run({...common,logoEnabled:true,logoPosition:25});
+const top=run({...common,logoEnabled:true,logoPosition:50});
+const left=run({...common,logoEnabled:true,logoPosition:75});
+const offsetLogo=run({...common,logoEnabled:true,logoPosition:0,logoOffset:5});
+const integratedLogo=run({...common,mode:'integrated',logoEnabled:true,logoPosition:0});
 const separatePlain=run({...common,mode:'separate',logoEnabled:false});
 const separateLogo=run({...common,mode:'separate',logoEnabled:true,logoPosition:0});
 
-for(const [name,result] of [['bottom',bottom],['right',right]]){
+for(const [name,result] of [['bottom',bottom],['right',right],['top',top],['left',left],['offset',offsetLogo],['integrated',integratedLogo]]){
  const part=result.parts[0];
  assert.equal(part.bodies,1,name+' logo must remain a single printable body');
  assert.equal(part.stats.open,0,name+' logo mesh open edges');
@@ -45,7 +49,10 @@ for(const [name,result] of [['bottom',bottom],['right',right]]){
 assert.ok(bottom.parts[0].bounds.min[1]<plain.parts[0].bounds.min[1]-1,'0% must place logo on lower border');
 assert.ok(right.parts[0].bounds.max[0]>plain.parts[0].bounds.max[0]+1,'25% must move logo along the perimeter to the right border');
 assert.ok(Math.abs(bottom.logoPlacement.angle)<5,'bottom logo must auto-align horizontally');
-assert.ok(Math.abs(Math.abs(right.logoPlacement.angle)-90)<5,'side logo must auto-rotate vertically with the border tangent');
+assert.ok(Math.abs(Math.abs(right.logoPlacement.angle)-90)<5,'right-side logo must auto-rotate vertically with the border tangent');
+assert.ok(Math.abs(top.logoPlacement.angle)<5,'top logo must remain horizontally readable');
+assert.ok(Math.abs(Math.abs(left.logoPlacement.angle)-90)<5,'left-side logo must auto-rotate vertically with the border tangent');
+assert.ok(offsetLogo.parts[0].bounds.min[1]<bottom.parts[0].bounds.min[1]-3,'positive offset must move the logo farther outside without disconnecting it');
 assert.ok(Math.abs(bottom.parts[0].bounds.max[2]-plain.parts[0].bounds.max[2])<1e-6,'logo height must stay below cutting edge');
 assert.equal(separatePlain.parts.length,2);
 assert.equal(separateLogo.parts.length,2);
