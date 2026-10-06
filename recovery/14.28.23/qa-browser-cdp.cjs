@@ -290,22 +290,35 @@ async function cdp(url){
   await evalv("RVTest.finishSketch(true);RVTest.commitImport([[[[-.5,-.4],[.5,-.4],[.5,.4],[-.5,.4]]]],'Logo QA',null);RVTest.convertAllToCutters();true");
   await evalv("RVTest.setParam('mode','cutter');RVTest.setParam('logoText','FIORI');RVTest.setParam('logoSize',5);RVTest.setParam('logoHeight',.7);RVTest.setParam('logoBaseWidth',6);RVTest.setParam('logoBaseDepth',5);RVTest.setParam('logoEnabled',true);true");
   await evalv('RVTest.wait()');
-  for(const [angle,gap,textAngle] of [[0,0,0],[45,4,45],[90,12,-45]]){
-    await evalv(`RVTest.setParam('logoBaseRotation',${angle});RVTest.setParam('logoBaseGap',${gap});RVTest.setParam('logoTextRotation',${textAngle});true`);
+  for(const [angle,gap] of [[0,0],[45,4],[90,12],[-45,6]]){
+    await evalv(`RVTest.setParam('logoOrientationMode','manual');RVTest.setParam('logoRotationAbsolute',${angle});RVTest.setParam('logoBaseRotation',0);RVTest.setParam('logoTextRotation',0);RVTest.setParam('logoCentralAxis',true);RVTest.setParam('logoBaseGap',${gap});true`);
     await evalv('RVTest.wait()');
-    const out=await evalv("(()=>{const r=RVTest.active().result;return {p:r.logoPlacement,loops:r.logoOutline,parts:r.parts.map(p=>({bodies:p.bodies,stats:p.stats}))};})()");
-    assert(out.p.autoExpanded,'Small manual base must support the complete rotated text');
+    const out=await evalv("(()=>{const r=RVTest.active().result;return {p:r.logoPlacement,parts:r.parts.map(p=>({bodies:p.bodies,stats:p.stats}))};})()");
+    const p=out.p;
+    assert(out.p.autoExpanded,'Small manual base must support the complete text');
     for(const part of out.parts){assert.equal(part.bodies,1);assert.equal(part.stats.open,0);assert.equal(part.stats.nonmanifold,0);}
-    const p=out.p,dx=p.plaqueCenter[0]-p.anchor[0],dy=p.plaqueCenter[1]-p.anchor[1];
-    assert(Math.abs(dx*p.normal[1]-dy*p.normal[0])<.001,'Rotating base must not move it to another side');
-    for(const loop of out.loops)for(const v of loop){const x=v[0]-p.plaqueCenter[0],y=v[1]-p.plaqueCenter[1],a=p.baseAngle*Math.PI/180;assert(Math.abs(x*Math.cos(a)+y*Math.sin(a))<p.baseWidth/2);assert(Math.abs(-x*Math.sin(a)+y*Math.cos(a))<p.baseDepth/2);}
+    assert(Math.abs((((p.baseAngle-angle)+540)%360)-180)<.05,'Base must follow the selected global angle');
+    assert(Math.abs((((p.textAngle-angle)+540)%360)-180)<.05,'Text must follow the selected global angle');
+    assert.equal(p.connectorMode,'axisAlignedFullSpan','Connector must use aligned full-span geometry');
+    assert(['width','depth'].includes(p.connectorAxis),'Connector axis must belong to the logo local frame');
+    const dx=p.plaqueCenter[0]-p.anchor[0],dy=p.plaqueCenter[1]-p.anchor[1],a=p.baseAngle*Math.PI/180;
+    const lx=dx*Math.cos(a)+dy*Math.sin(a),ly=-dx*Math.sin(a)+dy*Math.cos(a);
+    assert(Math.min(Math.abs(lx),Math.abs(ly))<.001,'Plaque displacement must be aligned to one global logo axis');
+    const expectedSpan=p.connectorAxis==='depth'?p.baseWidth:p.baseDepth;
+    assert(Math.abs(p.connectorWidth-expectedSpan)<.001,'Connector must preserve the full plaque span');
+  }
+  for(const angle of [0,45,90,-45]){
+    await evalv(`document.querySelector('[data-logo-global-angle="${angle}"]').click();true`);await evalv('RVTest.wait()');
+    const preset=await evalv("(()=>{const o=RVTest.active();return {mode:o.params.logoOrientationMode,angle:o.params.logoRotationAbsolute,base:o.params.logoBaseRotation,text:o.params.logoTextRotation,central:o.params.logoCentralAxis,p:o.result.logoPlacement};})()");
+    assert.equal(preset.mode,'manual');assert.equal(preset.angle,angle);assert.equal(preset.base,0);assert.equal(preset.text,0);assert.equal(preset.central,true);
+    assert(Math.abs((((preset.p.baseAngle-angle)+540)%360)-180)<.05,'Preset must align the base globally');
   }
   await evalv("RVTest.setParam('logoBaseRotation',0);RVTest.setParam('logoTextRotation',0);RVTest.setParam('logoBaseDepth',20);true");await evalv('RVTest.wait()');
   await evalv("(()=>{const r=document.querySelector('#logoBaseWidthRange');r.value='60';r.dispatchEvent(new Event('input',{bubbles:true}));r.dispatchEvent(new Event('change',{bubbles:true}));return true;})()");await evalv('RVTest.wait()');
   assert.equal(await evalv('RVTest.active().result.logoPlacement.baseWidth'),60,'Slider must update actual feature geometry');
   await evalv("(()=>{const r=document.querySelector('#logoBaseWidth');r.value='50';r.dispatchEvent(new Event('change',{bubbles:true}));return true;})()");await evalv('RVTest.wait()');
   assert.equal(await evalv('RVTest.active().result.logoPlacement.baseWidth'),50,'Typed value must update actual geometry');
-  console.log('Logo: rotated text support, stable placement, full width connector, manifold geometry, slider and numeric edit PASS');
+  console.log('Logo: global 0/45/90/-45 alignment, axis-aligned full-span connector, manifold geometry, presets, slider and numeric edit PASS');
   const exceptions=dev.events.filter(e=>e.method==='Runtime.exceptionThrown');
   const severe=dev.events.filter(e=>e.method==='Log.entryAdded'&&['error'].includes(e.params?.entry?.level));
   assert.deepEqual(exceptions.map(e=>e.params?.exceptionDetails?.text),[]);
