@@ -1,0 +1,31 @@
+name: Sketch logo 14.28.23 native validation
+on:
+  push:
+    branches: ['hotfix/14.28.23-sketch-logo']
+  workflow_dispatch:
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: recovery/14.28.23
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npm run build
+      - name: Native Electron and STL smoke
+        shell: pwsh
+        run: |
+          $dir = Join-Path (Get-Location) 'desktop-smoke'
+          $electron = Join-Path (Get-Location) 'node_modules/electron/dist/electron.exe'
+          $p = Start-Process -FilePath $electron -ArgumentList @('app', "--rv-desktop-smoke=$dir") -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw 'Native Electron failed' }
+          if (-not (Test-Path (Join-Path $dir 'desktop-smoke.stl'))) { throw 'STL missing' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: desktop-smoke-14.28.23
+          path: recovery/14.28.23/desktop-smoke
