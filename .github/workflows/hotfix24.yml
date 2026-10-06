@@ -1,0 +1,65 @@
+name: RV Cutter 14.28.24 Windows Delivery
+
+on:
+  push:
+    branches:
+      - hotfix/14.28.24-logo-global-alignment
+    paths:
+      - recovery/14.28.23/**
+      - .github/workflows/hotfix24.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-delivery:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: recovery/14.28.23
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install
+      - run: npm run build
+      - run: npm test
+      - name: Native Electron smoke
+        shell: pwsh
+        run: |
+          $dir = Join-Path (Get-Location) 'desktop-smoke'
+          Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $dir | Out-Null
+          $electron = Join-Path (Get-Location) 'node_modules\electron\dist\electron.exe'
+          $p = Start-Process -FilePath $electron -ArgumentList @('app', "--rv-desktop-smoke=$dir") -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Native Electron smoke failed with code $($p.ExitCode)" }
+          if (-not (Test-Path (Join-Path $dir 'desktop-smoke.stl'))) { throw 'Desktop smoke STL missing' }
+      - name: Package Windows x64
+        env:
+          RV_SOURCE_COMMIT: ${{ github.sha }}
+        run: node package-windows.cjs
+      - name: Packaged desktop smoke
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Path dist -Recurse -Filter 'RV Cutter CAD.exe' | Select-Object -First 1
+          if (-not $exe) { throw 'Packaged executable not found' }
+          $dir = Join-Path (Get-Location) 'packaged-smoke'
+          Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $dir | Out-Null
+          $p = Start-Process -FilePath $exe.FullName -ArgumentList @("--rv-desktop-smoke=$dir") -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Packaged smoke failed with code $($p.ExitCode)" }
+          if (-not (Test-Path (Join-Path $dir 'desktop-smoke.stl'))) { throw 'Packaged smoke STL missing' }
+      - name: Zip Windows x64
+        shell: pwsh
+        run: |
+          $folder = Get-ChildItem -Path dist -Directory | Where-Object { $_.Name -eq 'RV_Cutter_CAD_14.28.24_Windows_x64' } | Select-Object -First 1
+          if (-not $folder) { throw 'Package folder not found' }
+          Compress-Archive -Path $folder.FullName -DestinationPath 'dist/RV_Cutter_CAD_14.28.24_Windows_x64.zip' -CompressionLevel Optimal
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RV_Cutter_CAD_14.28.24_Windows_x64_Delivery
+          path: recovery/14.28.23/dist/RV_Cutter_CAD_14.28.24_Windows_x64.zip
+          if-no-files-found: error
+          retention-days: 30

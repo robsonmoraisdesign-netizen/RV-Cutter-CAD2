@@ -9138,9 +9138,22 @@ function rvLogoPlace(poly, p, profile) {
   let autoExpanded=(p.logoBaseWidth>0&&p.logoBaseWidth<minBaseW)||(p.logoBaseDepth>0&&p.logoBaseDepth<minBaseD);
   let gap=Math.max(0,Number(p.logoBaseGap)||0);
   const radians=baseAngle*Math.PI/180, along=[Math.cos(radians),Math.sin(radians)], across=[-along[1],along[0]];
-  const reach=Math.abs(normal[0]*along[0]+normal[1]*along[1])*plaqueW/2+Math.abs(normal[0]*across[0]+normal[1]*across[1])*plaqueD/2;
-  // Rotation changes orientation, not the selected side of the cutter.
-  let plaqueCenter=[hit[0]+normal[0]*(gap+reach),hit[1]+normal[1]*(gap+reach)];
+  // Global/manual rotation defines a real local frame for the whole logo support.
+  // The support and its connector use one of the plaque axes, never the cutter tangent,
+  // so a horizontal logo gets a horizontal plaque with a straight vertical/horizontal extension.
+  const axisCandidates=[
+    {axis:"width",sign:1,dir:along,half:plaqueW/2,span:plaqueD},
+    {axis:"width",sign:-1,dir:[-along[0],-along[1]],half:plaqueW/2,span:plaqueD},
+    {axis:"depth",sign:1,dir:across,half:plaqueD/2,span:plaqueW},
+    {axis:"depth",sign:-1,dir:[-across[0],-across[1]],half:plaqueD/2,span:plaqueW}
+  ];
+  let supportAxis=axisCandidates[0], supportDot=-Infinity;
+  for(const candidate of axisCandidates){
+    const dot=candidate.dir[0]*normal[0]+candidate.dir[1]*normal[1];
+    if(dot>supportDot){supportDot=dot;supportAxis=candidate;}
+  }
+  const outward=supportAxis.dir, inward=[-outward[0],-outward[1]];
+  let plaqueCenter=[hit[0]+outward[0]*(gap+supportAxis.half),hit[1]+outward[1]*(gap+supportAxis.half)];
   let plaqueTangent = [Math.cos(baseAngle * Math.PI / 180), Math.sin(baseAngle * Math.PI / 180)], plaqueLeft = [-plaqueTangent[1], plaqueTangent[0]], textTangent = [Math.cos(textAngle * Math.PI / 180), Math.sin(textAngle * Math.PI / 180)], textLeft = [-textTangent[1], textTangent[0]];
   let localToWorld = (q, c = plaqueCenter, t = plaqueTangent, l = plaqueLeft) => [c[0] + q[0] * t[0] + q[1] * l[0], c[1] + q[0] * t[1] + q[1] * l[1]], roundedRect = (w, h, r = Math.min(2, h * 0.28), steps = 12) => {
     let pts = [], corners = [[w / 2 - r, h / 2 - r, 0], [-w / 2 + r, h / 2 - r, Math.PI / 2], [-w / 2 + r, -h / 2 + r, Math.PI], [w / 2 - r, -h / 2 + r, Math.PI * 1.5]];
@@ -9151,30 +9164,19 @@ function rvLogoPlace(poly, p, profile) {
     return pts;
   };
   let plaque = roundedRect(plaqueW, plaqueD).map((q) => localToWorld(q, plaqueCenter, plaqueTangent, plaqueLeft));
-  let vx = plaqueCenter[0] - hit[0], vy = plaqueCenter[1] - hit[1], vl = Math.hypot(vx, vy) || 1, connDir = [vx / vl, vy / vl], cutterInset = 0.65;
-  let hull = (pts) => {
-    let clean = pts.map((q) => [q[0], q[1]]).sort((a13, b) => a13[0] - b[0] || a13[1] - b[1]), uniq = [];
-    for (let q of clean) {
-      let z2 = uniq.at(-1);
-      if (!z2 || Math.abs(q[0] - z2[0]) > 1e-8 || Math.abs(q[1] - z2[1]) > 1e-8) uniq.push(q);
-    }
-    if (uniq.length < 4) return uniq;
-    let cr2 = (o, a13, b) => (a13[0] - o[0]) * (b[1] - o[1]) - (a13[1] - o[1]) * (b[0] - o[0]), lo = [], up = [];
-    for (let q of uniq) {
-      while (lo.length >= 2 && cr2(lo[lo.length - 2], lo[lo.length - 1], q) <= 1e-10) lo.pop();
-      lo.push(q);
-    }
-    for (let i = uniq.length - 1; i >= 0; i--) {
-      let q = uniq[i];
-      while (up.length >= 2 && cr2(up[up.length - 2], up[up.length - 1], q) <= 1e-10) up.pop();
-      up.push(q);
-    }
-    lo.pop();
-    up.pop();
-    return lo.concat(up);
-  };
-  let sweepDistance = vl + cutterInset, plaqueAtCutter = plaque.map((q) => [q[0] - connDir[0] * sweepDistance, q[1] - connDir[1] * sweepDistance]), connector = hull([...plaque, ...plaqueAtCutter]), textLoops = profile.loops.map((loop) => loop.map((q) => localToWorld(q, plaqueCenter, textTangent, textLeft)));
-  return { textLoops, plaque, connector, plaqueCenter, minBaseW, minBaseD, autoExpanded, anchor: hit, tangent: plaqueTangent, normal, angle: textAngle, autoAngle: orientation.autoAngle, finalAngle: seedAngle, orientationMode: orientation.mode, rotationOffset: orientation.rotationOffset, rotationAbsolute: orientation.rotationAbsolute, position: p.logoPosition, baseWidth: plaqueW, baseDepth: plaqueD, baseWidthAuto: autoBaseW, baseDepthAuto: autoBaseD, baseGap: gap, connectorMode: "fullBaseSweep", connectorWidth: plaqueW, connectorDepth: plaqueD, textWidth: profile.width, textHeight: profile.height, baseAngle, textAngle, baseRotation: rvLogoNormalizeAngle(p.logoBaseRotation), textRotation: rvLogoNormalizeAngle(p.logoTextRotation), centralAxis: !!p.logoCentralAxis };
+  const cutterInset=0.75;
+  let connectorLocal, connectorAxis=supportAxis.axis;
+  if(supportAxis.axis==="depth"){
+    const near=-supportAxis.sign*plaqueD/2, far=near-supportAxis.sign*(gap+cutterInset);
+    connectorLocal=[[-plaqueW/2,near],[plaqueW/2,near],[plaqueW/2,far],[-plaqueW/2,far]];
+  }else{
+    const near=-supportAxis.sign*plaqueW/2, far=near-supportAxis.sign*(gap+cutterInset);
+    connectorLocal=[[near,-plaqueD/2],[far,-plaqueD/2],[far,plaqueD/2],[near,plaqueD/2]];
+  }
+  let connector=connectorLocal.map((q)=>localToWorld(q,plaqueCenter,plaqueTangent,plaqueLeft));
+  let textLoops = profile.loops.map((loop) => loop.map((q) => localToWorld(q, plaqueCenter, textTangent, textLeft)));
+  return { textLoops, plaque, connector, plaqueCenter, minBaseW, minBaseD, autoExpanded, anchor: hit, tangent: plaqueTangent, normal, angle: textAngle, autoAngle: orientation.autoAngle, finalAngle: seedAngle, orientationMode: orientation.mode, rotationOffset: orientation.rotationOffset, rotationAbsolute: orientation.rotationAbsolute, position: p.logoPosition, baseWidth: plaqueW, baseDepth: plaqueD, baseWidthAuto: autoBaseW, baseDepthAuto: autoBaseD, baseGap: gap, connectorMode: "axisAlignedFullSpan", connectorAxis, connectorDirection: outward, connectorWidth: connectorAxis==="depth"?plaqueW:plaqueD, connectorDepth: gap+cutterInset, textWidth: profile.width, textHeight: profile.height, baseAngle, textAngle, baseRotation: rvLogoNormalizeAngle(p.logoBaseRotation), textRotation: rvLogoNormalizeAngle(p.logoTextRotation), centralAxis: !!p.logoCentralAxis };
+
 }
 function qr(a13 = {}) {
   let e = { ...Wr, ...a13, stampBase: a13.stampBase ?? a13.base ?? Wr.stampBase };
@@ -9262,7 +9264,7 @@ function fa(a13, e, t, n = null, i = {}) {
       K = c(new u(g("rim", () => D(c(u.union([c(W.offset(Math.max(s.rim, s.wall), "Round", 2, O)), Ce]))).toPolygons()), "EvenOdd")), rvLogoPath = K.toPolygons()[0] || [], rvBase = K, s.logoEnabled && s.mode !== "stamp" && (() => {
         let rv = rvLogoPlace(K.toPolygons()[0], s, i.logoProfile);
         if (rv) {
-          rvLogoPlacement = { plaqueCenter:rv.plaqueCenter, minBaseW:rv.minBaseW,minBaseD:rv.minBaseD,autoExpanded:rv.autoExpanded, anchor: rv.anchor, tangent: rv.tangent, normal: rv.normal, angle: rv.angle, autoAngle: rv.autoAngle, finalAngle: rv.finalAngle, orientationMode: rv.orientationMode, rotationOffset: rv.rotationOffset, rotationAbsolute: rv.rotationAbsolute, position: rv.position, baseWidth: rv.baseWidth, baseDepth: rv.baseDepth, baseWidthAuto: rv.baseWidthAuto, baseDepthAuto: rv.baseDepthAuto, baseGap: rv.baseGap, connectorMode: rv.connectorMode, connectorWidth: rv.connectorWidth, connectorDepth: rv.connectorDepth, textWidth: rv.textWidth, textHeight: rv.textHeight, baseAngle: rv.baseAngle, textAngle: rv.textAngle, baseRotation: rv.baseRotation, textRotation: rv.textRotation, centralAxis: rv.centralAxis };
+          rvLogoPlacement = { plaqueCenter:rv.plaqueCenter, minBaseW:rv.minBaseW,minBaseD:rv.minBaseD,autoExpanded:rv.autoExpanded, anchor: rv.anchor, tangent: rv.tangent, normal: rv.normal, angle: rv.angle, autoAngle: rv.autoAngle, finalAngle: rv.finalAngle, orientationMode: rv.orientationMode, rotationOffset: rv.rotationOffset, rotationAbsolute: rv.rotationAbsolute, position: rv.position, baseWidth: rv.baseWidth, baseDepth: rv.baseDepth, baseWidthAuto: rv.baseWidthAuto, baseDepthAuto: rv.baseDepthAuto, baseGap: rv.baseGap, connectorMode: rv.connectorMode, connectorAxis: rv.connectorAxis, connectorDirection: rv.connectorDirection, connectorWidth: rv.connectorWidth, connectorDepth: rv.connectorDepth, textWidth: rv.textWidth, textHeight: rv.textHeight, baseAngle: rv.baseAngle, textAngle: rv.textAngle, baseRotation: rv.baseRotation, textRotation: rv.textRotation, centralAxis: rv.centralAxis };
           let p1 = c(new u([rv.plaque], "EvenOdd")), p2 = c(new u([rv.connector], "EvenOdd"));
           rvBase = D(c(u.union([K, p1, p2])));
           let rs2 = c(new u(rv.textLoops, "EvenOdd"));
@@ -9788,7 +9790,7 @@ function Na(a13, e) {
   }
   return gf(k, i, n.length, O, L), k;
 }
-var ns = "14.28.23", Fa = ["size", "mirror", "tolerance"], vf = { source: { parents: [], params: Fa }, outer: { parents: ["source"], params: ["outlineOffset", "mode", "stampExpansion"] }, inner: { parents: ["outer"], params: ["clearance", "cornerRadius", "wall"] }, blade: { parents: ["inner"], params: ["wall", "tip", "chamfer", "wallEdits"] }, rim: { parents: ["blade"], params: ["rim"] }, bladeSolid: { parents: ["blade"], params: ["base", "height", "rim", "chamferHeight", "bladeReinforcement", "reinforcementHeight", "reinforcementWidth"] }, art: { parents: ["source"], params: ["detailOffset", "removeOutline", "outlineBand", "stampInset", "mode", "outlineOffset"] }, footprint: { parents: ["outer"], params: ["stampInset", "stampExpansion"] }, cutter: { parents: ["rim", "bladeSolid"], params: ["base", "height", "chamferHeight", "bladeReinforcement", "reinforcementHeight", "reinforcementWidth", "logoEnabled", "logoText", "logoFont", "logoSize", "logoHeight", "logoBaseWidthExtra", "logoBaseWidth", "logoBaseDepth", "logoBaseGap", "logoPosition", "logoOffset", "logoOrientationMode", "logoRotationOffset", "logoRotationAbsolute", "logoBaseRotation", "logoTextRotation", "logoCentralAxis", "mode"] }, stamp: { parents: ["art", "footprint"], params: ["stampBase", "base", "relief", "reliefInverted", "mode"] }, integrated: { parents: ["cutter", "stamp"], params: ["base", "relief", "reliefInverted"] } };
+var ns = "14.28.24", Fa = ["size", "mirror", "tolerance"], vf = { source: { parents: [], params: Fa }, outer: { parents: ["source"], params: ["outlineOffset", "mode", "stampExpansion"] }, inner: { parents: ["outer"], params: ["clearance", "cornerRadius", "wall"] }, blade: { parents: ["inner"], params: ["wall", "tip", "chamfer", "wallEdits"] }, rim: { parents: ["blade"], params: ["rim"] }, bladeSolid: { parents: ["blade"], params: ["base", "height", "rim", "chamferHeight", "bladeReinforcement", "reinforcementHeight", "reinforcementWidth"] }, art: { parents: ["source"], params: ["detailOffset", "removeOutline", "outlineBand", "stampInset", "mode", "outlineOffset"] }, footprint: { parents: ["outer"], params: ["stampInset", "stampExpansion"] }, cutter: { parents: ["rim", "bladeSolid"], params: ["base", "height", "chamferHeight", "bladeReinforcement", "reinforcementHeight", "reinforcementWidth", "logoEnabled", "logoText", "logoFont", "logoSize", "logoHeight", "logoBaseWidthExtra", "logoBaseWidth", "logoBaseDepth", "logoBaseGap", "logoPosition", "logoOffset", "logoOrientationMode", "logoRotationOffset", "logoRotationAbsolute", "logoBaseRotation", "logoTextRotation", "logoCentralAxis", "mode"] }, stamp: { parents: ["art", "footprint"], params: ["stampBase", "base", "relief", "reliefInverted", "mode"] }, integrated: { parents: ["cutter", "stamp"], params: ["base", "relief", "reliefInverted"] } };
 function _f(a13, e) {
   let t = {};
   for (let [n, i] of Object.entries(vf)) {

@@ -1,4 +1,4 @@
-# RV Cutter CAD 14.28.23 — Sketch e logo
+# RV Cutter CAD 14.28.24 — Sketch e logo com alinhamento global
 
 Base efetiva: pacote Windows 14.28.22. As alterações 14.28.20–22 não estavam nas branches disponíveis do Git. Para preservar a extensão integral da logo, esta pasta recupera o JavaScript distribuído, formata-o como fonte legível e aplica as correções antes de gerar os bundles. Sem segundo editor ou overlay. Os módulos da raiz permanecem para reconciliação futura; a origem deste pacote é esta pasta.
 
@@ -19,3 +19,19 @@ Construção: nesta pasta, npm install e npm run build. Em Windows x64, npm star
 Testes CDP com clique e tecla físicos: exclusão interna/externa, Sketch vazio/misto, entidade paramétrica, foco, botão, desfazer/refazer. Regressões de projetos, importação múltipla, presets, geração 3D, apresentação e STL. Logo testada com texto real, rotações 0/45/90°, distâncias 0/4/12 mm, base manual pequena, slider e campo numérico; malhas fechadas e um corpo nos casos testados.
 
 Não se trata da conclusão do ambiente FreeCAD/Onshape. Fontes não instaladas podem usar equivalentes do sistema. Pacote PE Windows x64 conferido; execução nativa do EXE depende da validação Windows, separada dos testes Chromium/Linux.
+
+
+## 14.28.24 — alinhamento global real da logo
+- Presets globais: Horizontal 0°, 45°, Vertical 90° e −45°, além do ângulo manual livre.
+- O preset global alinha texto, placa/base e o complemento que liga a placa ao cortador no mesmo sistema de eixos.
+- Arrastar a logo pela borda altera somente a posição quando a orientação global/manual está ativa.
+- O complemento não é mais uma varredura diagonal pela normal local da borda. Ele é um retângulo de largura total, alinhado a um dos eixos da própria base da logo e prolongado até dentro da base do cortador.
+- Para logo horizontal, o complemento fica horizontal/vertical; para 45° ele gira junto em 45°; para 90° ele gira junto em 90°.
+- A distância da base ao cortador é preenchida pelo complemento mantendo toda a largura correspondente da base, sem pescoço estreito ou laterais oblíquas.
+- A normal da borda continua sendo usada apenas para escolher qual lado da base aponta para fora do cortador; ela não gira a base quando o modo global/manual está ativo.
+
+### Critérios de QA 14.28.24
+- 0°, 45°, 90° e −45°: texto e base devem ter exatamente o ângulo selecionado.
+- O deslocamento da placa em relação ao ponto de ancoragem deve ocorrer por um eixo local da placa.
+- O conector deve declarar `axisAlignedFullSpan` e preservar toda a largura útil da placa no eixo transversal.
+- A malha final deve permanecer em um único corpo fechado e sem arestas não-manifold.
