@@ -1,9 +1,10 @@
 {
   "name": "rv-cutter-cad",
-  "version": "14.28.24",
+  "version": "14.28.25",
   "description": "Editor paramétrico desktop com Sketch, Features e exportação nativa",
   "main": "main.cjs",
   "author": "RV",
   "license": "UNLICENSED",
   "type": "module"
 }
+
