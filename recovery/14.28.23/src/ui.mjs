@@ -146,7 +146,7 @@
     }
     return true;
   }
-  var Mr = "14.28.24", yf = ["size", "mirror", "tolerance"], Ua = { source: { parents: [], params: yf }, outer: { parents: ["source"], params: ["outlineOffset", "mode", "stampExpansion"] }, inner: { parents: ["outer"], params: ["clearance", "cornerRadius", "wall"] }, blade: { parents: ["inner"], params: ["wall", "tip", "chamfer", "wallEdits"] }, rim: { parents: ["blade"], params: ["rim"] }, bladeSolid: { parents: ["blade"], params: ["base", "height", "rim", "chamferHeight", "bladeReinforcement", "reinforcementHeight", "reinforcementWidth"] }, art: { parents: ["source"], params: ["detailOffset", "removeOutline", "outlineBand", "stampInset", "mode", "outlineOffset"] }, footprint: { parents: ["outer"], params: ["stampInset", "stampExpansion"] }, cutter: { parents: ["rim", "bladeSolid"], params: ["base", "height", "chamferHeight", "bladeReinforcement", "reinforcementHeight", "reinforcementWidth", "logoEnabled", "logoText", "logoFont", "logoSize", "logoHeight", "logoBaseWidthExtra", "logoBaseWidth", "logoBaseDepth", "logoBaseGap", "logoPosition", "logoOffset", "logoOrientationMode", "logoRotationOffset", "logoRotationAbsolute", "logoBaseRotation", "logoTextRotation", "logoCentralAxis", "mode"] }, stamp: { parents: ["art", "footprint"], params: ["stampBase", "base", "relief", "reliefInverted", "mode"] }, integrated: { parents: ["cutter", "stamp"], params: ["base", "relief", "reliefInverted"] } };
+  var Mr = "14.28.25", yf = ["size", "mirror", "tolerance"], Ua = { source: { parents: [], params: yf }, outer: { parents: ["source"], params: ["outlineOffset", "mode", "stampExpansion"] }, inner: { parents: ["outer"], params: ["clearance", "cornerRadius", "wall"] }, blade: { parents: ["inner"], params: ["wall", "tip", "chamfer", "wallEdits"] }, rim: { parents: ["blade"], params: ["rim"] }, bladeSolid: { parents: ["blade"], params: ["base", "height", "rim", "chamferHeight", "bladeReinforcement", "reinforcementHeight", "reinforcementWidth"] }, art: { parents: ["source"], params: ["detailOffset", "removeOutline", "outlineBand", "stampInset", "mode", "outlineOffset"] }, footprint: { parents: ["outer"], params: ["stampInset", "stampExpansion"] }, cutter: { parents: ["rim", "bladeSolid"], params: ["base", "height", "chamferHeight", "bladeReinforcement", "reinforcementHeight", "reinforcementWidth", "logoEnabled", "logoText", "logoFont", "logoSize", "logoHeight", "logoBaseWidthExtra", "logoBaseWidth", "logoBaseDepth", "logoBaseGap", "logoPosition", "logoOffset", "logoOrientationMode", "logoRotationOffset", "logoRotationAbsolute", "logoBaseRotation", "logoTextRotation", "logoCentralAxis", "mode"] }, stamp: { parents: ["art", "footprint"], params: ["stampBase", "base", "relief", "reliefInverted", "mode"] }, integrated: { parents: ["cutter", "stamp"], params: ["base", "relief", "reliefInverted"] } };
   function vf(n, e) {
     let t = {};
     for (let [i, r] of Object.entries(Ua)) {
@@ -17007,7 +17007,7 @@ rvZ=position.z; rvVertical=1.0-abs(normal.z);`), W.fragmentShader = `varying flo
         de < ee && (ee = de, W = se);
       }
       return W?.id || null;
-    }, k = (f, b = 8) => {
+    }, k = (f, b = 10) => {
       let T = e.object(), D = n.getBoundingClientRect();
       if (!T || !D.width || !D.height) return null;
       let te = null, K = b * Math.max(t[2] / D.width, t[3] / D.height);
@@ -17239,7 +17239,7 @@ rvZ=position.z; rvVertical=1.0-abs(normal.z);`), W.fragmentShader = `varying flo
       let b = x.native();
       z(b);
       let T = b?.entities?.length || 0, D = x.states();
-      if (f.result?.bladeProfile?.length && !T && n.appendChild(m("path", { class: "blade-preview", d: f.result.bladeProfile.map((K) => I(K.map(([v, A]) => [v / f.result.params.size * (f.result.params.mirror ? -1 : 1), A / f.result.params.size])) + "Z").join(" "), fill: $e("sketchBlade"), "fill-opacity": 0.42, "fill-rule": "evenodd", "pointer-events": "none" })), f.loops.length && n.appendChild(m("path", { d: f.loops.map((K) => I(K) + "Z").join(" "), class: T ? "sketch-derived-profile" : "legacy-profile", fill: $e("sketchUnder"), "fill-rule": "evenodd", "fill-opacity": T ? 0.045 : 0.42, "pointer-events": "none" })), legacyDisplayLoops().forEach((K, v) => n.appendChild(m("path", { d: I(K) + "Z", fill: "none", stroke: v === r ? $e("sketchSelected") : v === c ? $e("sketchHover") : v === 0 ? $e("sketchEntity") : $e("sketchConstruction"), "stroke-width": v === r ? 2 : 1.1, "vector-effect": "non-scaling-stroke", "pointer-events": "stroke", "data-loop": v }))), r >= 0 && f.loops[r] && i === "select" && !T && f.loops[r].forEach(([K, v], A) => n.appendChild(m("circle", { cx: K, cy: -v, r: t[2] * 4e-3, fill: A === s ? $e("sketchSelected") : $e("sketchHandle"), stroke: $e("sketchConstraint"), "stroke-width": 1, "vector-effect": "non-scaling-stroke", "data-node": A }))), o && n.appendChild(m("path", { d: I(o) + "Z", fill: $e("accentSoft"), "fill-opacity": 0.45, stroke: $e("sketchConstrained"), "stroke-dasharray": "5 4", "stroke-width": 1.5, "vector-effect": "non-scaling-stroke", "pointer-events": "none" })), a?.points?.length && n.appendChild(m("path", { d: I(a.points), fill: "none", stroke: i === "erase" ? $e("danger") : $e("sketchConstrained"), "stroke-width": (+g("brushWidth")?.value || 0.8) / f.params.size, "stroke-linecap": "round", "pointer-events": "none" })), T) {
+      if (f.result?.bladeProfile?.length && !T && n.appendChild(m("path", { class: "blade-preview", d: f.result.bladeProfile.map((K) => I(K.map(([v, A]) => [v / f.result.params.size * (f.result.params.mirror ? -1 : 1), A / f.result.params.size])) + "Z").join(" "), fill: $e("sketchBlade"), "fill-opacity": 0.42, "fill-rule": "evenodd", "pointer-events": "none" })), f.loops.length && n.appendChild(m("path", { d: f.loops.map((K) => I(K) + "Z").join(" "), class: T ? "sketch-derived-profile" : "legacy-profile", fill: $e("sketchUnder"), "fill-rule": "evenodd", "fill-opacity": T ? 0.045 : 0.42, "pointer-events": "none" })), legacyDisplayLoops().forEach((K, v) => n.appendChild(m("path", { d: I(K) + "Z", fill: "none", stroke: v === r ? $e("sketchSelected") : v === c ? $e("sketchHover") : v === 0 ? $e("sketchEntity") : $e("sketchConstruction"), "stroke-width": v === r ? 2 : 1.1, "vector-effect": "non-scaling-stroke", "pointer-events": "stroke", "data-loop": v }))), r >= 0 && legacyDisplayLoops()[r] && i === "select" && legacyDisplayLoops()[r].forEach(([K, v], A) => n.appendChild(m("circle", { cx: K, cy: -v, r: t[2] * 4e-3, fill: A === s ? $e("sketchSelected") : $e("sketchHandle"), stroke: $e("sketchConstraint"), "stroke-width": 1, "vector-effect": "non-scaling-stroke", "data-node": A }))), o && n.appendChild(m("path", { d: I(o) + "Z", fill: $e("accentSoft"), "fill-opacity": 0.45, stroke: $e("sketchConstrained"), "stroke-dasharray": "5 4", "stroke-width": 1.5, "vector-effect": "non-scaling-stroke", "pointer-events": "none" })), a?.points?.length && n.appendChild(m("path", { d: I(a.points), fill: "none", stroke: i === "erase" ? $e("danger") : $e("sketchConstrained"), "stroke-width": (+g("brushWidth")?.value || 0.8) / f.params.size, "stroke-linecap": "round", "pointer-events": "none" })), T) {
         for (let K of b.entities) {
           let v = x.selected().includes(K.id);
           if (Re(K, b, f, D.get(K.id) || "under", v), v && i === "select") {
@@ -17326,7 +17326,7 @@ rvZ=position.z; rvVertical=1.0-abs(normal.z);`), W.fragmentShader = `varying flo
       n.setAttribute("tabindex","0");n.focus({preventScroll:true});
       n.setPointerCapture(f.pointerId);
       let D = R(f), te = f.target.dataset.node, K = f.target.dataset.loop, v = f.target.dataset.entity;
-      if (!(f.target.dataset.handle !== void 0) && te === void 0 && ["select", "trim", "extend", "dimension"].includes(i) && (v = J(D, 8) || v), K === void 0 && ["select", "move"].includes(i)) {
+      if (!(f.target.dataset.handle !== void 0) && te === void 0 && K === void 0 && ["select", "trim", "extend", "dimension"].includes(i) && (v = J(D, 10) || v), K === void 0 && ["select", "move"].includes(i)) {
         let W = k(D);
         W !== null && (K = W);
       }
@@ -17395,13 +17395,13 @@ rvZ=position.z; rvVertical=1.0-abs(normal.z);`), W.fragmentShader = `varying flo
           return;
         }
         if (i === "move" && K !== void 0) {
-          if (!ie()) return;
-          e.history(), delete T.sketch, r = +K, a = { kind: "move", start: D, original: T.loops[r].map((W) => W.slice()) };
+          r=+K;s=-1;x.clearSelection();
+          a={kind:"move",start:D,doc:structuredClone(x.native()),index:r,original:legacyDisplayLoops()[r].map(pt=>pt.slice())};
           return;
         }
         if (te !== void 0) {
-          if (!ie()) return;
-          e.history(), delete T.sketch, s = +te, a = { kind: "node" };
+          s=+te;x.clearSelection();
+          a={kind:"node",start:D,doc:structuredClone(x.native()),index:r,original:legacyDisplayLoops()[r].map(pt=>pt.slice())};fe();
         } else K !== void 0 ? (x.clearSelection(), r = +K, s = -1, fe()) : i === "select" ? (r = -1, s = -1, f.shiftKey || x.clearSelection(), a = { kind: "box-select", start: D, end: D, extend: f.shiftKey }, fe()) : a = { kind: "pan", x: f.clientX, y: f.clientY, view: [...t] };
       }
     }, n.onpointermove = (f) => {
@@ -17435,8 +17435,8 @@ rvZ=position.z; rvVertical=1.0-abs(normal.z);`), W.fragmentShader = `varying flo
         a.end = v.point, a.endRelation = v.relation, u = v.relation ? { ...v, point: v.point, type: v.relation.type } : null, fe();
         return;
       }
-      if (a.kind === "node") b.loops[r][s] = T, fe();
-      else if (a.kind === "move") b.loops[r] = a.original.map((K) => [K[0] + T[0] - a.start[0], K[1] + T[1] - a.start[1]]), fe();
+      if (a.kind === "node") {a.preview=a.original.map(pt=>pt.slice());a.preview[s]=T;a.moved=Math.hypot(T[0]-a.start[0],T[1]-a.start[1])>1e-6;fe();}
+      else if (a.kind === "move") {a.preview=a.original.map(K=>[K[0]+T[0]-a.start[0],K[1]+T[1]-a.start[1]]);a.moved=Math.hypot(T[0]-a.start[0],T[1]-a.start[1])>1e-6;fe();}
       else if (a.kind === "region") {
         let K = a.start;
         o = [[Math.min(K[0], T[0]), Math.min(K[1], T[1])], [Math.max(K[0], T[0]), Math.min(K[1], T[1])], [Math.max(K[0], T[0]), Math.max(K[1], T[1])], [Math.min(K[0], T[0]), Math.max(K[1], T[1])]], fe();
@@ -17456,9 +17456,9 @@ rvZ=position.z; rvVertical=1.0-abs(normal.z);`), W.fragmentShader = `varying flo
         let T = _(b.start), D = _(b.end || b.start), te = { minX: Math.min(T[0], D[0]), minY: Math.min(T[1], D[1]), maxX: Math.max(T[0], D[0]), maxY: Math.max(T[1], D[1]) };
         x.selectBox(te, { crossing: (b.end?.[0] ?? b.start[0]) < b.start[0], extend: b.extend });
       }
-      b.kind === "entity-point" && b.end && x.movePoint(b.entity, b.handle, b.end, b.endRelation || null), ["node", "move"].includes(b.kind) && e.changed(), b.kind === "stroke" && b.points.length && Le({ type: "stroke", points: b.points, width: +g("brushWidth")?.value || 0.8, subtract: i === "erase" }), u = null, fe();
+      b.kind === "entity-point" && b.end && x.movePoint(b.entity, b.handle, b.end, b.endRelation || null), ["node", "move"].includes(b.kind) && commitLegacyDrag(b), b.kind === "stroke" && b.points.length && Le({ type: "stroke", points: b.points, width: +g("brushWidth")?.value || 0.8, subtract: i === "erase" }), u = null, fe();
     }, n.onpointercancel = () => {
-      a && ["node", "move"].includes(a.kind) && e.changed(), a?.kind !== "primitive" && (a = null, u = null), fe();
+      a?.kind !== "primitive" && (a = null, u = null), fe();
     }, n.onpointerleave = () => {
       a || (c = null, l = null, u = null, fe());
     }, n.oncontextmenu = (f) => f.preventDefault(), n.onwheel = (f) => {
@@ -17472,19 +17472,31 @@ rvZ=position.z; rvVertical=1.0-abs(normal.z);`), W.fragmentShader = `varying flo
         ce(f.target.dataset.dimensionEntity, f.clientX, f.clientY);
         return;
       }
-      if (i !== "select" || f.target.dataset.loop === void 0 || !ie()) return;
+      if (i !== "select" || f.target.dataset.loop === void 0) return;
       let b = e.object();
       r = +f.target.dataset.loop;
-      let T = b.loops[r], D = R(f), te = 0, K = 1 / 0;
+      let T = legacyDisplayLoops()[r], D = R(f), te = 0, K = 1 / 0;
       for (let v = 0; v < T.length; v++) {
         let A = T[v], W = T[(v + 1) % T.length], ee = W[0] - A[0], se = W[1] - A[1], de = Math.max(0, Math.min(1, ((D[0] - A[0]) * ee + (D[1] - A[1]) * se) / (ee * ee + se * se || 1))), we = Math.hypot(D[0] - A[0] - de * ee, D[1] - A[1] - de * se);
         we < K && (K = we, te = v + 1);
       }
-      e.history(), delete b.sketch, T.splice(te, 0, D), s = te, e.changed(), fe();
+      const doc=structuredClone(x.native());doc.legacyLoops[r].splice(te,0,_(D));
+      if(commitLegacyDoc(doc)){s=te;fe();}
     };
     function legacyDisplayLoops() {
       const doc=x.native();
-      return (doc?.legacyLoops||[]).map(poly=>poly.map(pt=>C(pt,doc)));
+      return (doc?.legacyLoops||[]).map((poly,index)=>a?.preview&&a.index===index?a.preview:poly.map(pt=>C(pt,doc)));
+    }
+    function commitLegacyDoc(doc){
+      const object=e.object();if(!object)return false;
+      try{const result=cg(doc);e.history();object.sketch=result.sketch;object.loops=result.loops;object.params.size=result.size;x.clearSelection();e.changed({geometryChanged:true});return true;}
+      catch(error){e.status('A alteração não foi aplicada: '+error.message);return false;}
+    }
+    function commitLegacyDrag(drag){
+      if(!drag.moved||!drag.preview)return false;
+      const size=e.object().params.size,center=drag.doc.profileCenter;
+      drag.doc.legacyLoops[drag.index]=drag.preview.map(pt=>[pt[0]*size+center[0],pt[1]*size+center[1]]);
+      return commitLegacyDoc(drag.doc);
     }
     function deleteSketchSelection({wholeContour=false}={}) {
       if(x.selected().length){const ok=x.remove();r=-1;s=-1;fe();return ok;}
@@ -18500,8 +18512,8 @@ rvZ=position.z; rvVertical=1.0-abs(normal.z);`), W.fragmentShader = `varying flo
     return e;
   }
   function v0(n, e) {
+    if (typeof e === "number" && !Number.isFinite(e)) return He("Informe um número finito.");
     rvLogoKeys.has(n) && (e = rvLogoNorm(n, e));
-    if (typeof e === "number" && !Number.isFinite(e)) return;
     let t = ga().filter((i) => (n !== "reliefSeparate" || ["separate", "stamp"].includes(i.params.mode)) && (!rvLogoKeys.has(n) || i.params.mode !== "stamp"));
     if (!t.length) return He(rvLogoKeys.has(n) ? "A logo e integrada a base do cortador e nao esta disponivel em So carimbo." : n === "reliefSeparate" ? "Separar relevo da base esta disponivel em Cortador + carimbo ou So carimbo." : "Aplique Converter em cortador ao Sketch antes de editar parametros 3D.");
     for (let i of t) cr(i), i.params[n] = e, n === "relief" && (i.params.reliefInverted ? i.params.reliefIn = e : i.params.reliefOut = e), n === "wall" && i.params.tip > e && (i.params.tip = e);
@@ -18521,7 +18533,7 @@ rvZ=position.z; rvVertical=1.0-abs(normal.z);`), W.fragmentShader = `varying flo
         e.value = r;
         let s = ga().filter((o) => !rvLogoKeys.has(n) || o.params.mode !== "stamp");
         for (let o of s) cr(o), o.params[n] = rvLogoKeys.has(n) ? rvLogoNorm(n,r) : r, n === "relief" && (o.params.reliefInverted ? o.params.reliefIn = r : o.params.reliefOut = r), n === "wall" && o.params.tip > r && (o.params.tip = r);
-        n === "logoPosition" && zt(s.map((o) => o.id)), He(n === "logoPosition" ? "Movendo logo pela borda · rotação automática em tempo real." : "Solte o controle para aplicar a medida.");
+        n === "logoPosition" && zt(s.map((o) => o.id)), He(n === "logoPosition" ? "Movendo logo pela borda · orientação selecionada preservada." : "Solte o controle para aplicar a medida.");
       }, t.onchange = () => {
         i = false, _t(), zt(ga().filter((o) => !rvLogoKeys.has(n) || o.params.mode !== "stamp").map((r) => r.id)), et();
       }, t.onblur = () => {
@@ -18806,14 +18818,14 @@ rvZ=position.z; rvVertical=1.0-abs(normal.z);`), W.fragmentShader = `varying flo
       rt?.focus?.(o?.id, true), rt?.setPlacementMode?.(true), He("Posicionar logo · clique e arraste sobre o cortador. A posição muda sem alterar a orientação global/manual escolhida.");
       return;
     }
-    rt?.setPlacementMode?.(false), rvLogoCam && rt?.restoreCamera?.(rvLogoCam), restore && rvLogoHist && o && Number.isFinite(rvLogoStart) && (o.params.logoPosition = rvLogoStart, G.history?.length && G.history.pop(), _t(), zt([o.id]), et()), rvLogoStart = null, rvLogoCam = null, rvLogoHist = false, rvLogoLast = 0;
+    rt?.setPlacementMode?.(false), rvLogoCam && rt?.restoreCamera?.(rvLogoCam), restore && rvLogoHist && o && Number.isFinite(rvLogoStart) && (cr(o), o.params.logoPosition = rvLogoStart, G.history?.length && G.history.pop(), _t(), zt([o.id]), et()), rvLogoStart = null, rvLogoCam = null, rvLogoHist = false, rvLogoLast = 0;
   }
   function rvApplyLogo(n) {
     let o = Dt(), valid = o && n.id === o.id && n.partIndex === 0 && n.point && o.result?.logoPathOutline?.length;
-    if (!valid) return n.phase === "end" && rvLogoHist ? (_t(), zt([o.id]), et(), rvLogoMode(false), He("Posição da logo aplicada na última borda válida."), true) : (n.phase !== "move" && He("Clique e arraste sobre o corpo do cortador para posicionar a logo."), false);
+    if (!valid) return o && n.phase === "end" && rvLogoHist ? (_t(), zt([o.id]), et(), rvLogoMode(false), He("Posição da logo aplicada na última borda válida."), true) : (n.phase !== "move" && He("Clique e arraste sobre o corpo do cortador para posicionar a logo."), false);
     let hit = rvEdgePos(o.result.logoPathOutline, n.point);
     if (!hit) return false;
-    rvLogoHist || (ln(), rvLogoHist = true), o.params.logoPosition = hit.position;
+    rvLogoHist || (ln(), rvLogoHist = true), cr(o), o.params.logoPosition = hit.position;
     let input = M("logoPosition"), range = M("logoPositionRange");
     input && (input.value = hit.position.toFixed(2)), range && (range.value = hit.position);
     let now = performance.now();
@@ -19539,3 +19551,4 @@ three/build/three.module.js:
    * SPDX-License-Identifier: MIT
    *)
 */
+

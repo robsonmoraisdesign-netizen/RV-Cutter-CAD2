@@ -277,6 +277,22 @@ async function cdp(url){
   await clickLoop(0);await del();assert.equal(await evalv('RVTest.active().loops.length'),0,'Delete removes outer contour');
   await evalv("document.querySelector('#undo').click();true");assert.equal(await evalv('RVTest.active().loops.length'),1);
   await evalv("RVTest.editor.sketch.create('circle',[0,0],[5,0]);RVTest.editor.sketch.clearSelection();RVTest.editor.render();true");
+  // Editing an imported contour must preserve adjacent native entities.
+  await clickLoop(0);
+  const originalMixed=await evalv('JSON.stringify(RVTest.active().sketch)');
+  const nodePt=await evalv(`(()=>{const p=document.querySelector('[data-node="0"]');const q=new DOMPoint(+p.getAttribute('cx'),+p.getAttribute('cy')).matrixTransform(p.getScreenCTM());return {x:q.x,y:q.y};})()`);
+  await send('Input.dispatchMouseEvent',{type:'mousePressed',...nodePt,button:'left',clickCount:1});
+  await send('Input.dispatchMouseEvent',{type:'mouseReleased',...nodePt,button:'left',clickCount:1});
+  assert.equal(await evalv('JSON.stringify(RVTest.active().sketch)'),originalMixed,'Selecting a vertex must not modify native geometry');
+  await send('Input.dispatchMouseEvent',{type:'mousePressed',...nodePt,button:'left',clickCount:1});
+  await send('Input.dispatchMouseEvent',{type:'mouseMoved',x:nodePt.x+18,y:nodePt.y+12,button:'left',buttons:1});
+  assert.equal(await evalv('JSON.stringify(RVTest.active().sketch)'),originalMixed,'Drag preview must not commit on every move');
+  await send('Input.dispatchMouseEvent',{type:'mouseReleased',x:nodePt.x+18,y:nodePt.y+12,button:'left',clickCount:1});
+  const movedMixed=JSON.parse(await evalv('JSON.stringify(RVTest.active().sketch)'));
+  assert.deepEqual(movedMixed.entities,JSON.parse(originalMixed).entities,'Dragging legacy node must retain parametric entities');
+  assert.notDeepEqual(movedMixed.legacyLoops,JSON.parse(originalMixed).legacyLoops,'Dragged point must move');
+  await evalv("document.querySelector('#undo').click();true");
+  assert.deepEqual(await evalv('RVTest.active().sketch.legacyLoops'),JSON.parse(originalMixed).legacyLoops,'Undo must restore native contour');
   await clickLoop(0);await del();
   assert.equal(await evalv('RVTest.active().sketch.legacyLoops.length'),0);
   assert.equal(await evalv('RVTest.active().sketch.entities.length'),1,'Preserve circle in mixed sketch');
@@ -318,6 +334,13 @@ async function cdp(url){
   assert.equal(await evalv('RVTest.active().result.logoPlacement.baseWidth'),60,'Slider must update actual feature geometry');
   await evalv("(()=>{const r=document.querySelector('#logoBaseWidth');r.value='50';r.dispatchEvent(new Event('change',{bubbles:true}));return true;})()");await evalv('RVTest.wait()');
   assert.equal(await evalv('RVTest.active().result.logoPlacement.baseWidth'),50,'Typed value must update actual geometry');
+  for(const [baseAngle,textAngle] of [[37,83],[-90,45]]){
+    await evalv(`RVTest.setParam('logoBaseWidth',0);RVTest.setParam('logoBaseDepth',0);RVTest.setParam('logoBaseRotation',${baseAngle});RVTest.setParam('logoTextRotation',${textAngle});true`);await evalv('RVTest.wait()');
+    const support=await evalv(`(()=>{const r=RVTest.active().result,p=r.logoPlacement,a=p.baseAngle*Math.PI/180;return {fits:r.logoOutline.every(l=>l.every(q=>{const dx=q[0]-p.plaqueCenter[0],dy=q[1]-p.plaqueCenter[1];return Math.abs(dx*Math.cos(a)+dy*Math.sin(a))<=p.baseWidth/2+.001&&Math.abs(-dx*Math.sin(a)+dy*Math.cos(a))<=p.baseDepth/2+.001;})),parts:r.parts.map(p=>({bodies:p.bodies,stats:p.stats}))};})()`);
+    assert(support.fits,'Rotated glyphs must remain supported');
+    for(const p of support.parts){assert.equal(p.bodies,1);assert.equal(p.stats.open,0);assert.equal(p.stats.nonmanifold,0);}
+  }
+  console.log('Mixed sketch: vertex selection, deferred drag commit, entity preservation and undo PASS');
   console.log('Logo: global 0/45/90/-45 alignment, axis-aligned full-span connector, manifold geometry, presets, slider and numeric edit PASS');
   const exceptions=dev.events.filter(e=>e.method==='Runtime.exceptionThrown');
   const severe=dev.events.filter(e=>e.method==='Log.entryAdded'&&['error'].includes(e.params?.entry?.level));
@@ -330,4 +353,5 @@ async function cdp(url){
   if(proc.exitCode&&!proc.killed)console.error(stderr.slice(-4000));
  }
 })().catch(e=>{console.error(e);process.exit(1);});
+
 

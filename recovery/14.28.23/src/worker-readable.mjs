@@ -9167,10 +9167,10 @@ function rvLogoPlace(poly, p, profile) {
   const cutterInset=0.75;
   let connectorLocal, connectorAxis=supportAxis.axis;
   if(supportAxis.axis==="depth"){
-    const near=-supportAxis.sign*plaqueD/2, far=near-supportAxis.sign*(gap+cutterInset);
+    const edge=-supportAxis.sign*plaqueD/2, near=edge+supportAxis.sign*0.05, far=edge-supportAxis.sign*(gap+cutterInset);
     connectorLocal=[[-plaqueW/2,near],[plaqueW/2,near],[plaqueW/2,far],[-plaqueW/2,far]];
   }else{
-    const near=-supportAxis.sign*plaqueW/2, far=near-supportAxis.sign*(gap+cutterInset);
+    const edge=-supportAxis.sign*plaqueW/2, near=edge+supportAxis.sign*0.05, far=edge-supportAxis.sign*(gap+cutterInset);
     connectorLocal=[[near,-plaqueD/2],[far,-plaqueD/2],[far,plaqueD/2],[near,plaqueD/2]];
   }
   let connector=connectorLocal.map((q)=>localToWorld(q,plaqueCenter,plaqueTangent,plaqueLeft));
@@ -9189,7 +9189,7 @@ function qr(a13 = {}) {
   e.logoBaseWidthExtra = Math.max(0, Math.min(40, Number(e.logoBaseWidthExtra) || 0));
   e.logoBaseWidth = Math.max(0, Math.min(120, Number(e.logoBaseWidth) || 0));
   e.logoBaseDepth = Math.max(0, Math.min(60, Number(e.logoBaseDepth) || 0));
-  e.logoBaseGap = Math.max(0, Math.min(20, Number(e.logoBaseGap ?? (Number(e.logoOffset) || 0)) || 0));
+  e.logoBaseGap = Math.max(0, Math.min(20, Number(a13.logoBaseGap ?? (Number(a13.logoOffset) || 0)) || 0));
   e.logoOrientationMode = ["auto", "autoOffset", "manual"].includes(e.logoOrientationMode) ? e.logoOrientationMode : Wr.logoOrientationMode;
   e.logoRotationOffset = Math.max(-45, Math.min(45, Number(e.logoRotationOffset) || 0));
   e.logoRotationAbsolute = rvLogoNormalizeAngle(e.logoRotationAbsolute);
@@ -9790,7 +9790,7 @@ function Na(a13, e) {
   }
   return gf(k, i, n.length, O, L), k;
 }
-var ns = "14.28.24", Fa = ["size", "mirror", "tolerance"], vf = { source: { parents: [], params: Fa }, outer: { parents: ["source"], params: ["outlineOffset", "mode", "stampExpansion"] }, inner: { parents: ["outer"], params: ["clearance", "cornerRadius", "wall"] }, blade: { parents: ["inner"], params: ["wall", "tip", "chamfer", "wallEdits"] }, rim: { parents: ["blade"], params: ["rim"] }, bladeSolid: { parents: ["blade"], params: ["base", "height", "rim", "chamferHeight", "bladeReinforcement", "reinforcementHeight", "reinforcementWidth"] }, art: { parents: ["source"], params: ["detailOffset", "removeOutline", "outlineBand", "stampInset", "mode", "outlineOffset"] }, footprint: { parents: ["outer"], params: ["stampInset", "stampExpansion"] }, cutter: { parents: ["rim", "bladeSolid"], params: ["base", "height", "chamferHeight", "bladeReinforcement", "reinforcementHeight", "reinforcementWidth", "logoEnabled", "logoText", "logoFont", "logoSize", "logoHeight", "logoBaseWidthExtra", "logoBaseWidth", "logoBaseDepth", "logoBaseGap", "logoPosition", "logoOffset", "logoOrientationMode", "logoRotationOffset", "logoRotationAbsolute", "logoBaseRotation", "logoTextRotation", "logoCentralAxis", "mode"] }, stamp: { parents: ["art", "footprint"], params: ["stampBase", "base", "relief", "reliefInverted", "mode"] }, integrated: { parents: ["cutter", "stamp"], params: ["base", "relief", "reliefInverted"] } };
+var ns = "14.28.25", Fa = ["size", "mirror", "tolerance"], vf = { source: { parents: [], params: Fa }, outer: { parents: ["source"], params: ["outlineOffset", "mode", "stampExpansion"] }, inner: { parents: ["outer"], params: ["clearance", "cornerRadius", "wall"] }, blade: { parents: ["inner"], params: ["wall", "tip", "chamfer", "wallEdits"] }, rim: { parents: ["blade"], params: ["rim"] }, bladeSolid: { parents: ["blade"], params: ["base", "height", "rim", "chamferHeight", "bladeReinforcement", "reinforcementHeight", "reinforcementWidth"] }, art: { parents: ["source"], params: ["detailOffset", "removeOutline", "outlineBand", "stampInset", "mode", "outlineOffset"] }, footprint: { parents: ["outer"], params: ["stampInset", "stampExpansion"] }, cutter: { parents: ["rim", "bladeSolid"], params: ["base", "height", "chamferHeight", "bladeReinforcement", "reinforcementHeight", "reinforcementWidth", "logoEnabled", "logoText", "logoFont", "logoSize", "logoHeight", "logoBaseWidthExtra", "logoBaseWidth", "logoBaseDepth", "logoBaseGap", "logoPosition", "logoOffset", "logoOrientationMode", "logoRotationOffset", "logoRotationAbsolute", "logoBaseRotation", "logoTextRotation", "logoCentralAxis", "mode"] }, stamp: { parents: ["art", "footprint"], params: ["stampBase", "base", "relief", "reliefInverted", "mode"] }, integrated: { parents: ["cutter", "stamp"], params: ["base", "relief", "reliefInverted"] } };
 function _f(a13, e) {
   let t = {};
   for (let [n, i] of Object.entries(vf)) {
@@ -9954,3 +9954,4 @@ three/build/three.module.js:
    * SPDX-License-Identifier: MIT
    *)
 */
+

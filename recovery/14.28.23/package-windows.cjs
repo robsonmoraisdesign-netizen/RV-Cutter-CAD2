@@ -14,5 +14,6 @@ fs.renameSync(path.join(out,'electron.exe'),path.join(out,'RV Cutter CAD.exe'));
 fs.rmSync(path.join(out,'resources/default_app.asar'),{force:true});
 fs.cpSync('app',path.join(out,'resources/app'),{recursive:true});
 fs.writeFileSync(path.join(out,'SOURCE_COMMIT.txt'),(process.env.RV_SOURCE_COMMIT||process.env.GITHUB_SHA||'local')+'\n');
-fs.writeFileSync(path.join(out,'LEIA-ME.txt'),'RV Cutter CAD '+version+' — Windows x64\r\nExtraia TODA a pasta antes de executar RV Cutter CAD.exe.\r\n14.28.24: logo com presets globais 0/45/90/-45 graus e complemento da base alinhado ao mesmo eixo da logo.\r\n');
+fs.writeFileSync(path.join(out,'LEIA-ME.txt'),'RV Cutter CAD '+version+' — Windows x64\r\nExtraia TODA a pasta antes de executar RV Cutter CAD.exe.\r\n14.28.25: revisão de edição de contornos mistos, arraste de pontos e suporte da logo.\r\n');
 console.log(out);
+

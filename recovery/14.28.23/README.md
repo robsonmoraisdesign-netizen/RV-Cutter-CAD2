@@ -1,4 +1,4 @@
-# RV Cutter CAD 14.28.24 — Sketch e logo com alinhamento global
+# RV Cutter CAD 14.28.25 — Sketch e logo com alinhamento global
 
 Base efetiva: pacote Windows 14.28.22. As alterações 14.28.20–22 não estavam nas branches disponíveis do Git. Para preservar a extensão integral da logo, esta pasta recupera o JavaScript distribuído, formata-o como fonte legível e aplica as correções antes de gerar os bundles. Sem segundo editor ou overlay. Os módulos da raiz permanecem para reconciliação futura; a origem deste pacote é esta pasta.
 
@@ -35,3 +35,17 @@ Não se trata da conclusão do ambiente FreeCAD/Onshape. Fontes não instaladas 
 - O deslocamento da placa em relação ao ponto de ancoragem deve ocorrer por um eixo local da placa.
 - O conector deve declarar `axisAlignedFullSpan` e preservar toda a largura útil da placa no eixo transversal.
 - A malha final deve permanecer em um único corpo fechado e sem arestas não-manifold.
+
+
+## 14.28.25 — revisão de edição e suporte da logo
+- Arrastar vértices e mover contornos importados preserva o documento nativo, as entidades e restrições independentes. A prévia não altera o projeto a cada movimento; a confirmação ocorre ao soltar. Cancelamento do ponteiro descarta a prévia.
+- Selecionar um vértice sem movê-lo não cria alterações. Edição e inserção de pontos disponíveis também em Sketch misto.
+- Seleção por proximidade de contornos ampliada para 10 pixels; clique direto no contorno não é capturado por uma entidade próxima.
+- Posicionamento da logo vincula os parâmetros à função do cortador antes da alteração e da restauração.
+- Ligação entre complemento e placa da logo tem sobreposição de 0,05 mm para evitar união apenas por aresta. Presets globais da 14.28.24 preservados.
+- Migração do afastamento antigo corrigida no worker; valores numéricos não finitos rejeitados antes da normalização.
+- Cache geométrico atualizado para a nova versão.
+
+### Validação desta revisão
+Chromium/Linux: regressões de interface, projetos, importação múltipla, apresentação e STL; Delete e desfazer; seleção e arraste real de vértice em Sketch misto; preservação de entidades e confirmação única; rotações globais e independentes de texto/base; apoio de todos os pontos da logo e malhas fechadas com um corpo nos casos testados.
+A execução nativa no Windows não foi validada neste ambiente. O runtime Windows x64 foi preservado do pacote 14.28.24.
