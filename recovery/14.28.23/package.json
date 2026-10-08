@@ -1,3 +1,19 @@
-{"name":"rv-cutter-cad-recovery","version":"14.28.26","private":true,"scripts":{"build":"node build.mjs","test":"node qa-browser-cdp.cjs","start":"electron app"},"dependencies":{"esbuild":"0.28.2","@sparticuz/chromium":"153.0.0","manifold-3d":"3.5.3"},"devDependencies":{"electron":"41.0.0"}}
-
-
+{
+  "name": "rv-cutter-cad-recovery",
+  "version": "14.28.27",
+  "private": true,
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node qa-browser-cdp.cjs",
+    "start": "electron app"
+  },
+  "dependencies": {
+    "esbuild": "0.28.2",
+    "@sparticuz/chromium": "153.0.0",
+    "manifold-3d": "3.5.3",
+    "three": "0.186.0"
+  },
+  "devDependencies": {
+    "electron": "41.0.0"
+  }
+}

@@ -1,3 +1,4 @@
+import {createRollerWorkspace} from './roller-ui.mjs';
 (() => {
   var Sr = (n = "sk") => `${n}-${globalThis.crypto.randomUUID()}`, V0 = /* @__PURE__ */ new Set(["point", "line", "circle", "arc", "bezier"]), H0 = /* @__PURE__ */ new Set(["parallel", "perpendicular", "collinear"]), G0 = /* @__PURE__ */ new Set(["concentric"]), br = (n) => Number.isFinite(n) && Math.abs(n) <= 1e6, gn = (n) => {
     if (!Array.isArray(n) || n.length !== 2 || !n.every(br)) throw Error("Ponto inválido.");
@@ -146,7 +147,7 @@
     }
     return true;
   }
-  var Mr = "14.28.26", yf = ["size", "mirror", "tolerance"], Ua = { source: { parents: [], params: yf }, outer: { parents: ["source"], params: ["outlineOffset", "mode", "stampExpansion"] }, inner: { parents: ["outer"], params: ["clearance", "cornerRadius", "wall"] }, blade: { parents: ["inner"], params: ["wall", "tip", "chamfer", "wallEdits"] }, rim: { parents: ["blade"], params: ["rim"] }, bladeSolid: { parents: ["blade"], params: ["base", "height", "rim", "chamferHeight", "bladeReinforcement", "reinforcementHeight", "reinforcementWidth"] }, art: { parents: ["source"], params: ["detailOffset", "removeOutline", "outlineBand", "stampInset", "mode", "outlineOffset"] }, footprint: { parents: ["outer"], params: ["stampInset", "stampExpansion"] }, cutter: { parents: ["rim", "bladeSolid"], params: ["base", "height", "chamferHeight", "bladeReinforcement", "reinforcementHeight", "reinforcementWidth", "logoEnabled", "logoText", "logoFont", "logoSize", "logoHeight", "logoBaseWidthExtra", "logoBaseWidth", "logoBaseDepth", "logoBaseGap", "logoPosition", "logoOffset", "logoOrientationMode", "logoRotationOffset", "logoRotationAbsolute", "logoBaseRotation", "logoTextRotation", "logoCentralAxis", "mode"] }, stamp: { parents: ["art", "footprint"], params: ["stampBase", "base", "relief", "reliefInverted", "mode"] }, integrated: { parents: ["cutter", "stamp"], params: ["base", "relief", "reliefInverted"] } };
+  var Mr = "14.28.27", yf = ["size", "mirror", "tolerance"], Ua = { source: { parents: [], params: yf }, outer: { parents: ["source"], params: ["outlineOffset", "mode", "stampExpansion"] }, inner: { parents: ["outer"], params: ["clearance", "cornerRadius", "wall"] }, blade: { parents: ["inner"], params: ["wall", "tip", "chamfer", "wallEdits"] }, rim: { parents: ["blade"], params: ["rim"] }, bladeSolid: { parents: ["blade"], params: ["base", "height", "rim", "chamferHeight", "bladeReinforcement", "reinforcementHeight", "reinforcementWidth"] }, art: { parents: ["source"], params: ["detailOffset", "removeOutline", "outlineBand", "stampInset", "mode", "outlineOffset"] }, footprint: { parents: ["outer"], params: ["stampInset", "stampExpansion"] }, cutter: { parents: ["rim", "bladeSolid"], params: ["base", "height", "chamferHeight", "bladeReinforcement", "reinforcementHeight", "reinforcementWidth", "logoEnabled", "logoText", "logoFont", "logoSize", "logoHeight", "logoBaseWidthExtra", "logoBaseWidth", "logoBaseDepth", "logoBaseGap", "logoPosition", "logoOffset", "logoOrientationMode", "logoRotationOffset", "logoRotationAbsolute", "logoBaseRotation", "logoTextRotation", "logoCentralAxis", "mode"] }, stamp: { parents: ["art", "footprint"], params: ["stampBase", "base", "relief", "reliefInverted", "mode"] }, integrated: { parents: ["cutter", "stamp"], params: ["base", "relief", "reliefInverted"] } };
   function vf(n, e) {
     let t = {};
     for (let [i, r] of Object.entries(Ua)) {
@@ -17892,7 +17893,7 @@ rvZ=position.z; rvVertical=1.0-abs(normal.z);`), W.fragmentShader = `varying flo
   function Kg() {
     qr = jd(), ur("saved");
   }
-  window.RVDesktopFlush = mu;
+  window.RVDesktopFlush = async () => {try {return rollerWorkspace?.active ? await rollerWorkspace.save() : await mu();} catch(e) {console.error(e);return false;}};
   var l1;
   function gu() {
     return l1 ??= new Promise((n, e) => {
@@ -17919,7 +17920,7 @@ rvZ=position.z; rvVertical=1.0-abs(normal.z);`), W.fragmentShader = `varying flo
           return;
         }
         let o = s.value;
-        i.push({ id: o.id, name: o.name, updatedAt: o.savedAt, count: o.objects.length, preview: o.objects[0]?.loops?.[0]?.filter((a, l) => l % 8 === 0), previewImage: o.previewImage || null }), s.continue();
+        i.push({ id: o.id, name: o.name, projectType: o.projectType, updatedAt: o.savedAt, count: o.objects.length, preview: o.objects[0]?.loops?.[0]?.filter((a, l) => l % 8 === 0), previewImage: o.previewImage || null }), s.continue();
       }, r.onerror = () => t(r.error);
     });
   }
@@ -18104,11 +18105,12 @@ rvZ=position.z; rvVertical=1.0-abs(normal.z);`), W.fragmentShader = `varying flo
           let a = document.createElement("strong");
           a.textContent = i.name;
           let l = document.createElement("small");
-          l.textContent = `${i.count} Sketch(es) · ${new Date(i.updatedAt).toLocaleString("pt-BR")}`, s.append(o, a, l), s.onclick = async () => {
+          l.textContent = `${i.projectType === "texture-roller" ? "Rolo de textura" : i.count + " Sketch(es)"} · ${new Date(i.updatedAt).toLocaleString("pt-BR")}`, s.append(o, a, l), s.onclick = async () => {
             if (!(ti || hr)) {
               ti = true;
               try {
                 let u = await t0(i.id);
+                if (u?.projectType === "texture-roller") {await openRollerProject(u);return;}
                 pu(u), G.history = [], G.future = [], Ea(), Kg(), zt();
               } catch (u) {
                 He(u.message);
@@ -19241,6 +19243,7 @@ rvZ=position.z; rvVertical=1.0-abs(normal.z);`), W.fragmentShader = `varying flo
       if (n.size > 80 * 1024 * 1024) throw Error("Projeto excede 80 MB.");
       let e = JSON.parse(await n.text());
       if (G.screen === "studio" && !await yu()) return;
+      if(e?.projectType === "texture-roller") {await openRollerProject(e);return;}
       pu(e), G.history = [], G.future = [], Ea(), qr = null, ur("dirty"), zt();
     } catch (n) {
       He(n.message);
@@ -19531,6 +19534,18 @@ rvZ=position.z; rvVertical=1.0-abs(normal.z);`), W.fragmentShader = `varying flo
   async function D1() {
     t1(), _t(), await h1(), await yr();
   }
+  var rollerWorkspace = createRollerWorkspace({
+    saveProject: async p => window.desktop?.catalogSave ? window.desktop.catalogSave(JSON.stringify(p)) : Qg(p),
+    saveFile: Sa,
+    onExit: async () => {G.screen = "home"; await yr();}
+  });
+  async function openRollerProject(record) {
+    if(G.screen === "studio" && !await yu()) return false;
+    c0(); G.screen = "roller"; M("home").hidden = true; M("studio").hidden = true;
+    try {await rollerWorkspace.open(record);return true;} catch(e) {G.screen="home"; M("home").hidden=false;He(e.message);throw e;}
+  }
+  M("newRollerProject").onclick = () => openRollerProject().catch(e=>He(e.message));
+  window.RVRoller = rollerWorkspace;
   window.RVTest = { setStage: mr, enterSketch: Dn, finishSketch: Fi, createNewSketch: m0, convertToCutter: Qd, convertAllToCutters: p0, ensureOutlinerVisible: Zr, enforceBudget: _0, refreshView: tn, showHome: yr, closeCurrentProject: yu, askLeaveProject: l0, destroyCurrentProject: c0, projectSignature: jd, markCurrentSaved: Kg, setParam: v0, savePreset: o0, applyPreset: a0, presetRows: Yr, renameStored: n0, deleteStored: i0, diagnostics: () => ({ theme: Md(), worker: !!yi, workerRestarts: Yg, pending: vi.size, queued: ei.size, batchProtected: Qs.size, running: jr, sessionEpoch: Sn, screen: G.screen, transitioning: ti, navigationBusy: hr, saveState: M("saveState")?.dataset?.state || null, transition: globalThis.__RV_LAST_TRANSITION || null, render: rt?.diagnostics?.() }), cacheStats: Am, meshBytes: du, resetSession: xu, state: G, active: Dt, generate: zt, loadImage: rf, loadSvg: E1, importFiles: I0, project: wa, traceSource: nf, applyProject: pu, commitImport: E0, commitImportBatch: T0, exportData: L0, measurements: Ca, primaryDimension: ma, selectObject: Xr, toggleIsolation: vu, flush: mu, catalog: e0, newProject: Ta, editor: it, viewer: rt, request: Ui, wait: async () => {
     for (let n = 0; n < 1200; n++) {
       if (await new Promise((t) => setTimeout(t, 50)), G.objects.length && !jr && G.objects.filter((t) => t.visible).every((t) => !Hn(t) || t.result && (t.result.released || t.cacheKey === xi(t)))) return G.objects.map((t) => t.result);
@@ -19551,5 +19566,6 @@ three/build/three.module.js:
    * SPDX-License-Identifier: MIT
    *)
 */
+
 
 
