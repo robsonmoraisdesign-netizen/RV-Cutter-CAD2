@@ -1,4 +1,4 @@
-# RV Cutter CAD 14.28.26 — Sketch e logo com alinhamento global
+# RV Cutter CAD 14.28.27 — Rolos de textura
 
 Base efetiva: pacote Windows 14.28.22. As alterações 14.28.20–22 não estavam nas branches disponíveis do Git. Para preservar a extensão integral da logo, esta pasta recupera o JavaScript distribuído, formata-o como fonte legível e aplica as correções antes de gerar os bundles. Sem segundo editor ou overlay. Os módulos da raiz permanecem para reconciliação futura; a origem deste pacote é esta pasta.
 
@@ -55,3 +55,16 @@ A execução nativa no Windows não foi validada neste ambiente. O runtime Windo
 Corrige os recortes laterais na junção do complemento com os cantos arredondados da placa: a ligação agora alcança o trecho reto. A outra extremidade acompanha a fronteira visível do cortador, preenchendo o vão por toda a largura no eixo selecionado. Não aplica convexificação global ao desenho.
 
 Validação: 32 combinações de contorno curvo/côncavo, posição e ângulo; 51.086 pontos de cobertura; união e extrusão conectadas sem erro no kernel. Regressões Chromium/Linux de interface, sketch, logo e STL passaram. O projeto exato da imagem não foi fornecido; foram usados contornos de teste. Execução nativa Windows não validada.
+
+
+
+## Novo produto: rolo de textura (14.28.27)
+Na biblioteca, escolha **Rolo de textura**. Importe PNG/JPG/SVG ou use o exemplo floral. A arte escura vira relevo radial, com repetições ao redor e no comprimento. Ajuste diâmetro do corpo, comprimento, furo, profundidade, margens e espelhamento (ligado por padrão). Há modo de gravação interna e inversão da arte.
+
+O arquivo .rvcad conserva imagem e parâmetros editáveis. Salvar inclui o projeto no histórico; Exportar STL grava a malha em milímetros. A cor e o fundo são apenas visuais. OBJ e 3MF enviados foram usados como referência; esta função cria novos rolos a partir de imagens, não edita diretamente esses arquivos de malha.
+
+A malha é uma superfície radial amostrada, não um sólido B-rep nem uma reconstrução vetorial exata. A resolução normal busca passo de 0,35 mm e a fina 0,18 mm, sujeitos ao orçamento de aproximadamente 350 mil vértices externos. O passo efetivo aparece na tela. Desenhos muito pequenos exigem maior qualidade ou menos repetições. As margens incluem uma transição de até 0,6 mm. A emenda circunferencial tem índices compartilhados; artes sem continuidade podem mostrar uma transição visual na emenda.
+
+Somente o rolo ativo possui worker e malha. Alterações rápidas são agrupadas, resultados antigos são descartados e o fechamento libera geometria, controles e contexto WebGL. Aparência não recalcula geometria. O histórico guarda parâmetros e miniaturas, sem iniciar geração em projetos fechados.
+
+Validação: 8 combinações de malha com duas faces por aresta, orientação consistente, volume positivo, triângulos não degenerados e STL binário; limite de memória para o maior preset; Chromium com importação SVG, edição, salvamento, reabertura por histórico/arquivo, exportação e liberação ao fechar; testes anteriores de Sketch, logo, apresentação e cortadores passaram. A execução nativa no Windows e a impressão física não foram testadas neste ambiente.
