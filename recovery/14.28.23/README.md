@@ -1,4 +1,4 @@
-# RV Cutter CAD 14.28.25 — Sketch e logo com alinhamento global
+# RV Cutter CAD 14.28.26 — Sketch e logo com alinhamento global
 
 Base efetiva: pacote Windows 14.28.22. As alterações 14.28.20–22 não estavam nas branches disponíveis do Git. Para preservar a extensão integral da logo, esta pasta recupera o JavaScript distribuído, formata-o como fonte legível e aplica as correções antes de gerar os bundles. Sem segundo editor ou overlay. Os módulos da raiz permanecem para reconciliação futura; a origem deste pacote é esta pasta.
 
@@ -49,3 +49,9 @@ Não se trata da conclusão do ambiente FreeCAD/Onshape. Fontes não instaladas 
 ### Validação desta revisão
 Chromium/Linux: regressões de interface, projetos, importação múltipla, apresentação e STL; Delete e desfazer; seleção e arraste real de vértice em Sketch misto; preservação de entidades e confirmação única; rotações globais e independentes de texto/base; apoio de todos os pontos da logo e malhas fechadas com um corpo nos casos testados.
 A execução nativa no Windows não foi validada neste ambiente. O runtime Windows x64 foi preservado do pacote 14.28.24.
+
+
+## 14.28.26 — preenchimento contínuo da base da logo
+Corrige os recortes laterais na junção do complemento com os cantos arredondados da placa: a ligação agora alcança o trecho reto. A outra extremidade acompanha a fronteira visível do cortador, preenchendo o vão por toda a largura no eixo selecionado. Não aplica convexificação global ao desenho.
+
+Validação: 32 combinações de contorno curvo/côncavo, posição e ângulo; 51.086 pontos de cobertura; união e extrusão conectadas sem erro no kernel. Regressões Chromium/Linux de interface, sketch, logo e STL passaram. O projeto exato da imagem não foi fornecido; foram usados contornos de teste. Execução nativa Windows não validada.
