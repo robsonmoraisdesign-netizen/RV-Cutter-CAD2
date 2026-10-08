@@ -147,7 +147,7 @@ import {createRollerWorkspace} from './roller-ui.mjs';
     }
     return true;
   }
-  var Mr = "14.28.27", yf = ["size", "mirror", "tolerance"], Ua = { source: { parents: [], params: yf }, outer: { parents: ["source"], params: ["outlineOffset", "mode", "stampExpansion"] }, inner: { parents: ["outer"], params: ["clearance", "cornerRadius", "wall"] }, blade: { parents: ["inner"], params: ["wall", "tip", "chamfer", "wallEdits"] }, rim: { parents: ["blade"], params: ["rim"] }, bladeSolid: { parents: ["blade"], params: ["base", "height", "rim", "chamferHeight", "bladeReinforcement", "reinforcementHeight", "reinforcementWidth"] }, art: { parents: ["source"], params: ["detailOffset", "removeOutline", "outlineBand", "stampInset", "mode", "outlineOffset"] }, footprint: { parents: ["outer"], params: ["stampInset", "stampExpansion"] }, cutter: { parents: ["rim", "bladeSolid"], params: ["base", "height", "chamferHeight", "bladeReinforcement", "reinforcementHeight", "reinforcementWidth", "logoEnabled", "logoText", "logoFont", "logoSize", "logoHeight", "logoBaseWidthExtra", "logoBaseWidth", "logoBaseDepth", "logoBaseGap", "logoPosition", "logoOffset", "logoOrientationMode", "logoRotationOffset", "logoRotationAbsolute", "logoBaseRotation", "logoTextRotation", "logoCentralAxis", "mode"] }, stamp: { parents: ["art", "footprint"], params: ["stampBase", "base", "relief", "reliefInverted", "mode"] }, integrated: { parents: ["cutter", "stamp"], params: ["base", "relief", "reliefInverted"] } };
+  var Mr = "14.28.28", yf = ["size", "mirror", "tolerance"], Ua = { source: { parents: [], params: yf }, outer: { parents: ["source"], params: ["outlineOffset", "mode", "stampExpansion"] }, inner: { parents: ["outer"], params: ["clearance", "cornerRadius", "wall"] }, blade: { parents: ["inner"], params: ["wall", "tip", "chamfer", "wallEdits"] }, rim: { parents: ["blade"], params: ["rim"] }, bladeSolid: { parents: ["blade"], params: ["base", "height", "rim", "chamferHeight", "bladeReinforcement", "reinforcementHeight", "reinforcementWidth"] }, art: { parents: ["source"], params: ["detailOffset", "removeOutline", "outlineBand", "stampInset", "mode", "outlineOffset"] }, footprint: { parents: ["outer"], params: ["stampInset", "stampExpansion"] }, cutter: { parents: ["rim", "bladeSolid"], params: ["base", "height", "chamferHeight", "bladeReinforcement", "reinforcementHeight", "reinforcementWidth", "logoEnabled", "logoText", "logoFont", "logoSize", "logoHeight", "logoBaseWidthExtra", "logoBaseWidth", "logoBaseDepth", "logoBaseGap", "logoPosition", "logoOffset", "logoOrientationMode", "logoRotationOffset", "logoRotationAbsolute", "logoBaseRotation", "logoTextRotation", "logoCentralAxis", "mode"] }, stamp: { parents: ["art", "footprint"], params: ["stampBase", "base", "relief", "reliefInverted", "mode"] }, integrated: { parents: ["cutter", "stamp"], params: ["base", "relief", "reliefInverted"] } };
   function vf(n, e) {
     let t = {};
     for (let [i, r] of Object.entries(Ua)) {
@@ -17893,7 +17893,7 @@ rvZ=position.z; rvVertical=1.0-abs(normal.z);`), W.fragmentShader = `varying flo
   function Kg() {
     qr = jd(), ur("saved");
   }
-  window.RVDesktopFlush = async () => {try {return rollerWorkspace?.active ? await rollerWorkspace.save() : await mu();} catch(e) {console.error(e);return false;}};
+  window.RVDesktopFlush = async () => {try {await presetWriteQueue; return rollerWorkspace?.active ? await rollerWorkspace.save() : await mu();} catch(e) {console.error(e);return false;}};
   var l1;
   function gu() {
     return l1 ??= new Promise((n, e) => {
@@ -17964,33 +17964,65 @@ rvZ=position.z; rvVertical=1.0-abs(normal.z);`), W.fragmentShader = `varying flo
   function qd(n, e = "") {
     return new Promise((t) => {
       let i = M("nameDialog");
-      M("nameDialogTitle").textContent = n, M("entryName").value = e, i.onclose = () => t(i.returnValue === "ok" ? M("entryName").value.trim() : null), i.showModal(), M("entryName").focus();
+      i.returnValue = "", i.oncancel = () => { i.returnValue = "cancel"; }, M("nameDialogTitle").textContent = n, M("entryName").value = e, i.onclose = () => t(i.returnValue === "ok" ? M("entryName").value.trim() : null), i.showModal(), M("entryName").focus();
     });
   }
   var Yr = [];
   async function h1() {
     try {
-      Yr = window.desktop?.presetsList ? await window.desktop.presetsList() : JSON.parse(localStorage.getItem("rv-presets-v1") || "[]");
+      const rows = window.desktop?.presetsList ? await window.desktop.presetsList() : JSON.parse(localStorage.getItem("rv-presets-v1") || "[]");
+      if(!Array.isArray(rows) || rows.some(row=>!row || typeof row.id!=="string" || typeof row.name!=="string" || !row.params))throw Error("Arquivo de presets inválido.");
+      Yr = rows;
     } catch (n) {
       He("Falha ao ler presets: " + n.message);
     }
     r0();
   }
+  var presetWriteQueue = Promise.resolve();
+  function presetName(value) {
+    const name = String(value || "").trim();
+    if (!name) throw Error("Informe um nome para o preset.");
+    if (name.length > 80) throw Error("O nome deve ter até 80 caracteres.");
+    return name;
+  }
   function r0() {
-    let n = M("savedPreset");
+    let n = M("savedPreset"), selected = n.value;
     n.replaceChildren(new Option("Escolha um preset", ""));
     for (let e of Yr) n.add(new Option(e.name, e.id));
+    n.value = Yr.some(e=>e.id===selected) ? selected : "";
+    for(const id of ["renamePreset","updatePreset","applyPreset","deletePreset"]) M(id).disabled = !n.value;
   }
-  async function s0(n) {
-    window.desktop?.presetsSave ? await window.desktop.presetsSave(n) : localStorage.setItem("rv-presets-v1", JSON.stringify(n)), Yr = n, r0();
+  function s0(change, selected) {
+    const operation = presetWriteQueue.catch(()=>{}).then(async () => {
+      const rows = typeof change === "function" ? change(structuredClone(Yr)) : change;
+      if(window.desktop?.presetsSave) {
+        if(await window.desktop.presetsSave(rows) === false) throw Error("Não foi possível gravar os presets.");
+      } else localStorage.setItem("rv-presets-v1", JSON.stringify(rows));
+      Yr = rows;
+      r0();
+      if(selected) {M("savedPreset").value=selected; r0();}
+    });
+    presetWriteQueue = operation;
+    return operation;
   }
-  async function o0(n) {
-    let e = Dt();
-    if (!e) throw Error("Selecione um objeto.");
-    if (n = String(n || "").trim().slice(0, 80), !n) throw Error("Informe um nome.");
-    cr(e);
-    let t = pi(structuredClone(e.params)), i = { id: dr(), name: n, params: t, version: 2, featureType: "cookie-cutter" };
-    return await s0([...Yr, i]), M("savedPreset").value = i.id, i;
+  function presetParams() {
+    const object = Dt();
+    if (!object) throw Error("Selecione um objeto.");
+    cr(object);
+    return pi(structuredClone(object.params));
+  }
+  async function o0(value) {
+    const row = {id:dr(),name:presetName(value),params:presetParams(),version:2,featureType:"cookie-cutter"};
+    await s0(rows=>[...rows,row],row.id);
+    return row;
+  }
+  async function renamePreset(id,value) {
+    const name = presetName(value);
+    await s0(rows=>{const row=rows.find(r=>r.id===id);if(!row)throw Error("Selecione um preset válido.");row.name=name;return rows;},id);
+  }
+  async function updatePreset(id) {
+    const params = presetParams();
+    await s0(rows=>{const row=rows.find(r=>r.id===id);if(!row)throw Error("Selecione um preset válido.");Object.assign(row,{params,version:2,featureType:"cookie-cutter"});return rows;},id);
   }
   function a0(n) {
     let e = Yr.find((r) => r.id === n);
@@ -18013,11 +18045,23 @@ rvZ=position.z; rvVertical=1.0-abs(normal.z);`), W.fragmentShader = `varying flo
       He(e.message);
     }
   };
+  M("savedPreset").onchange = r0;
+  M("renamePreset").onclick = async () => {
+    const row=Yr.find(r=>r.id===M("savedPreset").value);
+    if(!row)return;
+    const name=await qd("Renomear preset",row.name);
+    if(name!==null)try {await renamePreset(row.id,name);He("Preset renomeado e salvo.");}catch(e){He(e.message);}
+  };
+  M("updatePreset").onclick = async () => {
+    const id=M("savedPreset").value,row=Yr.find(r=>r.id===id);
+    if(!row||!confirm("Substituir as configurações de “"+row.name+"” pelas do objeto ativo?"))return;
+    try {await updatePreset(id);He("Configurações do preset atualizadas e salvas.");}catch(e){He(e.message);}
+  };
   M("applyPreset").onclick = () => a0(M("savedPreset").value);
   M("deletePreset").onclick = async () => {
     let n = M("savedPreset").value;
     if (!(!n || !confirm("Excluir este preset?"))) try {
-      await s0(Yr.filter((e) => e.id !== n));
+      await s0(rows=>rows.filter((e) => e.id !== n));
     } catch (e) {
       He(e.message);
     }
@@ -19546,7 +19590,7 @@ rvZ=position.z; rvVertical=1.0-abs(normal.z);`), W.fragmentShader = `varying flo
   }
   M("newRollerProject").onclick = () => openRollerProject().catch(e=>He(e.message));
   window.RVRoller = rollerWorkspace;
-  window.RVTest = { setStage: mr, enterSketch: Dn, finishSketch: Fi, createNewSketch: m0, convertToCutter: Qd, convertAllToCutters: p0, ensureOutlinerVisible: Zr, enforceBudget: _0, refreshView: tn, showHome: yr, closeCurrentProject: yu, askLeaveProject: l0, destroyCurrentProject: c0, projectSignature: jd, markCurrentSaved: Kg, setParam: v0, savePreset: o0, applyPreset: a0, presetRows: Yr, renameStored: n0, deleteStored: i0, diagnostics: () => ({ theme: Md(), worker: !!yi, workerRestarts: Yg, pending: vi.size, queued: ei.size, batchProtected: Qs.size, running: jr, sessionEpoch: Sn, screen: G.screen, transitioning: ti, navigationBusy: hr, saveState: M("saveState")?.dataset?.state || null, transition: globalThis.__RV_LAST_TRANSITION || null, render: rt?.diagnostics?.() }), cacheStats: Am, meshBytes: du, resetSession: xu, state: G, active: Dt, generate: zt, loadImage: rf, loadSvg: E1, importFiles: I0, project: wa, traceSource: nf, applyProject: pu, commitImport: E0, commitImportBatch: T0, exportData: L0, measurements: Ca, primaryDimension: ma, selectObject: Xr, toggleIsolation: vu, flush: mu, catalog: e0, newProject: Ta, editor: it, viewer: rt, request: Ui, wait: async () => {
+  window.RVTest = { setStage: mr, enterSketch: Dn, finishSketch: Fi, createNewSketch: m0, convertToCutter: Qd, convertAllToCutters: p0, ensureOutlinerVisible: Zr, enforceBudget: _0, refreshView: tn, showHome: yr, closeCurrentProject: yu, askLeaveProject: l0, destroyCurrentProject: c0, projectSignature: jd, markCurrentSaved: Kg, setParam: v0, savePreset: o0, applyPreset: a0, presetRows: Yr, listPresets: () => structuredClone(Yr), reloadPresets: h1, renamePreset, updatePreset, renameStored: n0, deleteStored: i0, diagnostics: () => ({ theme: Md(), worker: !!yi, workerRestarts: Yg, pending: vi.size, queued: ei.size, batchProtected: Qs.size, running: jr, sessionEpoch: Sn, screen: G.screen, transitioning: ti, navigationBusy: hr, saveState: M("saveState")?.dataset?.state || null, transition: globalThis.__RV_LAST_TRANSITION || null, render: rt?.diagnostics?.() }), cacheStats: Am, meshBytes: du, resetSession: xu, state: G, active: Dt, generate: zt, loadImage: rf, loadSvg: E1, importFiles: I0, project: wa, traceSource: nf, applyProject: pu, commitImport: E0, commitImportBatch: T0, exportData: L0, measurements: Ca, primaryDimension: ma, selectObject: Xr, toggleIsolation: vu, flush: mu, catalog: e0, newProject: Ta, editor: it, viewer: rt, request: Ui, wait: async () => {
     for (let n = 0; n < 1200; n++) {
       if (await new Promise((t) => setTimeout(t, 50)), G.objects.length && !jr && G.objects.filter((t) => t.visible).every((t) => !Hn(t) || t.result && (t.result.released || t.cacheKey === xi(t)))) return G.objects.map((t) => t.result);
       let e = G.objects.find((t) => t.visible && Vn(t) && t.error);
@@ -19566,6 +19610,7 @@ three/build/three.module.js:
    * SPDX-License-Identifier: MIT
    *)
 */
+
 
 
 
