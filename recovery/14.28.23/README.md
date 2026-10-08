@@ -1,3 +1,13 @@
+# RV Cutter CAD 14.28.28 — revisão dos presets
+
+- Salvar novo preset solicita um nome e mantém os parâmetros do objeto ativo.
+- Renomear altera somente o nome, mantendo ID e configurações.
+- Atualizar preset substitui parâmetros mediante confirmação, sem duplicar a entrada.
+- Cancelar/Escape não confirma o diálogo de nome.
+- Gravações são ordenadas; falhas não alteram a lista em memória. Fechar o programa aguarda gravações pendentes.
+- Testados: interface, cancelamento, falha de gravação, operações simultâneas, recarga da interface e persistência real em disco ao recriar o catálogo.
+- Teste nativo no Windows não realizado neste ambiente.
+
 # RV Cutter CAD 14.28.27 — Rolos de textura
 
 Base efetiva: pacote Windows 14.28.22. As alterações 14.28.20–22 não estavam nas branches disponíveis do Git. Para preservar a extensão integral da logo, esta pasta recupera o JavaScript distribuído, formata-o como fonte legível e aplica as correções antes de gerar os bundles. Sem segundo editor ou overlay. Os módulos da raiz permanecem para reconciliação futura; a origem deste pacote é esta pasta.
@@ -68,3 +78,4 @@ A malha é uma superfície radial amostrada, não um sólido B-rep nem uma recon
 Somente o rolo ativo possui worker e malha. Alterações rápidas são agrupadas, resultados antigos são descartados e o fechamento libera geometria, controles e contexto WebGL. Aparência não recalcula geometria. O histórico guarda parâmetros e miniaturas, sem iniciar geração em projetos fechados.
 
 Validação: 8 combinações de malha com duas faces por aresta, orientação consistente, volume positivo, triângulos não degenerados e STL binário; limite de memória para o maior preset; Chromium com importação SVG, edição, salvamento, reabertura por histórico/arquivo, exportação e liberação ao fechar; testes anteriores de Sketch, logo, apresentação e cortadores passaram. A execução nativa no Windows e a impressão física não foram testadas neste ambiente.
+
