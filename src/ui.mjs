@@ -265,12 +265,14 @@ for(const k of Object.keys(defaults)){
   status('Solte o controle para aplicar a medida.');
  };
  const finish=()=>{
-  if(!editing)return;
+  const wasEditing=editing;
   editing=false;
-  if(borderKeys.includes(k)){setParam(k,+r.value);return;}
+  if(!wasEditing)history(); // keyboard/change events may occur without an earlier input event
+  if(borderKeys.includes(k)||!wasEditing){setParam(k,+r.value);return;}
   sync();generate(targets().map(o=>o.id));autosave();
  };
- r.onchange=finish;r.onblur=finish;
+ r.onchange=finish;
+ r.onblur=()=>{if(editing)finish();};
 }
 document.querySelectorAll('[data-mode-choice]').forEach(b=>b.onclick=()=>{if(!active())return;$('mode').value=b.dataset.modeChoice;$('mode').dispatchEvent(new Event('change',{bubbles:true}));});
 document.querySelectorAll('[data-scope-choice]').forEach(b=>b.onclick=()=>{$('paramScope').value=b.dataset.scopeChoice;document.querySelectorAll('[data-scope-choice]').forEach(x=>x.classList.toggle('active',x===b));});
