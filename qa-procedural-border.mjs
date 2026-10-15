@@ -1,11 +1,19 @@
 import assert from 'node:assert/strict';
-import {proceduralBorder,borderDefaults,borderKeys} from './src/procedural-border.mjs';
+import {proceduralBorder,borderDefaults,borderKeys,validateBorderSettings} from './src/procedural-border.mjs';
 import {kernel,build,defaults,migrateParams,stl} from './src/geometry.mjs';
 import {BoundedCache,graphContext,dependencyKeys} from './src/dependencies.mjs';
 const m=await kernel(),loops=[[[-.5,-.5],[.5,-.5],[.5,.5],[-.5,.5]]];
 const source=loops[0].map(p=>p.map(v=>v*40));
 const base={...defaults,size:40,borderEnabled:true,mode:'separate'};
 assert.equal(migrateParams({}).borderEnabled,false);
+assert.equal(validateBorderSettings({borderCount:32,borderProfile:'wave'}).borderCount,32);
+assert.equal(validateBorderSettings({borderCount:32,borderProfile:'wave'}).borderMargin,borderDefaults.borderMargin);
+for(const patch of [
+ {borderCount:3},{borderCount:23,borderDirection:'alternating'},
+ {borderRadius:-1},{borderDepth:0},{borderCount:Infinity},
+ {borderProfile:'invalid'},{borderDirection:'invalid'},{borderDiameter:NaN},
+ {borderMargin:200}
+])assert.throws(()=>validateBorderSettings(patch),'UI must reject invalid procedural border settings');
 for(const n of [4,12,24,120])for(const direction of ['outward','inward','alternating'])for(const profile of ['circular','elliptical','wave']){
  const p={...base,borderCount:n,borderDirection:direction,borderProfile:profile};
  const b=proceduralBorder(source,p),c=new m.CrossSection([b.points],'EvenOdd');
