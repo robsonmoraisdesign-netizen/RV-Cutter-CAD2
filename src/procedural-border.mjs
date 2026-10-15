@@ -17,6 +17,7 @@ export function validateBorderSettings(params={}){
 
 export function proceduralBorder(source,params={}){
  const p=validateBorderSettings(params);
+ const n=p.borderCount;
  let extent=0;
  for(const point of source){if(point.length!==2||!point.every(Number.isFinite))throw Error('Contorno de referência inválido.');extent=Math.max(extent,Math.hypot(...point));}
  if(!extent)throw Error('Crie ou importe um Sketch antes de configurar a borda.');
