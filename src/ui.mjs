@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import {SVGLoader} from 'three/addons/loaders/SVGLoader.js';
 import {zipSync} from 'fflate';
 import {defaults,migrateParams,simplify,normalize,area,stl,validateProject,splitObjects,combineParts} from './geometry.mjs';
+import {borderKeys,validateBorderSettings} from './procedural-border.mjs';
 import {createViewer,initialColors,componentNames,layout} from './viewer.mjs';
 import {createEditor} from './editor.mjs';
 import {resolveProjectTransition} from './project-transition.mjs';
@@ -19,7 +20,7 @@ const active=()=>state.objects.find(o=>o.id===state.activeId);let viewer,editor,
 const groups=[['Dimensões da peça',null,[['size','Tamanho máximo do desenho',10,300,.5],['outlineOffset','Expansão externa',0,10,.1]]],['Cortador','cutterBase',[['wall','Espessura da lâmina',.3,5,.05],['cornerRadius','Proteção de cantos',0,10,.1],['height','Altura total',4,50,.1],['rim','Largura da base de apoio',1,15,.1],['base','Altura da base do cortador',.5,10,.1]]],['Carimbo','stampBase',[['stampBase','Altura da base do carimbo',.5,15,.1],['stampExpansion','Expansão da base',0,10,.05],['stampInset','Recuo lateral da base',0,5,.05],['clearance','Folga entre cortador e carimbo',.1,5,.05]]],['Relevo','relief',[['detailOffset','Espessura dos detalhes',-.4,1.5,.05],['relief','Altura / profundidade do relevo',.05,20,.1]]]];
 const control=([id,label,min,max,step],role)=>`<div class="range-pair" data-param="${id}"><label for="${id}">${role?`<i class="swatch" data-color="${role}"></i>`:''}${label}</label><input id="${id}" type="number" step="${step}" value="${defaults[id]}" title="Digite livremente. A barra mantém apenas uma faixa prática de arraste."><input id="${id}Range" type="range" min="${min}" max="${max}" step="${step}" value="${Math.min(max,Math.max(min,defaults[id]))}" aria-label="${label}"></div>`;
 $('params').innerHTML=groups.map(([label,role,fields],index)=>`<details class="param-group" ${index<2?'open':''}><summary>${role?`<i class="swatch" data-color="${role}"></i>`:''}${label}</summary><div class="param-content">${fields.map(f=>control(f,role)).join('')}</div></details>`).join('');
-$('params').insertAdjacentHTML('beforeend',`<details class="param-group" open><summary>Borda personalizada</summary><div class="param-content"><label class="check"><input id="borderEnabled" type="checkbox">Ativar borda procedural circular</label><div id="borderFields"><label class="field">Perfil da curva<select id="borderProfile"><option value="circular">Arco circular</option><option value="elliptical">Elíptico radial</option><option value="wave">Onda suave</option></select></label><label class="field">Sentido<select id="borderDirection"><option value="outward">Para fora</option><option value="inward">Para dentro</option><option value="alternating">Alternado</option></select></label>${[['borderCount','Quantidade de curvas',4,120,1],['borderDiameter','Diâmetro entre junções · 0 = automático',0,200,.5],['borderMargin','Margem automática ao redor da arte',0,20,.1],['borderRadius','Raio do arco · 0 = automático',0,30,.1],['borderDepth','Profundidade da elipse / onda',.1,20,.1],['borderRotation','Rotação do padrão (graus)',0,360,1]].map(f=>control(f)).join('')}<p class="hint">Medidas em mm. Diâmetro automático envolve a arte; o manual mede o círculo das junções, não as pontas das curvas. O raio mínimo depende da distância entre junções e do sentido; 0 usa o menor raio seguro. Alternado exige quantidade par. A proteção de cantos fica suspensa para preservar o padrão; a folga e a espessura continuam aplicadas. O relevo mantém a arte do Sketch.</p></div></div></details>`);
+$('params').insertAdjacentHTML('beforeend',`<details class="param-group" open><summary>Borda personalizada</summary><div class="param-content"><label class="check"><input id="borderEnabled" type="checkbox">Ativar borda procedural circular</label><div id="borderFields"><label class="field">Perfil da curva<select id="borderProfile"><option value="circular">Arco circular</option><option value="elliptical">Elíptico radial</option><option value="wave">Onda suave</option></select></label><label class="field">Sentido<select id="borderDirection"><option value="outward">Para fora</option><option value="inward">Para dentro</option><option value="alternating">Alternado</option></select></label>${[['borderCount','Quantidade de curvas',4,120,1],['borderDiameter','Diâmetro entre junções · 0 = automático',0,200,.5],['borderMargin','Margem automática ao redor da arte',0,20,.1],['borderRadius','Raio do arco · 0 = automático',0,30,.1],['borderDepth','Profundidade da elipse / onda',.1,20,.1],['borderRotation','Rotação do padrão (graus)',0,360,1]].map(f=>control(f)).join('')}<p class="hint">Medidas em mm. Diâmetro automático envolve a arte; o manual mede o círculo das junções, não as pontas das curvas. O raio mínimo depende da distância entre junções e do sentido; 0 usa o menor raio seguro. Alternado exige quantidade par. A proteção de cantos fica suspensa para preservar o padrão; a folga e a espessura continuam aplicadas. O relevo mantém a arte do Sketch.</p><button id="applyProceduralBorder" type="button" class="secondary-accent">Aplicar parâmetros e atualizar 3D</button><p id="borderFeedback" class="hint" role="status" aria-live="polite">Alterações em caixas numéricas são aplicadas ao confirmar; este botão força uma nova atualização da função.</p></div></div></details>`);
 const reliefContent=document.querySelector('[data-param="relief"]')?.closest('.param-content');if(reliefContent){const b=document.createElement('button');b.id='invertRelief';b.className='secondary-accent';b.type='button';b.title='Alterna o relevo entre saliente e gravado para dentro';reliefContent.appendChild(b);}
 $('wallControl').innerHTML='<p class="hint">A espessura geral está na seção Cortador, disponível no 2D e no 3D. O ajuste dos detalhes move cada lado do traço pelo valor indicado.</p>';$('chamferParams').innerHTML=control(['tip','Espessura final da ponta',.15,5,.05],'blade')+control(['chamferHeight','Altura vertical do chanfro',.1,20,.1],'blade');$('outlineParams').innerHTML=control(['outlineBand','Faixa externa a remover',.1,5,.05],'relief');$('precisionParams').innerHTML=control(['tolerance','Simplificação (mm)',.005,.3,.005])+control(['threshold','Limiar da imagem',20,245,1]);
 $('colorKeys').innerHTML=Object.entries(componentNames).map(([id,name])=>`<label class="color-key"><input id="color-${id}" type="color" value="${state.view.colors[id]}" aria-label="Cor: ${name}">${name}</label>`).join('');
@@ -196,8 +197,81 @@ $('name').onchange=()=>renameProject($('name').value);
 $('renameProject').onclick=()=>{$('renameValue').value=state.name;$('renameDialog').showModal();$('renameValue').focus();};
 $('cancelRename').onclick=()=>$('renameDialog').close();$('confirmRename').onclick=()=>{renameProject($('renameValue').value);$('renameDialog').close();};
 function targets(){const rows=$('paramScope').value==='all'?state.objects:[active()].filter(Boolean);return rows.filter(hasManufacturingFeature)}
-function setParam(k,value){if(typeof value==='number'&&!Number.isFinite(value))return;const changed=targets();if(!changed.length)return status('Aplique “Converter em cortador” ao Sketch antes de editar parâmetros 3D.');for(const o of changed){syncRuntimeParams(o);o.params[k]=value;if(k==='relief'){if(o.params.reliefInverted)o.params.reliefIn=value;else o.params.reliefOut=value;}if(k==='wall'&&o.params.tip>value)o.params.tip=value;}sync();generate(changed.map(o=>o.id));autosave();}
-for(const k of Object.keys(defaults)){const e=$(k),r=$(k+'Range');if(!e)continue;e.addEventListener('change',()=>{history();setParam(k,e.type==='checkbox'?e.checked:e.tagName==='SELECT'?e.value:+e.value)});if(r){let editing=false;r.oninput=()=>{if(!editing){history();editing=true;}const value=+r.value;e.value=value;const changed=targets();for(const o of changed){o.params[k]=value;if(k==='relief'){if(o.params.reliefInverted)o.params.reliefIn=value;else o.params.reliefOut=value;}if(k==='wall'&&o.params.tip>value)o.params.tip=value;}status('Solte o controle para aplicar a medida.');};r.onchange=()=>{editing=false;sync();generate(targets().map(o=>o.id));autosave()};r.onblur=()=>{if(editing){editing=false;sync();generate(targets().map(o=>o.id));autosave();}};}}
+function borderNotice(message,failed=false){
+ const feedback=$('borderFeedback');
+ if(feedback){feedback.textContent=message;feedback.dataset.error=failed?'true':'false';}
+ status(message);
+}
+function validBorderPatch(rows,patch){
+ try{
+  for(const o of rows)validateBorderSettings({...featureParams(o),...patch});
+  return true;
+ }catch(error){borderNotice(error.message,true);return false;}
+}
+function setParam(k,value){
+ if(typeof value==='number'&&!Number.isFinite(value)){borderNotice('Digite um número válido.',true);sync();return false;}
+ const changed=targets();
+ if(!changed.length){status('Aplique “Converter em cortador” ao Sketch antes de editar parâmetros 3D.');return false;}
+ if(borderKeys.includes(k)&&!validBorderPatch(changed,{[k]:value})){sync();return false;}
+ for(const o of changed){
+  syncRuntimeParams(o);
+  o.params[k]=value;
+  if(k==='relief'){if(o.params.reliefInverted)o.params.reliefIn=value;else o.params.reliefOut=value;}
+  if(k==='wall'&&o.params.tip>value)o.params.tip=value;
+ }
+ sync();generate(changed.map(o=>o.id));autosave();return true;
+}
+function applyProceduralBorder(){
+ const changed=targets();
+ if(!changed.length)return borderNotice('Converta o Sketch em cortador para gerar a borda 3D.',true);
+ const patch={};
+ for(const key of borderKeys){
+  const el=$(key);if(!el)continue;
+  if(el.type==='checkbox')patch[key]=el.checked;
+  else if(el.tagName==='SELECT')patch[key]=el.value;
+  else{
+   if(!el.value.trim()||!Number.isFinite(el.valueAsNumber))return borderNotice('Informe um número válido em '+(document.querySelector('label[for="'+key+'"]')?.textContent||key)+'.',true);
+   patch[key]=el.valueAsNumber;
+  }
+ }
+ if(!validBorderPatch(changed,patch))return;
+ history();
+ for(const o of changed){
+  syncRuntimeParams(o);
+  Object.assign(o.params,patch);
+  // The previous valid 3D remains visible while the new geometry is calculated.
+  o.error=null;
+  o.cacheKey=null;
+ }
+ sync();generate(changed.map(o=>o.id));autosave();
+ borderNotice('Parâmetros aplicados. Reconstruindo a borda 3D…');
+}
+$('applyProceduralBorder').onclick=applyProceduralBorder;
+for(const k of Object.keys(defaults)){
+ const e=$(k),r=$(k+'Range');if(!e)continue;
+ e.addEventListener('change',()=>{history();setParam(k,e.type==='checkbox'?e.checked:e.tagName==='SELECT'?e.value:+e.value)});
+ if(!r)continue;
+ let editing=false;
+ r.oninput=()=>{
+  if(!editing){history();editing=true;}
+  const value=+r.value;e.value=value;
+  if(borderKeys.includes(k)){borderNotice('Solte o controle para reconstruir a borda 3D.');return;}
+  const changed=targets();
+  for(const o of changed){
+   o.params[k]=value;
+   if(k==='relief'){if(o.params.reliefInverted)o.params.reliefIn=value;else o.params.reliefOut=value;}
+   if(k==='wall'&&o.params.tip>value)o.params.tip=value;
+  }
+  status('Solte o controle para aplicar a medida.');
+ };
+ const finish=()=>{
+  if(!editing)return;
+  editing=false;
+  if(borderKeys.includes(k)){setParam(k,+r.value);return;}
+  sync();generate(targets().map(o=>o.id));autosave();
+ };
+ r.onchange=finish;r.onblur=finish;
+}
 document.querySelectorAll('[data-mode-choice]').forEach(b=>b.onclick=()=>{if(!active())return;$('mode').value=b.dataset.modeChoice;$('mode').dispatchEvent(new Event('change',{bubbles:true}));});
 document.querySelectorAll('[data-scope-choice]').forEach(b=>b.onclick=()=>{$('paramScope').value=b.dataset.scopeChoice;document.querySelectorAll('[data-scope-choice]').forEach(x=>x.classList.toggle('active',x===b));});
 for(const [number,range]of [['lineDelta','lineDeltaRange'],['offsetAmount','offsetRange']]){$(number).oninput=()=>$(range).value=$(number).value;$(range).oninput=()=>$(number).value=$(range).value;}
@@ -216,7 +290,7 @@ async function ensure(o){if(!hasManufacturingFeature(o))throw Error('Este Sketch
 function generate(ids=null){if(state.screen!=='studio'||transitioning)return;generation++;const list=(ids==null?state.objects.filter(displayed):ids.map(id=>state.objects.find(o=>o.id===id)).filter(Boolean)).filter(generatable).map(o=>o.id);for(const id of list)if(id)pendingBuildIds.add(id);clearTimeout(timer);$('export').disabled=true;timer=setTimeout(runGeneration,220);}
 function meshBytes(){return state.objects.reduce((n,o)=>n+(o.result?.parts||[]).reduce((a,p)=>a+p.positions.byteLength+p.indices.byteLength+Object.values(p.renderData||{}).reduce((n,r)=>n+r.positions.byteLength+r.normals.byteLength+r.indices.byteLength,0),0),0);}
 async function runGeneration(){if(running||state.screen!=='studio'||transitioning)return;const epoch=sessionEpoch;running=true;$('busy').hidden=false;const started=performance.now();let limited=false,lastRefresh=0;try{while(pendingBuildIds.size&&epoch===sessionEpoch){const id=pendingBuildIds.values().next().value;pendingBuildIds.delete(id);const o=state.objects.find(x=>x.id===id);if(!o||!displayed(o)||!generatable(o))continue;
- $('busy').textContent='Atualizando '+o.name+'…';try{await ensure(o);}catch(e){if(epoch!==sessionEpoch)return;if(e.name==='AbortError'){pendingBuildIds.add(id);continue;}o.result=null;o.cacheKey=null;o.error=e.message;}if(epoch!==sessionEpoch)return;enforceBudget(o.id);if(performance.now()-lastRefresh>180||!pendingBuildIds.size){refreshView();lastRefresh=performance.now();}await new Promise(r=>setTimeout(r,0));}
+ $('busy').textContent='Atualizando '+o.name+'…';try{await ensure(o);}catch(e){if(epoch!==sessionEpoch)return;if(e.name==='AbortError'){pendingBuildIds.add(id);continue;}o.error=e.message; // Keep previous valid mesh visible on a failed rebuild.}if(epoch!==sessionEpoch)return;enforceBudget(o.id);if(performance.now()-lastRefresh>180||!pendingBuildIds.size){refreshView();lastRefresh=performance.now();}await new Promise(r=>setTimeout(r,0));}
  if(epoch===sessionEpoch){refreshView();const errors=state.objects.filter(o=>displayed(o)&&hasManufacturingFeature(o)&&o.error);$('validation').className='validation'+(errors.length?' error':'');$('validation').textContent=errors.length?errors.map(o=>o.name+': '+o.error).join(' · '):'Projeto ativo · '+state.objects.filter(o=>o.result).length+' geometrias disponíveis · '+Math.round(meshBytes()/1048576)+' MB de malhas'+(state.objects.some(o=>o.result?.released)?' · peças em caixas leves: selecione para detalhar':'');if(!errors.length&&!limited){const c=active()?.result?.calculation;status(c?.loadedFromDisk?'Geometria restaurada do cache · sem recálculo.':'Atualizado em '+Math.round(performance.now()-started)+' ms · '+(c?.computed?.length||0)+' etapas calculadas, '+(c?.reused?.length||0)+' reutilizadas.');}autosave();}}
  finally{if(epoch===sessionEpoch){running=false;$('busy').hidden=true;$('export').disabled=!state.objects.some(generatable);if(pendingBuildIds.size)timer=setTimeout(runGeneration,0);}}}
 function releaseMesh(o){if(!o.result||o.result.released)return;o.result={...o.result,released:true,parts:o.result.parts.map(p=>({...p,positions:new Float32Array(),indices:new Uint32Array(),renderData:null}))};o.cacheKey=null;}
