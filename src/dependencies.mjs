@@ -1,14 +1,15 @@
+import {borderKeys} from './procedural-border.mjs';
 // Versioned dependency graph. Only plain data / typed arrays are retained: never WASM handles.
-export const ENGINE_VERSION='14.22.0';
+export const ENGINE_VERSION='14.28-border-1';
 const shape=['size','mirror','tolerance'];
 export const PARAMETRIC_GRAPH={
  source:{parents:[],params:shape},
- outer:{parents:['source'],params:['outlineOffset','mode','stampExpansion']},
+ outer:{parents:['source'],params:[...borderKeys,'outlineOffset','mode','stampExpansion']},
  inner:{parents:['outer'],params:['clearance','cornerRadius','wall']},
  blade:{parents:['inner'],params:['wall','tip','chamfer','wallEdits']},
  rim:{parents:['blade'],params:['rim']},
  bladeSolid:{parents:['blade'],params:['base','height','chamferHeight']},
- art:{parents:['source'],params:['detailOffset','removeOutline','outlineBand','stampInset','mode','outlineOffset']},
+ art:{parents:['outer'],params:['detailOffset','removeOutline','outlineBand','stampInset','mode','outlineOffset']},
  footprint:{parents:['outer'],params:['stampInset','stampExpansion']},
  cutter:{parents:['rim','bladeSolid'],params:['base','height','chamferHeight','mode']},
  stamp:{parents:['art','footprint'],params:['stampBase','base','relief','reliefInverted','mode']},
@@ -16,7 +17,7 @@ export const PARAMETRIC_GRAPH={
 };
 export function dependencyKeys(source,p){const keys={};for(const [node,spec] of Object.entries(PARAMETRIC_GRAPH)){const fields=new Set(spec.params);for(const parent of spec.parents)for(const field of keys[parent].fields)fields.add(field);
  // Separate stamps do not depend on cutter offsets, clearance, or blade thickness.
- if(node==='stamp'&&p.mode!=='integrated'){fields.clear();for(const f of [...shape,'mode','stampInset','stampExpansion','detailOffset','removeOutline','outlineBand','stampBase','relief','reliefInverted'])fields.add(f);}
+ if(node==='stamp'&&p.mode!=='integrated'){fields.clear();for(const f of [...shape,...borderKeys,'mode','stampInset','stampExpansion','detailOffset','removeOutline','outlineBand','stampBase','relief','reliefInverted'])fields.add(f);}
  keys[node]={fields:[...fields].sort()};keys[node].key=ENGINE_VERSION+':'+source+':'+node+':'+JSON.stringify(keys[node].fields.map(k=>[k,p[k]]));}return keys;}
 export function dataBytes(x){if(ArrayBuffer.isView(x))return x.byteLength;if(x instanceof ArrayBuffer)return x.byteLength;if(typeof x==='string')return x.length*2;if(typeof x==='number')return 8;if(!x||typeof x!=='object')return 4;let n=48;for(const v of Object.values(x))n+=dataBytes(v)+8;return n;}
 export class BoundedCache{
@@ -35,3 +36,4 @@ export class SolidCache{
  set(key,solid){let bytes;try{const mesh=solid.getMesh();bytes=(mesh.vertProperties.byteLength+mesh.triVerts.byteLength)*6;}catch(e){solid.delete();throw e;}if(bytes>this.limit){solid.delete();return;}const old=this.entries.get(key);if(old){old.solid.delete();this.bytes-=old.bytes;this.entries.delete(key);}while(this.entries.size&&(this.bytes+bytes>this.limit||this.entries.size>=4)){const [k,e]=this.entries.entries().next().value;e.solid.delete();this.bytes-=e.bytes;this.entries.delete(k);}this.entries.set(key,{solid,bytes});this.bytes+=bytes;}
  clear(){for(const e of this.entries.values())e.solid.delete();this.entries.clear();this.bytes=0;}
 }
+

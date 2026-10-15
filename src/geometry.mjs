@@ -1,7 +1,8 @@
+import {borderDefaults,proceduralBorder} from './procedural-border.mjs';
 import {validateSketch} from './sketch/model.mjs';
 import Module from 'manifold-3d';
 export async function kernel(options={}){const m=await Module(options);m.setup();return m;}
-export const defaults={size:75,wall:0.8,height:12.5,rim:4,base:2.5,relief:4.5,reliefInverted:false,reliefOut:4.5,reliefIn:1,clearance:0.9,detailOffset:0,outlineOffset:0,mode:'integrated',mirror:false,threshold:160,tolerance:0.04,stampBase:2.5,stampInset:0,stampExpansion:0,removeOutline:false,outlineBand:0.8,chamfer:false,tip:0.4,chamferHeight:2,wallEdits:[],cornerRadius:2};
+export const defaults={...borderDefaults,size:75,wall:0.8,height:12.5,rim:4,base:2.5,relief:4.5,reliefInverted:false,reliefOut:4.5,reliefIn:1,clearance:0.9,detailOffset:0,outlineOffset:0,mode:'integrated',mirror:false,threshold:160,tolerance:0.04,stampBase:2.5,stampInset:0,stampExpansion:0,removeOutline:false,outlineBand:0.8,chamfer:false,tip:0.4,chamferHeight:2,wallEdits:[],cornerRadius:2};
 export function area(p){return p.reduce((a,v,i)=>{const q=p[(i+1)%p.length];return a+v[0]*q[1]-q[0]*v[1]},0)/2;}
 export function simplify(p,eps){if(p.length<5)return p;const seg=(p,a,b)=>{let dx=b[0]-a[0],dy=b[1]-a[1],t=Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/(dx*dx+dy*dy||1)));return Math.hypot(p[0]-a[0]-t*dx,p[1]-a[1]-t*dy)};const rdp=a=>{let d=0,k=0;for(let i=1;i<a.length-1;i++){let v=seg(a[i],a[0],a.at(-1));if(v>d){d=v;k=i}}return d>eps?[...rdp(a.slice(0,k+1)).slice(0,-1),...rdp(a.slice(k))]:[a[0],a.at(-1)];};let k=1,d=0;for(let i=1;i<p.length;i++){const v=Math.hypot(p[i][0]-p[0][0],p[i][1]-p[0][1]);if(v>d){d=v;k=i}}return [...rdp(p.slice(0,k+1)).slice(0,-1),...rdp([...p.slice(k),p[0]]).slice(0,-1)];}
 export function normalize(loops){const all=loops.flat();if(!all.length)throw Error('Nenhum contorno fechado encontrado.');let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;for(const [x,y]of all){minX=Math.min(x,minX);maxX=Math.max(x,maxX);minY=Math.min(y,minY);maxY=Math.max(y,maxY)}const scale=Math.max(maxX-minX,maxY-minY);if(!(scale>0))throw Error('Arte sem dimensão.');return loops.map(p=>p.map(([x,y])=>[(x-(minX+maxX)/2)/scale,(y-(minY+maxY)/2)/scale]));}
@@ -75,12 +76,15 @@ export function build(m,loops,params,ctx=null){const started=performance.now(),p
  const src=memo('source',()=>loops.map(l=>simplify(l,p.tolerance/p.size).map(([x,y])=>[x*p.size*(p.mirror?-1:1),y*p.size])).sort((a,b)=>Math.abs(area(b))-Math.abs(area(a))));
  const silhouette=section=>{const polys=section.toPolygons().sort((a,b)=>Math.abs(area(b))-Math.abs(area(a)));if(!polys.length)throw Error('O recuo eliminou o contorno. Reduza o valor.');return hold(new C([polys[0]],'EvenOdd'));};
  const linkedCutterExpansion=p.mode==='separate'?p.stampExpansion:0;
- let original=hold(new C([src[0]],'EvenOdd')),outer=hold(new C(memo('outer',()=>silhouette(hold(hold(original.offset(p.outlineOffset+linkedCutterExpansion,'Round',2,256)).simplify(.002))).toPolygons()),'EvenOdd'));
+ let original=hold(new C([src[0]],'EvenOdd'));
+ const borderSource=p.borderEnabled?hold(new C([proceduralBorder(src.flat(),p).points],'EvenOdd')):original;
+ if(p.borderEnabled&&hold(original.subtract(borderSource)).area()>1e-5)throw Error('A borda corta a arte. Aumente o diâmetro ou use 0 para ajuste automático.');
+ let outer=hold(new C(memo('outer',()=>silhouette(hold(hold(borderSource.offset(p.outlineOffset+linkedCutterExpansion,'Round',2,256)).simplify(.002))).toPolygons()),'EvenOdd'));
  let bladeSolid,rimOuter,inner,cutter,relief,stamp,bladeProfile=[],reliefOutline=[];
  if(p.mode!=='stamp'&&!cachedCutter){
   const innerPolys=memo('inner',()=>{
   inner=silhouette(hold(outer.offset(p.clearance,'Round',2,256)));
-  if(p.cornerRadius>0){
+  if(p.cornerRadius>0&&!p.borderEnabled){
    const radius=p.cornerRadius+p.wall;
    const rounded=hold(hold(inner.offset(radius,'Round',2,256)).offset(-radius,'Round',2,256));
    inner=silhouette(hold(C.union([inner,rounded])));
@@ -122,11 +126,11 @@ export function build(m,loops,params,ctx=null){const started=performance.now(),p
  if(p.mode!=='cutter'&&!cachedStamp){
   const artPolys=memo('art',()=>{let ink=hold(new C(src,'EvenOdd'));if(p.detailOffset)ink=hold(ink.offset(p.detailOffset,'Round',2,128));
   if(p.removeOutline)ink=hold(ink.intersect(hold(original.offset(-p.outlineBand,'Round',2,256))));
-  const footprint=p.mode==='integrated'?outer:silhouette(hold(original.offset(-p.stampInset,'Round',2,256)));
+  const footprint=p.mode==='integrated'?outer:silhouette(hold(borderSource.offset(-p.stampInset,'Round',2,256)));
   const art=hold(ink.intersect(footprint));if(art.isEmpty())throw Error('Nenhum detalhe restou no carimbo. Reduza a remoção de borda ou o recuo.');return art.toPolygons();});
   reliefOutline=artPolys;
   const art=hold(new C(artPolys,'EvenOdd')),zBase=p.mode==='integrated'?p.base:p.stampBase;
-  const baseFootprint=hold(new C(memo('footprint',()=>{const footprint=p.mode==='integrated'?outer:silhouette(hold(original.offset(-p.stampInset,'Round',2,256)));return (p.mode!=='integrated'&&p.stampExpansion>0?silhouette(hold(original.offset(p.stampExpansion-p.stampInset,'Round',2,256))):footprint).toPolygons();}),'EvenOdd'));
+  const baseFootprint=hold(new C(memo('footprint',()=>{const footprint=p.mode==='integrated'?outer:silhouette(hold(borderSource.offset(-p.stampInset,'Round',2,256)));return (p.mode!=='integrated'&&p.stampExpansion>0?silhouette(hold(borderSource.offset(p.stampExpansion-p.stampInset,'Round',2,256))):footprint).toPolygons();}),'EvenOdd'));
   if(p.reliefInverted){
    // Relevo invertido não cava a base estrutural. A profundidade define uma camada
    // paramétrica acima da base; o desenho é subtraído apenas dessa camada.
@@ -180,3 +184,4 @@ export function stl(part){const n=part.indices.length/3,b=new ArrayBuffer(84+n*5
 export function contains(poly,p){let yes=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const a=poly[i],b=poly[j];if((a[1]>p[1])!==(b[1]>p[1])&&p[0]<(b[0]-a[0])*(p[1]-a[1])/(b[1]-a[1])+a[0])yes=!yes;}return yes;}
 export function splitObjects(loops,minRatio=.015){const ordered=loops.slice().sort((a,b)=>Math.abs(area(b))-Math.abs(area(a))),roots=[];for(const loop of ordered){let root=roots.find(r=>contains(r[0],loop[0]));if(root)root.push(loop);else roots.push([loop]);}const max=Math.max(...roots.map(r=>Math.abs(area(r[0]))));return roots.filter(r=>Math.abs(area(r[0]))>=max*minRatio).slice(0,1000).map(group=>normalize(group));}
 export function combineParts(parts){const n=parts.reduce((s,{part})=>s+part.positions.length/part.stride,0),f=parts.reduce((s,{part})=>s+part.indices.length,0),positions=new Float32Array(n*3),indices=new Uint32Array(f);let v=0,t=0;for(const {part,position=[0,0,0]} of parts){const off=v/3;for(let i=0;i<part.positions.length;i+=part.stride){positions[v++]=part.positions[i]+position[0];positions[v++]=part.positions[i+1]+position[1];positions[v++]=part.positions[i+2]+position[2];}for(const id of part.indices)indices[t++]=id+off;}return {positions,indices,stride:3};}
+
