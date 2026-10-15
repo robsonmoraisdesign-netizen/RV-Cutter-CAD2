@@ -2,7 +2,9 @@
 export const borderDefaults={borderEnabled:false,borderCount:24,borderDiameter:0,borderMargin:2,borderRadius:0,borderDepth:3,borderRotation:0,borderProfile:'circular',borderDirection:'outward'};
 export const borderKeys=Object.keys(borderDefaults);
 
-export function proceduralBorder(source,params={}){
+// Validação compartilhada entre os controles da UI e o motor 3D.
+// Falhas devem impedir a gravação do conjunto de parâmetros inteiro.
+export function validateBorderSettings(params={}){
  const p={...borderDefaults,...params};
  for(const key of ['borderCount','borderDiameter','borderMargin','borderRadius','borderDepth','borderRotation'])if(!Number.isFinite(p[key]))throw Error('Valor inválido em '+key+'.');
  const n=p.borderCount;
@@ -10,6 +12,12 @@ export function proceduralBorder(source,params={}){
  if(!['circular','elliptical','wave'].includes(p.borderProfile)||!['outward','inward','alternating'].includes(p.borderDirection))throw Error('Tipo de borda inválido.');
  if(p.borderDirection==='alternating'&&n%2)throw Error('A borda alternada precisa de uma quantidade par de curvas.');
  if(p.borderDiameter<0||p.borderDiameter>2000||p.borderRadius<0||p.borderRadius>2000||p.borderMargin<0||p.borderMargin>100||p.borderDepth<=0||p.borderDepth>100)throw Error('Medidas da borda fora dos limites: diâmetro/raio 0–2000 mm, margem 0–100 mm e profundidade maior que 0 até 100 mm.');
+ return p;
+}
+
+export function proceduralBorder(source,params={}){
+ const p=validateBorderSettings(params);
+ const n=p.borderCount;
  let extent=0;
  for(const point of source){if(point.length!==2||!point.every(Number.isFinite))throw Error('Contorno de referência inválido.');extent=Math.max(extent,Math.hypot(...point));}
  if(!extent)throw Error('Crie ou importe um Sketch antes de configurar a borda.');

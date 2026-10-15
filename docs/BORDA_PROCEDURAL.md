@@ -23,6 +23,24 @@ pelo fluxo existente. Desativar restaura o comportamento anterior sem alterar o 
 O SVG exportado pelo comando de Sketch continua representando a arte; o STL contém
 a geometria da lâmina personalizada.
 
+
+## Atualização dos controles e reconstrução 3D
+
+A caixa numérica aplica a alteração quando confirmada (Enter ou saída do campo).
+O controle deslizante aplica ao soltar ou alterar seu valor. Para aplicar várias
+medidas digitadas juntas, clique em **Aplicar parâmetros e atualizar 3D**.
+A ação valida o conjunto de parâmetros antes de gravá-lo na Feature do cortador,
+reconstrói o 3D e atualiza a persistência e o histórico do projeto.
+Se um valor estiver fora dos limites, a edição inválida não substitui a
+configuração anterior. Se a operação geométrica falhar, a última malha válida
+continua visível, com o erro exibido no painel de validação.
+
+A implementação definitiva reside em `src/ui.mjs`,
+`src/procedural-border.mjs`, `src/geometry.mjs` e no grafo de dependências:
+o executável deve ser compilado a partir do mesmo commit, não receber um
+script de sobreposição separado após o empacotamento. O cache de malhas tem
+versão própria para descartar resultados incompatíveis.
+
 ## Geometria
 
 Para N curvas, α = π/N; R é metade do diâmetro entre junções.
