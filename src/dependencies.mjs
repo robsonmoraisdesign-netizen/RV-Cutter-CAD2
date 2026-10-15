@@ -1,6 +1,6 @@
 import {borderKeys} from './procedural-border.mjs';
 // Versioned dependency graph. Only plain data / typed arrays are retained: never WASM handles.
-export const ENGINE_VERSION='14.28-border-1';
+export const ENGINE_VERSION='14.28-border-2';
 const shape=['size','mirror','tolerance'];
 export const PARAMETRIC_GRAPH={
  source:{parents:[],params:shape},
