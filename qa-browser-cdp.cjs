@@ -103,6 +103,18 @@ async function cdp(url){
   assert(await evalv("!document.querySelector('#three').hidden && !document.querySelector('#editor').hidden"),'Re-entering Sketch must keep the unified graphics workspace');
   await evalv("RVTest.finishSketch(true);true");
 
+  await evalv("(()=>{const e=document.querySelector('#borderEnabled');e.checked=true;e.dispatchEvent(new Event('change'));return true})()");
+  await evalv("RVTest.wait()");
+  assert.equal(await evalv("RVTest.active().params.borderEnabled"),true);
+  assert.equal(await evalv("document.querySelector('#borderFields').hidden"),false);
+  await evalv("(()=>{const e=document.querySelector('#borderCount');e.value='16';e.dispatchEvent(new Event('change'));return true})()");
+  await evalv("RVTest.wait()");
+  assert.equal(await evalv("RVTest.active().params.borderCount"),16);
+  assert.equal(await evalv("RVTest.project().objects[0].features[0].params.borderCount"),16);
+  assert.equal(await evalv("RVTest.active().result.parts.every(p=>p.stats.open===0 && p.stats.nonmanifold===0)"),true);
+  await evalv("document.querySelector('#borderFields').scrollIntoView({block:'center'});true");
+  await sleep(300);
+  const borderShot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync('audit-procedural-border.png',Buffer.from(borderShot.data,'base64'));
   await evalv("document.querySelector('#homeBtn').click();true");await waitFor(()=>evalv("document.querySelector('#leaveProjectDialog').open"));
   await evalv("document.querySelector('#leaveCancel').click();true");
   await waitFor(()=>evalv("!document.querySelector('#leaveProjectDialog').open && !RVTest.diagnostics().navigationBusy"));
@@ -137,3 +149,4 @@ async function cdp(url){
   if(proc.exitCode&&!proc.killed)console.error(stderr.slice(-4000));
  }
 })().catch(e=>{console.error(e);process.exit(1);});
+
