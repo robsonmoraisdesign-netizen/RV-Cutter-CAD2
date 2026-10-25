@@ -150,8 +150,22 @@ async function cdp(url){
   await send('Input.dispatchMouseEvent',{type:'mouseMoved',...pick,button:'none'});
   await send('Input.dispatchMouseEvent',{type:'mousePressed',...pick,button:'left',clickCount:1});
   await send('Input.dispatchMouseEvent',{type:'mouseReleased',...pick,button:'left',clickCount:1});
-  assert(await evalv("(()=>{const p=document.querySelector('#editor path[data-loop]');return !!p&&p.getAttribute('stroke')===RVTheme.color('sketchSelected')})()"),'Imported contour must be selectable six pixels away');
-  console.log('Integration regressions: undo/redo, preset, STL, Sketch switch, import, proximity picking PASS');
+  assert(await evalv("RVTest.editor.sketch.selected().length===1 && RVTest.editor.sketch.selected()[0].startsWith('import-')"),'Imported contour must be selectable six pixels away');
+  assert(await evalv("RVTest.diagnostics().sketch.ready"),'WASM kernel must be initialized');
+  // Actual PNG decoding + vectorization, then native trim through pointer events.
+  await evalv("(async()=>{const c=document.createElement('canvas');c.width=c.height=256;const x=c.getContext('2d');x.fillStyle='white';x.fillRect(0,0,256,256);x.fillStyle='black';x.fillRect(40,40,176,176);await RVTest.loadImage(c.toDataURL(),'Raster Rust QA',false);return true})()");
+  assert(await evalv("RVTest.editor.sketch.native().entities.some(e=>e.imported)"),'Raster outlines must be native editable curves');
+  await evalv("(()=>{const s=RVTest.editor.sketch,n=s.native(),e=n.entities.find(e=>e.type==='line'&&Math.hypot(e.end[0]-e.start[0],e.end[1]-e.start[1])>10);if(!e)throw Error('No raster edge');const m=e.start.map((v,i)=>(v+e.end[i])/2),d=[e.end[0]-e.start[0],e.end[1]-e.start[1]],l=Math.hypot(...d),v=[-d[1]/l*10,d[0]/l*10];window.trimId=e.id;window.trimClick=e.start.map((p,i)=>p*.25+e.end[i]*.75);window.trimOriginal=structuredClone(e);if(!s.create('line',m.map((p,i)=>p-v[i]),m.map((p,i)=>p+v[i])))throw Error('Cannot create cutter');RVTest.editor.setTool('trim');return true})()");
+  const trimClick=await evalv("(()=>{const n=RVTest.editor.sketch.native(),size=RVTest.active().params.size,q=trimClick.map((v,i)=>(v-n.profileCenter[i])/size),p=new DOMPoint(q[0],-q[1]).matrixTransform(document.querySelector('#editor').getScreenCTM());return {x:p.x,y:p.y}})()");
+  await send('Input.dispatchMouseEvent',{type:'mouseMoved',...trimClick,button:'none'});
+  await send('Input.dispatchMouseEvent',{type:'mousePressed',...trimClick,button:'left',clickCount:1});
+  await send('Input.dispatchMouseEvent',{type:'mouseReleased',...trimClick,button:'left',clickCount:1});
+  assert(await evalv("(()=>{const e=RVTest.active().sketch.entities.find(e=>e.id===trimId);return e&&Math.abs(Math.hypot(e.end[0]-e.start[0],e.end[1]-e.start[1])*2-Math.hypot(trimOriginal.end[0]-trimOriginal.start[0],trimOriginal.end[1]-trimOriginal.start[1]))<1e-4})()"),'Pointer trim must remove only half of the imported raster edge');
+  await evalv("document.querySelector('#undo').click();true");
+  assert(await evalv("JSON.stringify(RVTest.active().sketch.entities.find(e=>e.id===trimId))===JSON.stringify(trimOriginal)"),'Undo must restore original raster edge');
+  await evalv("document.querySelector('#redo').click();window.rasterSaved=RVTest.project();RVTest.applyProject(rasterSaved);true");
+  assert(await evalv("RVTest.active().sketch.entities.some(e=>e.id===trimId)"),'Imported editable geometry must persist');
+  console.log('Integration regressions: undo/redo, preset, STL, Sketch switch, raster import and pointer trim PASS');
 
   await evalv("RVTest.finishSketch(true);true");
   await evalv(`RVTest.commitImport([
@@ -272,4 +286,5 @@ async function cdp(url){
   if(proc.exitCode&&!proc.killed)console.error(stderr.slice(-4000));
  }
 })().catch(e=>{console.error(e);process.exit(1);});
+
 

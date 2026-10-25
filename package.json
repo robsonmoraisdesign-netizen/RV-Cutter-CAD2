@@ -1,12 +1,14 @@
 {
   "name": "rv-cutter-cad-source",
-  "version": "14.28.19",
-  "description": "RV Cutter CAD — desktop runtime fix for 3D, Worker/WASM and native export",
+  "version": "14.29.0-rust-preview.1",
+  "description": "RV Cutter CAD \u2014 desktop runtime fix for 3D, Worker/WASM and native export",
   "main": "app/main.cjs",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "node qa13-geometry.mjs && node qa14-bevel.mjs && node qa14-corners.mjs && node qa148-expansion-linked.mjs && node qa148-runtime-worker.mjs && node qa14-export-center.mjs && node qa13-catalog.cjs && node qa1422-inverted-relief-volume.mjs && node qa14282-relief-separated.mjs && node qa14285-cad-display.mjs && node qa-sketch-phase1.mjs && node qa-sketch-integration.mjs && node qa1417-catalog.cjs && node qa-source-version.cjs && node qa-project-transition.mjs && node qa-sketch-constraints.mjs && node qa-sketch-ui-contract.cjs && node qa-sketch-snapping.mjs && node qa-ui-v4-contract.cjs && node qa142811-theme-engine.mjs && node qa142812-sketch-clarity.mjs && node qa-sketch-phase2.mjs && node qa-project-features.mjs && node qa142813-blade-reinforcement.mjs && node qa142813-reinforcement-visual.mjs && node qa142813-color-palettes.mjs && node qa142814-appearance-sketch.mjs && node qa142815-review.mjs && node qa142816-edge-logo.mjs && node qa142817-logo-font-library.mjs && node qa142818-logo-rotation.mjs && node qa142819-sketch-dimensions.mjs",
-    "start": "electron app"
+    "test": "node qa13-geometry.mjs && node qa14-bevel.mjs && node qa14-corners.mjs && node qa148-expansion-linked.mjs && node qa148-runtime-worker.mjs && node qa14-export-center.mjs && node qa13-catalog.cjs && node qa1422-inverted-relief-volume.mjs && node qa14282-relief-separated.mjs && node qa14285-cad-display.mjs && node --import ./qa-rust-init.mjs qa-sketch-phase1.mjs && node --import ./qa-rust-init.mjs qa-sketch-integration.mjs && node qa1417-catalog.cjs && node qa-source-version.cjs && node qa-project-transition.mjs && node --import ./qa-rust-init.mjs qa-sketch-constraints.mjs && node --import ./qa-rust-init.mjs qa-sketch-ui-contract.cjs && node --import ./qa-rust-init.mjs qa-sketch-snapping.mjs && node qa-ui-v4-contract.cjs && node qa142811-theme-engine.mjs && node qa142812-sketch-clarity.mjs && node --import ./qa-rust-init.mjs qa-sketch-phase2.mjs && node qa-project-features.mjs && node qa142813-blade-reinforcement.mjs && node qa142813-reinforcement-visual.mjs && node qa142813-color-palettes.mjs && node qa142814-appearance-sketch.mjs && node --import ./qa-rust-init.mjs qa142815-review.mjs && node qa142816-edge-logo.mjs && node qa142817-logo-font-library.mjs && node qa142818-logo-rotation.mjs && node --import ./qa-rust-init.mjs qa142819-sketch-dimensions.mjs",
+    "start": "electron app",
+    "test:sketch:rust": "node --import ./qa-rust-init.mjs qa-rust-sketch.mjs",
+    "test:sketch": "node --import ./qa-rust-init.mjs qa-sketch-phase1.mjs && node --import ./qa-rust-init.mjs qa-sketch-phase2.mjs && node --import ./qa-rust-init.mjs qa-sketch-integration.mjs && node --import ./qa-rust-init.mjs qa-sketch-constraints.mjs && node --import ./qa-rust-init.mjs qa142819-sketch-dimensions.mjs && npm run test:sketch:rust"
   },
   "keywords": [],
   "author": "",

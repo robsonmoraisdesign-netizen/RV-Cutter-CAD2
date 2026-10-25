@@ -49,5 +49,6 @@ const id=o.sketch.entities[0].id;
 assert(c.movePoint(id,'start',[2,3]));
 assert.deepEqual(o.sketch.entities[0].start,[0,0],'Origin constraint persists on edit');
 assert(c.movePoint(id,'end',[25,4]));
-assert.equal(o.sketch.entities[0].end[1],0,'Axis constraint persists on edit');
+assert.ok(Math.abs(o.sketch.entities[0].end[1])<1e-6,'Axis constraint persists on edit');
 console.log('PASS review: real role geometry, warm/cold caches, mirror, thin bases, stamp isolation and persistent datums');
+

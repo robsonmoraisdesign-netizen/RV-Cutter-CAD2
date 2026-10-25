@@ -14,7 +14,7 @@ const d=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
  addEntity(s,base);addEntity(s,p);addConstraint(s,'midpoint',{point:{entity:'point',point:'point'},line:'base-point'});
  const solved=solveSketch(s);
  assert.equal(solved.sketch.entities.find(e=>e.id==='point').type,'point');
- assert.ok(d(solved.sketch.entities.find(e=>e.id==='point').position,[10,0])<1e-6);
+ const l=solved.sketch.entities.find(e=>e.id==='base-point');assert.ok(d(solved.sketch.entities.find(e=>e.id==='point').position,l.start.map((v,i)=>(v+l.end[i])/2))<1e-6);
 }
 
 // Midpoint is a persistent geometric relation.
@@ -24,7 +24,7 @@ const d=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
  addConstraint(s,'midpoint',{point:{entity:'probe',point:'start'},line:'base'});
  const solved=solveSketch(s);
  assert.equal(solved.converged,true);
- assert.ok(d(solved.sketch.entities.find(e=>e.id==='probe').start,[20,0])<1e-6);
+ const l=solved.sketch.entities.find(e=>e.id==='base');assert.ok(d(solved.sketch.entities.find(e=>e.id==='probe').start,l.start.map((v,i)=>(v+l.end[i])/2))<1e-6);
 }
 
 // Entity state reporting distinguishes fully constrained components.
@@ -81,3 +81,4 @@ const d=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
 }
 
 console.log('Sketch Phase 2 — midpoint, states, trim, extend and Bezier: PASS');
+

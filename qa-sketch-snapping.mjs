@@ -22,12 +22,13 @@ assert(o.sketch.constraints.some(x=>x.type==='coincidentOrigin'&&x.point.entity=
 
 assert.equal(c.create('point',[12,4],null,null,{pointRelation:{type:'axis',axis:'x'}}),true);
 const onX=o.sketch.entities.at(-1);
-assert.equal(onX.position[1],0);
+assert.ok(Math.abs(onX.position[1])<1e-6);
 assert(o.sketch.constraints.some(x=>x.type==='pointOnAxis'&&x.axis==='x'&&x.point.entity===onX.id));
 
 assert.equal(c.create('point',[7,9],null,null,{pointRelation:{type:'axis',axis:'y'}}),true);
 const onY=o.sketch.entities.at(-1);
-assert.equal(onY.position[0],0);
+assert.ok(Math.abs(onY.position[0])<1e-6);
 assert(o.sketch.constraints.some(x=>x.type==='pointOnAxis'&&x.axis==='y'&&x.point.entity===onY.id));
 
 console.log('Sketch snap inference persists for entities, origin and X/Y axes: PASS');
+

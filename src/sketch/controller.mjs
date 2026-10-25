@@ -38,7 +38,8 @@ export function createSketchController(api){
   const s=cloneSketch(native()),existing=new Set(s.entities.map(e=>e.id));edit(s);
   const affected=changedIds===null?null:[...new Set([...changedIds,...s.entities.filter(e=>!existing.has(e.id)).map(e=>e.id)])];
   const r=resolveDocument(s,affected);
-  const geometryChanged=o.params.size!==r.size||JSON.stringify(o.loops)!==JSON.stringify(r.loops);api.history();o.sketch=r.sketch;o.loops=r.loops;o.params.size=r.size;
+  const sameLoops=o.loops.length===r.loops.length&&o.loops.every((loop,i)=>loop.length===r.loops[i].length&&loop.every((p,j)=>p.every((v,k)=>Math.abs(v-r.loops[i][j][k])<1e-10)));
+  const geometryChanged=Math.abs(o.params.size-r.size)>1e-9||!sameLoops;if(!geometryChanged){r.loops=o.loops;r.size=o.params.size;}api.history();o.sketch=r.sketch;o.loops=r.loops;o.params.size=r.size;
   lastSolution=r.solution;selected=selected.filter(id=>s.entities.some(e=>e.id===id));points=points.filter(p=>selected.includes(p.entity));invalidate();
   api.changed({geometryChanged});return true;
  }catch(e){api.status(e.message);return false;}}
@@ -175,7 +176,11 @@ export function createSketchController(api){
   const e=getEntity(s,entity);
   if(s.constraints.some(c=>c.type==='fixed'&&c.entity===entity))throw Error('Entidade fixada: remova Fixar antes de mover.');
   if(e.type==='point')e.position=[...p];
-  else if(e.type==='line')e[which]=[...p];
+  else if(e.type==='line'){
+   const old=e[which];if(!['start','end'].includes(which))throw Error('Extremidade inválida.');
+   if(e.imported){for(const other of s.entities){if(other.id===e.id||!other.imported||other.sourceLoop!==e.sourceLoop||other.type!=='line')continue;for(const end of ['start','end'])if(Math.hypot(other[end][0]-old[0],other[end][1]-old[1])<1e-7){if(s.constraints.some(c=>c.type==='fixed'&&c.entity===other.id))throw Error('Vértice conectado a uma entidade fixada.');other[end]=[...p];}}}
+   e[which]=[...p];
+  }
   else if(e.type==='bezier'){
    const i=which==='start'?0:which==='end'?e.points.length-1:typeof which==='string'&&which.startsWith('control:')?Number(which.slice(8)):-1;
    if(!Number.isInteger(i)||!e.points[i])throw Error('Ponto de controle Bézier inválido.');e.points[i]=[...p];
@@ -239,4 +244,5 @@ export function createSketchController(api){
  }
  return {native,create,constrain,dimension,dimensionSpec,dimensionPreview,movePoint,select,setSelection,selectBox,clearSelection,remove,rules,removeRule,toggleConstruction,trim,extend,convert,describe,states,selectionInfo,reset:()=>{selected=[];points=[];lastSolution=null;invalidate();},selected:()=>selected,points:()=>points};
 }
+
 

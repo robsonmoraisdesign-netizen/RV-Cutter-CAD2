@@ -36,6 +36,17 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
+      - name: Install Rust Sketch toolchain
+        shell: bash
+        run: |
+          rustup toolchain install 1.99.1 --profile minimal
+          rustup default 1.99.1
+          rustup target add wasm32-unknown-unknown
+          cargo install wasm-bindgen-cli --version 0.2.105 --locked
+
+      - name: Test Rust Sketch core
+        run: cargo test --manifest-path rust/sketch-core/Cargo.toml --locked
+
       - name: Build generated runtime
         run: npm run build
 
@@ -74,6 +85,9 @@ jobs:
           for(const f of files)cp.execFileSync(process.execPath,['--check',f],{stdio:'inherit'});
           console.log('Syntax OK:',files.length,'files');
 
+      - name: Rust Sketch integration
+        run: npm run test:sketch:rust
+
       - name: Run QA
         run: npm test
 
@@ -81,7 +95,7 @@ jobs:
         shell: node {0}
         run: |
           const fs=require('fs');
-          for(const p of ['app/ui.js','app/worker.js','app/manifold.wasm']){
+          for(const p of ['app/ui.js','app/worker.js','app/manifold.wasm','app/rv_sketch_core_bg.wasm']){
             if(!fs.existsSync(p)||fs.statSync(p).size===0)throw new Error('Invalid generated artifact: '+p);
           }
 
