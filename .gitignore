@@ -25,3 +25,9 @@ qa-browser/
 .transfer/
 audit-*-results.json
 rose-fixed-*.stl
+
+# Rust Sketch build artifacts
+generated/
+rust/**/target/
+app/rv_sketch_core_bg.wasm
+.cdp-profile/

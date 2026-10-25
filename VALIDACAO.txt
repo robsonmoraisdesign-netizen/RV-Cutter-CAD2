@@ -1,0 +1,22 @@
+RV Cutter CAD 14.29.0-rust-preview.1
+
+APROVADOS
+- Compilação Rust release para WASM e build da aplicação.
+- 2 testes Rust nativos.
+- Fases 1 e 2 do Sketch, integração, restrições, cotas e suíte Rust específica.
+- Snap e persistência de referências: tolerância numérica de 0,000001 mm.
+- Teste CDP completo: interface, PNG/vetorização/aparar por mouse, desfazer/refazer, salvar/reabrir, múltiplos objetos, geração 3D e exportação STL.
+- 31 suítes gerais restantes executadas individualmente; arquivos de teste ausentes foram recuperados e comparações exatas de zero foram ajustadas à tolerância numérica do solver.
+
+FALHA CONHECIDA
+- npm test para em qa13-geometry.mjs: um cenário de cortador regional produz 1 aresta não manifold. O código geometry.mjs desse cenário é igual ao da base, exceto uma linha em branco final. A proteção de exportação bloqueia essa malha. O cenário precisa de uma correção própria no motor 3D; esta versão não é uma aprovação geral de produção.
+
+WINDOWS
+- Runtime oficial Electron 41.0.0 Windows x64, assinatura de formato PE x64 conferida.
+- Pacote montado em Linux. Não foi possível validar a abertura nativa do EXE no Windows neste ambiente.
+- Extraia o ZIP inteiro; execute o EXE dentro da pasta Windows. Não mova apenas o EXE.
+
+ESCOPO
+- Núcleo geométrico do Sketch em Rust/WASM com bibliotecas SolidCraft 0.15.0.
+- Interface, vetorização, controle de documentos e geração 3D continuam em JavaScript/Electron/Manifold.
+- Aparar atua em contornos vetorizados, não diretamente no bitmap. Prolongar atua em linhas.

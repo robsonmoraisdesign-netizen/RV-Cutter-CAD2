@@ -1,3 +1,4 @@
+import {sketchCommand} from './rust-kernel.mjs';
 import {createSketch,cloneSketch,validateSketch} from './model.mjs';
 import {solveSketch} from './solver.mjs';
 import {resolveProfiles,normalizeProfiles} from './profile.mjs';
@@ -5,7 +6,8 @@ export function sketchFromObject(o){
  const s=o.sketch?cloneSketch(o.sketch):createSketch();
  if(!o.sketch)s.legacyLoops=o.loops.map(p=>p.map(([x,y])=>[x*o.params.size,y*o.params.size]));
  s.legacyLoops??=[];s.profileSize??=o.params.size; s.profileCenter??=[0,0];
- return scaleSketch(s,o.params.size/s.profileSize);
+ const scaled=scaleSketch(s,o.params.size/s.profileSize);
+ return scaled.legacyLoops.length?sketchCommand('import',scaled).sketch:scaled;
 }
 export function scaleSketch(s,k){
  if(!(k>0&&Number.isFinite(k)))throw Error('Escala do Sketch inválida.');
@@ -22,3 +24,4 @@ export function resolveDocument(input,changedIds=null){
  s.profileSize=n.size||s.profileSize||75;
  return {sketch:s,loops:n.loops,size:s.profileSize,solution};
 }
+

@@ -23,7 +23,7 @@ export function arc(center,radius,startAngle,endAngle,options={}) {
   return {...c,id:options.id||id('arc'),type:'arc',startAngle,endAngle,ccw:options.ccw!==false};
 }
 export function bezier(points,options={}) {
-  if(!Array.isArray(points)||points.length<2||points.length>16)throw Error('Bézier requer entre 2 e 16 pontos de controle.');
+  if(!Array.isArray(points)||points.length<2||points.length>10)throw Error('Bézier requer entre 2 e 10 pontos de controle.');
   return {id:options.id||id('bezier'),type:'bezier',points:points.map(point),construction:!!options.construction};
 }
 export function getEntity(sketch,entityId) {
@@ -98,7 +98,7 @@ export function validateSketch(s) {
   for (const key of ['entities','constraints','dimensions']) {
     if (!Array.isArray(s[key]) || s[key].length>8000) throw Error('Lista de Sketch inválida ou muito grande.');
   }
-  if(s.entities.length>2000)throw Error('Limite de 2000 entidades por Sketch. Divida em objetos.');
+  if(s.entities.length>8000)throw Error('Limite de 8000 entidades por Sketch. Divida em objetos.');
   if(s.profileCenter!==undefined)point(s.profileCenter);
   if(s.profileSize!==undefined&&(!finite(s.profileSize)||s.profileSize<=0))throw Error('Tamanho do Sketch inválido.');
   if(s.legacyLoops!==undefined){
@@ -114,7 +114,7 @@ export function validateSketch(s) {
     if (!TYPES.has(e.type)) throw Error('Tipo de entidade não suportado.');
     if(e.type==='point')point(e.position);
     else if (e.type==='line') { point(e.start);point(e.end);if(Math.hypot(e.end[0]-e.start[0],e.end[1]-e.start[1])<1e-8)throw Error('Linha sem comprimento.');}
-    else if(e.type==='bezier'){if(!Array.isArray(e.points)||e.points.length<2||e.points.length>16)throw Error('Bézier inválida.');e.points.forEach(point);}
+    else if(e.type==='bezier'){if(!Array.isArray(e.points)||e.points.length<2||e.points.length>10)throw Error('Bézier inválida.');e.points.forEach(point);}
     else {point(e.center);if(!finite(e.radius)||e.radius<=0)throw Error('Raio inválido.');}
     if(e.type==='arc' && ![e.startAngle,e.endAngle].every(finite))throw Error('Ângulo inválido.');
   }
@@ -172,3 +172,4 @@ export function validateSketch(s) {
   }
   return true;
 }
+

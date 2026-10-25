@@ -1,6 +1,6 @@
 {
   "name": "rv-cutter-cad",
-  "version": "14.28.19",
+  "version": "14.29.0-rust-preview.1",
   "description": "Editor paramétrico desktop com Sketch, Features e exportação nativa",
   "main": "main.cjs",
   "author": "RV",
