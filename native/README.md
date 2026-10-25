@@ -12,6 +12,7 @@ Na raiz do repositório:
 ```
 cargo run --manifest-path native/Cargo.toml --release
 cargo run --manifest-path native/Cargo.toml --release -- --demo
+cargo run --manifest-path native/Cargo.toml --release -- --import desenho.png
 cargo test --manifest-path native/Cargo.toml --no-default-features
 ```
 
