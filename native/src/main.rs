@@ -53,11 +53,48 @@ impl eframe::App for App {
         self.cad.raw_input_hook(raw);
     }
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        ui.horizontal_wrapped(|ui|{ui.strong("RV CUTTER · NATIVO");ui.label("Sketch → Parâmetros → Sólido");
- if ui.button("Novo Sketch XY").clicked(){if self.cad.session.active_sketch.is_some(){let _=self.cad.run("sketch.finish",json!({}));}let _=self.cad.run("sketch.create",json!({"plane":"XY"}));solidcraft_ui_egui::dialogs::look_at_sketch(&mut self.cad);self.cad.fit_view();}
- ui.label("Imagem mm");ui.add(egui::DragValue::new(&mut self.size).range(1.0..=10000.0));ui.label("Limiar");ui.add(egui::DragValue::new(&mut self.threshold));
- if ui.add_enabled(self.pending.is_none(),egui::Button::new("Importar contornos")).on_hover_text("PNG/JPG: vetoriza em Rust. SVG: curvas nativas. Projeto RV antigo: somente contornos; suas cotas e operações não são migradas.").clicked(){let(tx,rx)=mpsc::channel();let size=self.size;let threshold=self.threshold;let ctx=ui.ctx().clone();self.pending=Some(rx);std::thread::spawn(move||{let r=match rfd::FileDialog::new().add_filter("Contornos / projeto RV",&["png","jpg","jpeg","svg","rvcad","json"]).pick_file(){Some(p)=>rv_cutter_native::prepare_import(&p,size,threshold),None=>Err("Importação cancelada.".into())};let _=tx.send(r);ctx.request_repaint();});}
- if ui.button("Parâmetros").clicked(){self.cad.start("parameters.change");}ui.label("SolidCraft Rust / B-rep");});
+        ui.horizontal_wrapped(|ui| {
+            ui.strong("RV CUTTER · NATIVO");
+            ui.label("Sketch / Parâmetros / Sólido");
+            if ui.button("Novo Sketch XY").clicked() {
+                let finished = self.cad.session.active_sketch.is_none()
+                    || self.cad.run("sketch.finish", json!({})).is_ok();
+                if finished {
+                    let _ = self.cad.run("sketch.create", json!({"plane":"XY"}));
+                    solidcraft_ui_egui::dialogs::look_at_sketch(&mut self.cad);
+                    self.cad.fit_view();
+                }
+            }
+            ui.label("Imagem mm");
+            ui.add(egui::DragValue::new(&mut self.size).range(1.0..=10000.0));
+            ui.label("Limiar");
+            ui.add(egui::DragValue::new(&mut self.threshold));
+            if ui.add_enabled(self.pending.is_none(), egui::Button::new("Importar contornos"))
+                .on_hover_text("PNG/JPG: vetoriza em Rust. SVG: curvas nativas. Projeto RV antigo: somente contornos; suas cotas e operações não são migradas.")
+                .clicked()
+            {
+                let (tx, rx) = mpsc::channel();
+                let size = self.size;
+                let threshold = self.threshold;
+                let ctx = ui.ctx().clone();
+                self.pending = Some(rx);
+                std::thread::spawn(move || {
+                    let result = match rfd::FileDialog::new()
+                        .add_filter("Contornos / projeto RV", &["png", "jpg", "jpeg", "svg", "rvcad", "json"])
+                        .pick_file()
+                    {
+                        Some(path) => rv_cutter_native::prepare_import(&path, size, threshold),
+                        None => Err("Importação cancelada.".into()),
+                    };
+                    let _ = tx.send(result);
+                    ctx.request_repaint();
+                });
+            }
+            if ui.button("Parâmetros").clicked() {
+                self.cad.start("parameters.change");
+            }
+            ui.label("SolidCraft Rust / B-rep");
+        });
         ui.separator();
         self.cad.ui(ui);
     }
@@ -101,7 +138,12 @@ fn services() -> Services {
     }
 }
 fn main() -> eframe::Result {
-    let demo = std::env::args().any(|s| s == "--demo");
+    let args: Vec<String> = std::env::args().collect();
+    let demo = args.iter().any(|s| s == "--demo");
+    let import_path = args
+        .windows(2)
+        .find(|p| p[0] == "--import")
+        .map(|p| p[1].clone());
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1440.0, 900.0])
@@ -130,7 +172,14 @@ fn main() -> eframe::Result {
                 cad.set_wgpu(rs, 24, 8, rs.msaa_samples);
                 solidcraft_ui_egui::gpu::install_picture_renderer(rs);
             }
-            if !demo {
+            if let Some(path) = &import_path {
+                let imports =
+                    rv_cutter_native::prepare_import(std::path::Path::new(path), 75.0, 180)
+                        .map_err(std::io::Error::other)?;
+                rv_cutter_native::import_into(&mut cad.session, &imports)
+                    .map_err(std::io::Error::other)?;
+                solidcraft_ui_egui::dialogs::look_at_sketch(&mut cad);
+            } else if !demo {
                 let _ = cad.run("sketch.create", json!({"plane":"XY","name":"Sketch RV"}));
                 solidcraft_ui_egui::dialogs::look_at_sketch(&mut cad);
             }
