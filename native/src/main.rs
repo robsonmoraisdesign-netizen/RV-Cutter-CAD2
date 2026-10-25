@@ -33,8 +33,7 @@ impl eframe::App for App {
                         self.cad.ui.tab = "SKETCH".into();
                         self.cad.tool = None;
                         self.cad.dialog = None;
-                        solidcraft_ui_egui::dialogs::look_at_sketch(&mut self.cad);
-                        self.cad.fit_view();
+                        focus_sketch(&mut self.cad);
                         self.cad
                             .set_status("Contornos importados como Sketch nativo editável.", false);
                     }
@@ -61,8 +60,7 @@ impl eframe::App for App {
                     || self.cad.run("sketch.finish", json!({})).is_ok();
                 if finished {
                     let _ = self.cad.run("sketch.create", json!({"plane":"XY"}));
-                    solidcraft_ui_egui::dialogs::look_at_sketch(&mut self.cad);
-                    self.cad.fit_view();
+                    focus_sketch(&mut self.cad);
                 }
             }
             ui.label("Imagem mm");
@@ -104,6 +102,15 @@ impl eframe::App for App {
     fn on_exit(&mut self) {
         solidcraft_ui_egui::recovery_ui::close(&mut self.cad);
     }
+}
+/// Apply the sketch orientation before fitting; fit_view cancels camera animation.
+fn focus_sketch(cad: &mut SolveApp) {
+    cad.ui.tab = "SKETCH".into();
+    solidcraft_ui_egui::dialogs::look_at_sketch(cad);
+    if let Some(animation) = cad.cam_anim.take() {
+        cad.cam = animation.to;
+    }
+    cad.fit_view();
 }
 fn services() -> Services {
     Services {
@@ -178,10 +185,10 @@ fn main() -> eframe::Result {
                         .map_err(std::io::Error::other)?;
                 rv_cutter_native::import_into(&mut cad.session, &imports)
                     .map_err(std::io::Error::other)?;
-                solidcraft_ui_egui::dialogs::look_at_sketch(&mut cad);
+                focus_sketch(&mut cad);
             } else if !demo {
                 let _ = cad.run("sketch.create", json!({"plane":"XY","name":"Sketch RV"}));
-                solidcraft_ui_egui::dialogs::look_at_sketch(&mut cad);
+                focus_sketch(&mut cad);
             }
             cad.fit_view();
             Ok(Box::new(App {
