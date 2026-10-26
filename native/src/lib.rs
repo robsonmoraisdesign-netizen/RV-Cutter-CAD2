@@ -2,6 +2,7 @@
 #![forbid(unsafe_code)]
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 pub mod raster;
+pub mod recipe;
 use serde_json::{Value, json};
 use solidcraft_engine::{Session, Snapshot};
 use std::path::Path;
