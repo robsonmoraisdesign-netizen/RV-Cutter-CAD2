@@ -1,0 +1,78 @@
+{
+  "format": "rv-parametric-recipe-1",
+  "name": "Criar placa parametrica RV",
+  "commands": [
+    {
+      "command": "parameters.add",
+      "params": {
+        "name": "largura_placa",
+        "expression": "60 mm"
+      }
+    },
+    {
+      "command": "parameters.add",
+      "params": {
+        "name": "profundidade_placa",
+        "expression": "40 mm"
+      }
+    },
+    {
+      "command": "parameters.add",
+      "params": {
+        "name": "altura_placa",
+        "expression": "5 mm"
+      }
+    },
+    {
+      "command": "sketch.create",
+      "params": {
+        "plane": "XY",
+        "name": "Placa parametrica RV"
+      }
+    },
+    {
+      "command": "sketch.rectangle.center",
+      "params": {
+        "center": [
+          0,
+          0
+        ],
+        "corner": [
+          30,
+          20
+        ]
+      }
+    },
+    {
+      "command": "sketch.dimension",
+      "params": {
+        "entities": [
+          "l1"
+        ],
+        "value": "largura_placa"
+      }
+    },
+    {
+      "command": "sketch.dimension",
+      "params": {
+        "entities": [
+          "l2"
+        ],
+        "value": "profundidade_placa"
+      }
+    },
+    {
+      "command": "sketch.finish",
+      "params": {}
+    },
+    {
+      "command": "solid.extrude",
+      "params": {
+        "sketch": "Placa parametrica RV",
+        "distance": "altura_placa",
+        "operation": "new",
+        "body_name": "Placa RV"
+      }
+    }
+  ]
+}
