@@ -3,6 +3,8 @@
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 pub mod raster;
 pub mod recipe;
+pub mod cutter;
+pub mod dimensions;
 use serde_json::{Value, json};
 use solidcraft_engine::{Session, Snapshot};
 use std::path::Path;
@@ -102,6 +104,12 @@ pub fn legacy_outlines(bytes: &[u8]) -> Result<Vec<Import>> {
 }
 /// Import is one undo step, and rolls back the whole batch on failure.
 pub fn import_into(s: &mut Session, imports: &[Import]) -> Result<()> {
+    import_into_with_size(s, imports, None)
+}
+
+/// Raster imports can include an editable size dimension in the same undo step.
+/// SVG/legacy imports keep their original native dimensions by default.
+pub fn import_into_with_size(s: &mut Session, imports: &[Import], raster_size_mm: Option<f64>) -> Result<()> {
     if imports.is_empty() {
         return Err("Nada para importar.".into());
     }
@@ -133,6 +141,9 @@ pub fn import_into(s: &mut Session, imports: &[Import]) -> Result<()> {
         if let Some(id) = last {
             s.execute("sketch.edit", &json!({"sketch":id}))
                 .map_err(|e| e.to_string())?;
+            if let Some(size) = raster_size_mm {
+                dimensions::constrain_longest_axis(s, size)?;
+            }
         }
         Ok(())
     })();
