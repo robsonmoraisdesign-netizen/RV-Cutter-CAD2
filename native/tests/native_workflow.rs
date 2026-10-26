@@ -185,3 +185,62 @@ fn automatic_constraints_and_native_recipe_recompute() {
     assert_eq!(io::write_design(&s.doc), before);
     assert!(rv_cutter_native::recipe::apply(&mut s, &json!({"format":"rv-parametric-recipe-1","commands":[{"command":"file.open","params":{}}]})).is_err());
 }
+
+#[test]
+fn raster_over_four_megapixels_downsamples_and_keeps_physical_size() {
+    let mut img = image::RgbaImage::from_pixel(2050, 2050, image::Rgba([255, 255, 255, 255]));
+    for y in 20..2030 {
+        for x in 20..2030 {
+            img.put_pixel(x, y, image::Rgba([0, 0, 0, 255]));
+        }
+    }
+    let mut png = std::io::Cursor::new(Vec::new());
+    img.write_to(&mut png, image::ImageFormat::Png).unwrap();
+    let svg = raster::trace(png.get_ref(), 75.0, 180).unwrap();
+    assert_eq!(svg.matches("<path").count(), 1);
+    assert!(svg.contains("mm"));
+}
+
+#[test]
+fn importing_raster_adds_a_driving_dimension_to_longest_axis() {
+    let svg = raster::polygons_svg(&[
+        vec![[-20.0, -10.0], [20.0, -10.0], [20.0, 10.0], [-20.0, 10.0]],
+    ]).unwrap();
+    let mut s = Session::default();
+    rv_cutter_native::import_into_with_size(
+        &mut s,
+        &[Import { name: "Logo importada".into(), svg }],
+        Some(75.0)
+    ).unwrap();
+    let sk = s.doc.sketch(s.active_sketch.unwrap()).unwrap();
+    assert!(sk.constraints.iter().any(|c| c.kind.is_dimension()));
+    let bounds: Vec<_> = (0..sk.curves.len()).filter_map(|i| sk.shape(i)).collect();
+    assert_eq!(bounds.len(), 4);
+    assert_eq!(s.undo.len(), 1);
+}
+
+#[test]
+fn cookie_cutter_creates_parametric_thin_wall_and_base() {
+    let mut s = Session::default();
+    s.execute("sketch.create", &json!({"plane":"XY","name":"Biscoito"})).unwrap();
+    s.execute("sketch.rectangle.two_point", &json!({"p0":[-20,-15],"p1":[20,15]})).unwrap();
+    let id = s.active_sketch.unwrap();
+    let before = io::write_design(&s.doc);
+    let cfg = rv_cutter_native::cutter::CutterSettings::default();
+    rv_cutter_native::cutter::create(&mut s, &cfg).unwrap();
+    let initial = volume(&s);
+    assert!(initial > 0.0, "Cortador nao criou B-rep fechado");
+    assert_eq!(s.model.state().bodies.len(), 1);
+    s.execute("parameters.change", &json!({
+        "name": format!("rv_lamina_altura_{id}"),
+        "expression": "20 mm"
+    })).unwrap();
+    assert!(volume(&s) > initial);
+    // The manufacturing generator is a single undo operation, distinct from edits.
+    s.execute("edit.undo", &json!({})).unwrap();
+    s.execute("edit.undo", &json!({})).unwrap();
+    assert_eq!(io::write_design(&s.doc), before);
+    assert!(rv_cutter_native::cutter::CutterSettings {
+        blade_height_mm: 3.0, ..cfg
+    }.validate().is_err());
+}
