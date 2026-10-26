@@ -73,3 +73,43 @@ nem deduz automaticamente a intenção de toda operação. Uma sequência com va
 fixos permanece fixa até que seus valores sejam ligados a parâmetros.
 
 Consulte SKETCH-COMANDOS.md para o inventário de ferramentas do motor incluído.
+
+
+## RV CORTADORES — primeira automação de fabricação
+
+Na barra RV, abra **CORTADORES**, crie/importe um Sketch fechado e
+escolha **GERAR CORTADOR**. O gerador usa duas extrusões *Thin* nativas
+SolidCraft: uma lâmina de espessura/altura ajustáveis e uma base mais larga
+e mais baixa unida à lâmina. Os quatro valores são parâmetros nomeados
+`rv_lamina_altura_<id>`, `rv_lamina_espessura_<id>`,
+`rv_base_altura_<id>` e `rv_base_largura_<id>`; alterá-los por
+**Parâmetros** recalcula o B-rep. A criação é uma transação desfeita
+por uma única operação de histórico. Apenas Sketches abertos com até
+800 curvas são aceitos nesta etapa; contornos desconectados, furos e
+geometrias excessivamente complexas podem exigir correção manual.
+
+A ferramenta CORTADORES é um painel do shell RV sobre a interface egui
+SolidCraft, **ainda não** uma aba injetada diretamente no registro
+interno do ribbon da dependência SolidCraft. A integração visual como
+tab nativo independente está planejada sem alterar o design-system original.
+
+### Imagem → Sketch
+
+PNG/JPG podem ter **mais de 4 MP**: o Rust agora decodifica a imagem e
+reduz automaticamente apenas a amostragem geométrica até 4 MP, preservando
+as proporções e o tamanho físico selecionado em **Imagem mm**. O vetor
+gerado é Sketch nativo editável, não uma figura fixada no viewport.
+
+Com **Cota automática** ativa, aplica uma cota dirigível no maior eixo
+horizontal/vertical do contorno importado. Caso o solver rejeite cotas
+naquele contorno, desative a opção para importar sem cota, edite o Sketch
+e aplique dimensões manualmente. A seleção do tamanho físico continua
+funcionando independentemente da cota automática.
+
+Os limites de segurança ainda se aplicam: arquivo comprimido de até
+32 MiB, imagem original com até 64 milhões de pixels, até 16.384 px
+por lado, máximo de 1.000 regiões e 8.000 vértices finais editáveis.
+Um desenho muito ruidoso pode exceder os limites de complexidade
+mesmo com redimensionamento automático.
+
+Migração progressiva: ver `MIGRATION-RV-ROADMAP.md`.
