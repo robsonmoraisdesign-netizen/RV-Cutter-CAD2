@@ -53,3 +53,23 @@ para proteger memória e tempo de processamento.
 
 Licenças e atribuições: `../docs/licenses/`. SolidCraft é MIT OR Apache-2.0;
 consulte também as licenças das dependências distribuídas.
+
+
+## Automação paramétrica RV
+
+A barra RV oferece Restringir automaticamente e Concluir com restrições, usando
+os comandos AutoConstrain nativos. Eles inferem relações próximas e acrescentam
+cotas; revise as relações sugeridas para confirmar a intenção do seu desenho.
+
+Operação paramétrica RV carrega arquivos no formato `rv-parametric-recipe-1`.
+O exemplo `examples/placa-parametrica.json` cria uma placa e registra largura,
+profundidade e altura como expressões. Altere esses parâmetros para recalcular
+o sólido. Cada operação inteira pode ser desfeita; uma falha restaura o documento.
+Os nomes do exemplo precisam estar livres (use um documento novo para repeti-lo).
+
+Uma nova função precisa declarar seus comandos, cotas e dependências. O motor
+recalcula as dependências declaradas, mas não converte código JavaScript antigo
+nem deduz automaticamente a intenção de toda operação. Uma sequência com valores
+fixos permanece fixa até que seus valores sejam ligados a parâmetros.
+
+Consulte SKETCH-COMANDOS.md para o inventário de ferramentas do motor incluído.
