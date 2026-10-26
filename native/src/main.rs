@@ -6,6 +6,7 @@ use solidcraft_ui_egui::{Services, SolveApp};
 use std::sync::mpsc;
 struct App {
     cad: SolveApp,
+    recipe_pending: Option<mpsc::Receiver<rv_cutter_native::Result<serde_json::Value>>>,
     size: f64,
     threshold: u8,
     pending: Option<mpsc::Receiver<rv_cutter_native::Result<Vec<rv_cutter_native::Import>>>>,
@@ -42,6 +43,39 @@ impl eframe::App for App {
             } else {
                 ctx.request_repaint_after(std::time::Duration::from_millis(100));
             }
+        }
+        let recipe_ready = self
+            .recipe_pending
+            .as_ref()
+            .and_then(|rx| match rx.try_recv() {
+                Ok(value) => Some(value),
+                Err(mpsc::TryRecvError::Empty) => None,
+                Err(mpsc::TryRecvError::Disconnected) => {
+                    Some(Err("Falha ao carregar operação.".into()))
+                }
+            });
+        if let Some(result) = recipe_ready {
+            self.recipe_pending = None;
+            match result
+                .and_then(|value| rv_cutter_native::recipe::apply(&mut self.cad.session, &value))
+            {
+                Ok(()) => {
+                    if self.cad.session.active_sketch.is_some() {
+                        focus_sketch(&mut self.cad);
+                    } else {
+                        self.cad.ui.tab = "SOLID".into();
+                        self.cad.fit_view();
+                    }
+                    self.cad.set_status(
+                        "Operação aplicada. Edite as expressões em Parâmetros para recalcular.",
+                        false,
+                    );
+                }
+                Err(error) => self.cad.set_status(error, true),
+            }
+        }
+        if self.recipe_pending.is_some() {
+            ctx.request_repaint_after(std::time::Duration::from_millis(100));
         }
         self.cad.logic(ctx);
         if self.cad.quit_requested {
@@ -90,6 +124,30 @@ impl eframe::App for App {
             }
             if ui.button("Parâmetros").clicked() {
                 self.cad.start("parameters.change");
+            }
+            let editing = self.cad.session.active_sketch.is_some();
+            if ui.add_enabled(editing, egui::Button::new("Restringir automaticamente")).clicked() {
+                let _ = self.cad.run("sketch.auto_constrain", json!({}));
+            }
+            if ui.add_enabled(editing, egui::Button::new("Concluir com restrições")).clicked() {
+                if self.cad.run("sketch.finish_auto_constrain", json!({})).is_ok() {
+                    self.cad.ui.tab = "SOLID".into();
+                }
+            }
+            if ui.add_enabled(self.recipe_pending.is_none() && self.pending.is_none(), egui::Button::new("Operação paramétrica RV")).clicked() {
+                let (tx, rx) = mpsc::channel();
+                self.recipe_pending = Some(rx);
+                let ctx = ui.ctx().clone();
+                std::thread::spawn(move || {
+                    let result = (|| -> rv_cutter_native::Result<serde_json::Value> {
+                        let path = rfd::FileDialog::new().add_filter("Operação RV", &["json"]).pick_file().ok_or("Operação cancelada.")?;
+                        if std::fs::metadata(&path).map_err(|e|e.to_string())?.len() > 1024*1024 { return Err("Operação excede 1 MB.".into()); }
+                        let bytes = std::fs::read(path).map_err(|e|e.to_string())?;
+                        serde_json::from_slice(&bytes).map_err(|e|e.to_string())
+                    })();
+                    let _ = tx.send(result);
+                    ctx.request_repaint();
+                });
             }
             ui.label("SolidCraft Rust / B-rep");
         });
@@ -196,6 +254,7 @@ fn main() -> eframe::Result {
                 size: 75.0,
                 threshold: 180,
                 pending: None,
+                recipe_pending: None,
             }))
         }),
     )
