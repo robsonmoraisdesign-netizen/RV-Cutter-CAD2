@@ -240,7 +240,7 @@ fn cookie_cutter_creates_parametric_thin_wall_and_base() {
     s.execute("edit.undo", &json!({})).unwrap();
     s.execute("edit.undo", &json!({})).unwrap();
     assert_eq!(io::write_design(&s.doc), before);
-    assert!(rv_cutter_native::cutter::CutterSettings {
+    assert!((rv_cutter_native::cutter::CutterSettings {
         blade_height_mm: 3.0, ..cfg
-    }.validate().is_err());
+    }).validate().is_err());
 }
