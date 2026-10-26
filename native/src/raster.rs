@@ -54,19 +54,39 @@ pub fn trace(bytes: &[u8], size: f64, threshold: u8) -> Result<String> {
     if !size.is_finite() || size <= 0.0 || size > 100000.0 {
         return Err("Tamanho inválido.".into());
     }
+    // Decode at the source resolution, then adaptively reduce only the tracing grid.
+    // Large high-resolution images therefore retain their intended dimensions in mm,
+    // without creating millions of individual Sketch entities or unbounded memory use.
+    const MAX_SOURCE_PIXELS: u64 = 64_000_000;
+    const MAX_TRACE_PIXELS: u64 = 4_000_000;
+    let (source_w, source_h) = image::ImageReader::new(std::io::Cursor::new(bytes))
+        .with_guessed_format()
+        .map_err(|e| e.to_string())?
+        .into_dimensions()
+        .map_err(|e| e.to_string())?;
+    if source_w == 0 || source_h == 0 || u64::from(source_w) * u64::from(source_h) > MAX_SOURCE_PIXELS {
+        return Err("Imagem acima de 64 milhões de pixels: reduza a resolução para importar com segurança.".into());
+    }
     let mut reader = image::ImageReader::new(std::io::Cursor::new(bytes))
         .with_guessed_format()
         .map_err(|e| e.to_string())?;
     let mut limits = image::Limits::default();
-    limits.max_image_width = Some(4096);
-    limits.max_image_height = Some(4096);
-    limits.max_alloc = Some(96 * 1024 * 1024);
+    limits.max_image_width = Some(16_384);
+    limits.max_image_height = Some(16_384);
+    limits.max_alloc = Some(384 * 1024 * 1024);
     reader.limits(limits);
-    let image = reader.decode().map_err(|e| e.to_string())?.to_rgba8();
+    let decoded = reader.decode().map_err(|e| e.to_string())?.into_rgba8();
+    let (original_w, original_h) = decoded.dimensions();
+    let image = if u64::from(original_w) * u64::from(original_h) > MAX_TRACE_PIXELS {
+        let factor = (MAX_TRACE_PIXELS as f64
+            / (f64::from(original_w) * f64::from(original_h))).sqrt();
+        let target_w = (f64::from(original_w) * factor).floor().max(1.0) as u32;
+        let target_h = (f64::from(original_h) * factor).floor().max(1.0) as u32;
+        image::imageops::resize(&decoded, target_w, target_h, image::imageops::FilterType::Triangle)
+    } else {
+        decoded
+    };
     let (w, h) = image.dimensions();
-    if u64::from(w) * u64::from(h) > 4000000 {
-        return Err("Reduza para até 4 milhões de pixels.".into());
-    }
     let black = |x: i64, y: i64| {
         if x < 0 || y < 0 || x >= i64::from(w) || y >= i64::from(h) {
             return false;
