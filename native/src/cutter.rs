@@ -55,7 +55,7 @@ pub fn create(session: &mut Session, settings: &CutterSettings) -> Result<()> {
     let sketch_id = session.active_sketch.ok_or(
         "Abra ou importe um Sketch antes de criar um cortador."
     )?;
-    let sketch = session.doc.sketch(sketch_id).ok_or("Sketch nao encontrado.")?;
+    let sketch = session.doc.sketch(sketch_id).map_err(|error| error.to_string())?;
     if sketch.curves.is_empty() {
         return Err("Desenhe ou importe ao menos um contorno no Sketch.".into());
     }
