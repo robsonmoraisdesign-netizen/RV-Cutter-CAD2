@@ -7,9 +7,12 @@ use std::sync::mpsc;
 struct App {
     cad: SolveApp,
     recipe_pending: Option<mpsc::Receiver<rv_cutter_native::Result<serde_json::Value>>>,
+    cutter_tab: bool,
+    cutter: rv_cutter_native::cutter::CutterSettings,
+    auto_size: bool,
     size: f64,
     threshold: u8,
-    pending: Option<mpsc::Receiver<rv_cutter_native::Result<Vec<rv_cutter_native::Import>>>>,
+    pending: Option<mpsc::Receiver<rv_cutter_native::Result<(Vec<rv_cutter_native::Import>, Option<f64>)>>>,
 }
 impl eframe::App for App {
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
@@ -27,8 +30,8 @@ impl eframe::App for App {
         if self.pending.is_some() {
             if let Some(result) = ready {
                 self.pending = None;
-                match result.and_then(|imports| {
-                    rv_cutter_native::import_into(&mut self.cad.session, &imports)
+                match result.and_then(|(imports, size_mm)| {
+                    rv_cutter_native::import_into_with_size(&mut self.cad.session, &imports, size_mm)
                 }) {
                     Ok(()) => {
                         self.cad.ui.tab = "SKETCH".into();
@@ -36,7 +39,7 @@ impl eframe::App for App {
                         self.cad.dialog = None;
                         focus_sketch(&mut self.cad);
                         self.cad
-                            .set_status("Contornos importados como Sketch nativo editável.", false);
+                            .set_status("Sketch editável importado. Dimensão física automática aplicada quando ativada.", false);
                     }
                     Err(e) => self.cad.set_status(e, true),
                 }
@@ -88,6 +91,9 @@ impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         ui.horizontal_wrapped(|ui| {
             ui.strong("RV CUTTER · NATIVO");
+            if ui.selectable_label(self.cutter_tab, "CORTADORES").on_hover_text("Nova área de fabricação RV: gerar cortador paramétrico do Sketch ativo.").clicked() {
+                self.cutter_tab = !self.cutter_tab;
+            }
             ui.label("Sketch / Parâmetros / Sólido");
             if ui.button("Novo Sketch XY").clicked() {
                 let finished = self.cad.session.active_sketch.is_none()
@@ -101,6 +107,8 @@ impl eframe::App for App {
             ui.add(egui::DragValue::new(&mut self.size).range(1.0..=10000.0));
             ui.label("Limiar");
             ui.add(egui::DragValue::new(&mut self.threshold));
+            ui.checkbox(&mut self.auto_size, "Cota automática")
+                .on_hover_text("Imagem PNG/JPG: escala o maior lado para Imagem mm e registra uma cota dirigível no Sketch.");
             if ui.add_enabled(self.pending.is_none(), egui::Button::new("Importar contornos"))
                 .on_hover_text("PNG/JPG: vetoriza em Rust. SVG: curvas nativas. Projeto RV antigo: somente contornos; suas cotas e operações não são migradas.")
                 .clicked()
@@ -108,6 +116,7 @@ impl eframe::App for App {
                 let (tx, rx) = mpsc::channel();
                 let size = self.size;
                 let threshold = self.threshold;
+                let auto_size = self.auto_size;
                 let ctx = ui.ctx().clone();
                 self.pending = Some(rx);
                 std::thread::spawn(move || {
@@ -115,7 +124,12 @@ impl eframe::App for App {
                         .add_filter("Contornos / projeto RV", &["png", "jpg", "jpeg", "svg", "rvcad", "json"])
                         .pick_file()
                     {
-                        Some(path) => rv_cutter_native::prepare_import(&path, size, threshold),
+                        Some(path) => {
+                            let raster = path.extension().and_then(|e| e.to_str()).is_some_and(|e|
+                                ["png", "jpg", "jpeg"].iter().any(|kind| e.eq_ignore_ascii_case(kind)));
+                            rv_cutter_native::prepare_import(&path, size, threshold)
+                                .map(|imports| (imports, if raster && auto_size { Some(size) } else { None }))
+                        },
                         None => Err("Importação cancelada.".into()),
                     };
                     let _ = tx.send(result);
@@ -151,6 +165,38 @@ impl eframe::App for App {
             }
             ui.label("SolidCraft Rust / B-rep");
         });
+        if self.cutter_tab {
+            ui.group(|ui| {
+                ui.horizontal_wrapped(|ui| {
+                    ui.strong("CORTADORES DE BISCOITO");
+                    ui.label("Lâmina (mm)");
+                    ui.add(egui::DragValue::new(&mut self.cutter.blade_height_mm).range(4.0..=100.0).speed(0.1));
+                    ui.label("Espessura (mm)");
+                    ui.add(egui::DragValue::new(&mut self.cutter.blade_thickness_mm).range(0.3..=5.0).speed(0.05));
+                    ui.label("Base altura (mm)");
+                    ui.add(egui::DragValue::new(&mut self.cutter.base_height_mm).range(0.5..=20.0).speed(0.1));
+                    ui.label("Base largura (mm)");
+                    ui.add(egui::DragValue::new(&mut self.cutter.base_width_mm).range(0.5..=20.0).speed(0.1));
+                    let editing = self.cad.session.active_sketch.is_some();
+                    if ui.add_enabled(editing, egui::Button::new("GERAR CORTADOR"))
+                        .on_hover_text("Cria lâmina e reforço paramétricos a partir do Sketch ativo. Mantém histórico, permite desfazer e editar dimensões.")
+                        .clicked()
+                    {
+                        match rv_cutter_native::cutter::create(&mut self.cad.session, &self.cutter) {
+                            Ok(()) => {
+                                self.cad.ui.tab = "SOLID".into();
+                                self.cad.fit_view();
+                                self.cad.set_status("Cortador RV criado com espessura, altura e base paramétricas.", false);
+                            }
+                            Err(e) => self.cad.set_status(e, true),
+                        }
+                    }
+                    if !editing {
+                        ui.weak("Abra ou importe um Sketch para criar o cortador.");
+                    }
+                });
+            });
+        }
         ui.separator();
         self.cad.ui(ui);
     }
@@ -255,6 +301,9 @@ fn main() -> eframe::Result {
                 threshold: 180,
                 pending: None,
                 recipe_pending: None,
+                cutter_tab: false,
+                cutter: rv_cutter_native::cutter::CutterSettings::default(),
+                auto_size: true,
             }))
         }),
     )
