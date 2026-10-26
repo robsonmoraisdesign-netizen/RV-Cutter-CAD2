@@ -10,7 +10,7 @@ pub fn constrain_longest_axis(session: &mut Session, target_mm: f64) -> Result<(
         return Err("Tamanho fisico invalido para cota automatica.".into());
     }
     let id = session.active_sketch.ok_or("Nao existe Sketch ativo.")?;
-    let sketch = session.doc.sketch(id).ok_or("Sketch nao encontrado.")?;
+    let sketch = session.doc.sketch(id).map_err(|error| error.to_string())?;
     let mut left: Option<(f64, String)> = None;
     let mut right: Option<(f64, String)> = None;
     let mut top: Option<(f64, String)> = None;
