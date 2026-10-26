@@ -155,3 +155,33 @@ fn legacy_rv_and_invalid_input() {
     assert!(legacy_outlines(b"{}").is_err());
     assert!(raster::trace(b"invalid", 75.0, 180).is_err());
 }
+
+#[test]
+fn automatic_constraints_and_native_recipe_recompute() {
+    let mut s = Session::default();
+    s.execute("sketch.create", &json!({"plane":"XY"})).unwrap();
+    s.execute(
+        "sketch.line",
+        &json!({"points":[[0,0],[40,0.004],[40.003,30],[0,30.002]],"closed":true}),
+    )
+    .unwrap();
+    let result = s.execute("sketch.auto_constrain", &json!({})).unwrap();
+    assert_eq!(result["dof"], 0);
+    let recipe = serde_json::from_str(include_str!("../examples/placa-parametrica.json")).unwrap();
+    let undo = s.undo.len();
+    rv_cutter_native::recipe::apply(&mut s, &recipe).unwrap();
+    assert_eq!(s.undo.len(), undo + 1);
+    near(volume(&s), 12000.0);
+    s.execute(
+        "parameters.change",
+        &json!({"name":"largura_placa","expression":"80 mm"}),
+    )
+    .unwrap();
+    near(volume(&s), 16000.0);
+    let before = io::write_design(&s.doc);
+    let mut failed = recipe.clone();
+    failed["commands"][0]["params"]["name"] = json!("parametro_novo");
+    assert!(rv_cutter_native::recipe::apply(&mut s, &failed).is_err());
+    assert_eq!(io::write_design(&s.doc), before);
+    assert!(rv_cutter_native::recipe::apply(&mut s, &json!({"format":"rv-parametric-recipe-1","commands":[{"command":"file.open","params":{}}]})).is_err());
+}
