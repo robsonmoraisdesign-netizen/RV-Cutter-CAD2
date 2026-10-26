@@ -2,7 +2,7 @@ name: RV Native Rust Windows
 on:
   workflow_dispatch:
   push:
-    branches: [feature/native-rust-cad, feature/native-rust-sketch-preview]
+    branches: [feature/native-rust-cad, feature/native-rust-sketch-preview, feature/rv-native-cookie-cutter-workspace]
     paths: ['native/**', '.github/workflows/native-rust-cad.yml']
   pull_request:
     paths: ['native/**', '.github/workflows/native-rust-cad.yml']
