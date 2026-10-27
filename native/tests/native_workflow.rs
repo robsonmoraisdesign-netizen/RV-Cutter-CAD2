@@ -283,7 +283,7 @@ fn proportional_import_rebuilds_cutter_and_survives_reopen() {
     let id = s.active_sketch.unwrap();
     let lengths = |s: &Session| -> Vec<f64> {
         let state = s.model.state();
-        let sk = state.sketch(id).unwrap();
+        let sk = &state.sketch(id).unwrap().sketch;
         (0..sk.curves.len())
             .filter_map(|i| match sk.shape(i)? {
                 Shape::Line { a, b } => Some(a.dist(b)),
