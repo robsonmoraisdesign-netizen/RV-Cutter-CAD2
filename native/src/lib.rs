@@ -1,10 +1,10 @@
 //! Native RV document, Sketch and B-rep integration. No JavaScript runtime.
 #![forbid(unsafe_code)]
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-pub mod raster;
-pub mod recipe;
 pub mod cutter;
 pub mod dimensions;
+pub mod raster;
+pub mod recipe;
 use serde_json::{Value, json};
 use solidcraft_engine::{Session, Snapshot};
 use std::path::Path;
@@ -15,6 +15,20 @@ pub struct Import {
     pub svg: String,
 }
 pub fn prepare_import(path: &Path, size: f64, threshold: u8) -> Result<Vec<Import>> {
+    prepare_import_with_options(
+        path,
+        size,
+        raster::TraceOptions {
+            threshold,
+            ..Default::default()
+        },
+    )
+}
+pub fn prepare_import_with_options(
+    path: &Path,
+    size: f64,
+    options: raster::TraceOptions,
+) -> Result<Vec<Import>> {
     if std::fs::metadata(path).map_err(|e| e.to_string())?.len() > 32 * 1024 * 1024 {
         return Err("Arquivo excede 32 MB.".into());
     }
@@ -37,7 +51,7 @@ pub fn prepare_import(path: &Path, size: f64, threshold: u8) -> Result<Vec<Impor
         }]),
         "png" | "jpg" | "jpeg" => Ok(vec![Import {
             name,
-            svg: raster::trace(&bytes, size, threshold)?,
+            svg: raster::trace_with_options(&bytes, size, options)?,
         }]),
         "rvcad" | "json" => legacy_outlines(&bytes),
         _ => Err("Use PNG, JPG, SVG ou projeto RV .rvcad.".into()),
@@ -109,7 +123,11 @@ pub fn import_into(s: &mut Session, imports: &[Import]) -> Result<()> {
 
 /// Raster imports can include an editable size dimension in the same undo step.
 /// SVG/legacy imports keep their original native dimensions by default.
-pub fn import_into_with_size(s: &mut Session, imports: &[Import], raster_size_mm: Option<f64>) -> Result<()> {
+pub fn import_into_with_size(
+    s: &mut Session,
+    imports: &[Import],
+    raster_size_mm: Option<f64>,
+) -> Result<()> {
     if imports.is_empty() {
         return Err("Nada para importar.".into());
     }
