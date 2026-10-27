@@ -51,10 +51,25 @@ impl CutterSettings {
 /// removes the whole manufacturing feature; failed B-rep creation restores the
 /// source Sketch without leaving half-built solids or orphan parameters.
 pub fn create(session: &mut Session, settings: &CutterSettings) -> Result<()> {
-    settings.validate()?;
     let sketch_id = session
         .active_sketch
-        .ok_or("Abra ou importe um Sketch antes de criar um cortador.")?;
+        .ok_or("Escolha um Sketch para criar o cortador.")?;
+    create_from_sketch(session, sketch_id, settings)
+}
+/// Finished sketches can be selected independently of the active editor.
+pub fn create_from_sketch(
+    session: &mut Session,
+    sketch_id: u64,
+    settings: &CutterSettings,
+) -> Result<()> {
+    settings.validate()?;
+    if session
+        .doc
+        .feature(sketch_id)
+        .is_none_or(|feature| feature.suppressed)
+    {
+        return Err("Sketch ausente ou suprimido. Escolha outro contorno.".into());
+    }
     let sketch = session
         .doc
         .sketch(sketch_id)
