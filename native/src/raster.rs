@@ -1,5 +1,6 @@
 //! Rust threshold vectorization: closed pixel boundaries become editable native curves.
 use crate::Result;
+use image::GenericImageView;
 use std::collections::{HashMap, HashSet};
 type P = (u32, u32);
 fn dir(a: P, b: P) -> u8 {
@@ -50,7 +51,41 @@ fn simplify(p: &[[f64; 2]], tol: f64) -> Vec<[f64; 2]> {
         .filter_map(|(p, k)| k.then_some(*p))
         .collect()
 }
+#[derive(Clone, Copy, Debug)]
+pub struct TraceOptions {
+    pub threshold: u8,
+    /// Maximum geometric deviation in tracing-grid pixels.
+    pub simplify_px: f64,
+    /// Remove closed rings smaller than this area; zero preserves all holes.
+    pub min_area_px: f64,
+}
+impl Default for TraceOptions {
+    fn default() -> Self {
+        Self {
+            threshold: 180,
+            simplify_px: 0.35,
+            min_area_px: 0.0,
+        }
+    }
+}
 pub fn trace(bytes: &[u8], size: f64, threshold: u8) -> Result<String> {
+    trace_with_options(
+        bytes,
+        size,
+        TraceOptions {
+            threshold,
+            ..Default::default()
+        },
+    )
+}
+pub fn trace_with_options(bytes: &[u8], size: f64, options: TraceOptions) -> Result<String> {
+    if !options.simplify_px.is_finite()
+        || !(0.1..=3.0).contains(&options.simplify_px)
+        || !options.min_area_px.is_finite()
+        || !(0.0..=1000.0).contains(&options.min_area_px)
+    {
+        return Err("Opções de vetorização inválidas.".into());
+    }
     if !size.is_finite() || size <= 0.0 || size > 100000.0 {
         return Err("Tamanho inválido.".into());
     }
@@ -64,8 +99,14 @@ pub fn trace(bytes: &[u8], size: f64, threshold: u8) -> Result<String> {
         .map_err(|e| e.to_string())?
         .into_dimensions()
         .map_err(|e| e.to_string())?;
-    if source_w == 0 || source_h == 0 || u64::from(source_w) * u64::from(source_h) > MAX_SOURCE_PIXELS {
-        return Err("Imagem acima de 64 milhões de pixels: reduza a resolução para importar com segurança.".into());
+    if source_w == 0
+        || source_h == 0
+        || u64::from(source_w) * u64::from(source_h) > MAX_SOURCE_PIXELS
+    {
+        return Err(
+            "Imagem acima de 64 milhões de pixels: reduza a resolução para importar com segurança."
+                .into(),
+        );
     }
     let mut reader = image::ImageReader::new(std::io::Cursor::new(bytes))
         .with_guessed_format()
@@ -75,28 +116,37 @@ pub fn trace(bytes: &[u8], size: f64, threshold: u8) -> Result<String> {
     limits.max_image_height = Some(16_384);
     limits.max_alloc = Some(384 * 1024 * 1024);
     reader.limits(limits);
-    let decoded = reader.decode().map_err(|e| e.to_string())?.into_rgba8();
+    let decoded = reader.decode().map_err(|e| e.to_string())?;
     let (original_w, original_h) = decoded.dimensions();
+    // Composite BEFORE filtering, so hidden RGB cannot bleed into visible edges.
+    let gray = image::GrayImage::from_fn(original_w, original_h, |x, y| {
+        let p = decoded.get_pixel(x, y).0;
+        let alpha = f64::from(p[3]) / 255.0;
+        let luminance =
+            0.2126 * f64::from(p[0]) + 0.7152 * f64::from(p[1]) + 0.0722 * f64::from(p[2]);
+        image::Luma([(luminance * alpha + 255.0 * (1.0 - alpha)).round() as u8])
+    });
+    drop(decoded);
     let image = if u64::from(original_w) * u64::from(original_h) > MAX_TRACE_PIXELS {
-        let factor = (MAX_TRACE_PIXELS as f64
-            / (f64::from(original_w) * f64::from(original_h))).sqrt();
+        let factor =
+            (MAX_TRACE_PIXELS as f64 / (f64::from(original_w) * f64::from(original_h))).sqrt();
         let target_w = (f64::from(original_w) * factor).floor().max(1.0) as u32;
         let target_h = (f64::from(original_h) * factor).floor().max(1.0) as u32;
-        image::imageops::resize(&decoded, target_w, target_h, image::imageops::FilterType::Triangle)
+        image::imageops::resize(
+            &gray,
+            target_w,
+            target_h,
+            image::imageops::FilterType::Triangle,
+        )
     } else {
-        decoded
+        gray
     };
     let (w, h) = image.dimensions();
     let black = |x: i64, y: i64| {
         if x < 0 || y < 0 || x >= i64::from(w) || y >= i64::from(h) {
             return false;
         }
-        let p = image.get_pixel(x as u32, y as u32).0;
-        let alpha = f64::from(p[3]) / 255.0;
-        let l = (0.2126 * f64::from(p[0]) + 0.7152 * f64::from(p[1]) + 0.0722 * f64::from(p[2]))
-            * alpha
-            + 255.0 * (1.0 - alpha);
-        l < f64::from(threshold)
+        image.get_pixel(x as u32, y as u32).0[0] < options.threshold
     };
     let mut edges = HashSet::new();
     let mut outgoing: HashMap<P, Vec<P>> = HashMap::new();
@@ -153,7 +203,13 @@ pub fn trace(bytes: &[u8], size: f64, threshold: u8) -> Result<String> {
                 return Err("Contorno excede o limite.".into());
             }
         }
-        if ring.len() >= 4 {
+        let twice_area: f64 = ring
+            .iter()
+            .zip(ring.iter().cycle().skip(1))
+            .take(ring.len())
+            .map(|(a, b)| f64::from(a.0) * f64::from(b.1) - f64::from(b.0) * f64::from(a.1))
+            .sum();
+        if ring.len() >= 4 && twice_area.abs() * 0.5 >= options.min_area_px {
             rings.push(ring);
         }
         if rings.len() > 1000 {
@@ -200,7 +256,7 @@ pub fn trace(bytes: &[u8], size: f64, threshold: u8) -> Result<String> {
         if let Some(first) = p.first().copied() {
             p.push(first);
         }
-        let mut simple = simplify(&p, scale * 0.35);
+        let mut simple = simplify(&p, scale * options.simplify_px);
         if simple.first() == simple.last() {
             simple.pop();
         }
