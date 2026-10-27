@@ -27,14 +27,16 @@ fn simplify(p: &[[f64; 2]], tol: f64) -> Vec<[f64; 2]> {
         let dx = p[b][0] - p[a][0];
         let dy = p[b][1] - p[a][1];
         let len = dx * dx + dy * dy;
-        let (mut best, mut at) = (tol, None);
+        let (mut best, mut at) = (tol * tol, None);
         for i in a + 1..b {
             let t = if len > 0.0 {
                 (((p[i][0] - p[a][0]) * dx + (p[i][1] - p[a][1]) * dy) / len).clamp(0.0, 1.0)
             } else {
                 0.0
             };
-            let d = (p[i][0] - p[a][0] - dx * t).hypot(p[i][1] - p[a][1] - dy * t);
+            let ex = p[i][0] - p[a][0] - dx * t;
+            let ey = p[i][1] - p[a][1] - dy * t;
+            let d = ex * ex + ey * ey;
             if d > best {
                 best = d;
                 at = Some(i);
@@ -63,7 +65,7 @@ impl Default for TraceOptions {
     fn default() -> Self {
         Self {
             threshold: 180,
-            simplify_px: 0.35,
+            simplify_px: 1.0,
             min_area_px: 0.0,
         }
     }
@@ -175,7 +177,12 @@ pub fn trace_with_options(bytes: &[u8], size: f64, options: TraceOptions) -> Res
         return Err("Nenhum contorno escuro encontrado.".into());
     }
     let mut rings = Vec::new();
-    while let Some(&(a, b)) = edges.iter().min() {
+    let mut starts: Vec<_> = edges.iter().copied().collect();
+    starts.sort_unstable();
+    for (a, b) in starts {
+        if !edges.contains(&(a, b)) {
+            continue;
+        }
         let mut ring = vec![a];
         let (mut prev, mut p) = (a, b);
         edges.remove(&(a, b));
@@ -247,25 +254,83 @@ pub fn trace_with_options(bytes: &[u8], size: f64, options: TraceOptions) -> Res
     let scale = size / f64::from(extent);
     let cx = f64::from(minx + maxx) / 2.0;
     let cy = f64::from(miny + maxy) / 2.0;
-    let mut polygons = Vec::new();
-    for ring in rings {
-        let mut p: Vec<_> = ring
+    let source: Vec<Vec<[f64; 2]>> = rings
+        .iter()
+        .map(|ring| {
+            ring.iter()
+                .map(|&(x, y)| [(f64::from(x) - cx) * scale, (f64::from(y) - cy) * scale])
+                .collect()
+        })
+        .collect();
+    // Relax only when the requested precision would reject the entire image.
+    // Bound the extra deviation to three tracing pixels; retain every ring.
+    let mut tolerance = options.simplify_px;
+    loop {
+        let polygons: Vec<_> = source
             .iter()
-            .map(|&(x, y)| [(f64::from(x) - cx) * scale, (f64::from(y) - cy) * scale])
+            .map(|ring| simplify_ring(ring, scale * tolerance))
             .collect();
-        if let Some(first) = p.first().copied() {
-            p.push(first);
+        let count: usize = polygons.iter().map(Vec::len).sum();
+        if count <= 8000 {
+            return polygons_svg(&polygons);
         }
-        let mut simple = simplify(&p, scale * options.simplify_px);
-        if simple.first() == simple.last() {
-            simple.pop();
+        if tolerance >= 3.0 {
+            return Err(format!(
+                "Contorno ainda tem {count} vértices após simplificação. Aumente Ruído ou recorte a região desejada."
+            ));
         }
-        if simple.len() > 2 {
-            polygons.push(simple);
+        tolerance = (tolerance * 1.5).min(3.0);
+    }
+}
+
+// Retain extrema so simplification cannot change the selected physical size.
+fn simplify_ring(ring: &[[f64; 2]], tolerance: f64) -> Vec<[f64; 2]> {
+    if ring.len() < 4 {
+        return ring.to_vec();
+    }
+    let mut anchors = vec![0];
+    for axis in 0..2 {
+        if let Some((i, _)) = ring
+            .iter()
+            .enumerate()
+            .min_by(|a, b| a.1[axis].total_cmp(&b.1[axis]))
+        {
+            anchors.push(i);
+        }
+        if let Some((i, _)) = ring
+            .iter()
+            .enumerate()
+            .max_by(|a, b| a.1[axis].total_cmp(&b.1[axis]))
+        {
+            anchors.push(i);
         }
     }
-    polygons_svg(&polygons)
+    anchors.sort_unstable();
+    anchors.dedup();
+    let mut out = Vec::new();
+    for (position, &start) in anchors.iter().enumerate() {
+        let end = anchors.get(position + 1).copied().unwrap_or(ring.len());
+        let mut chain = ring[start..end].to_vec();
+        chain.push(ring[end % ring.len()]);
+        let mut reduced = simplify(&chain, tolerance);
+        reduced.pop();
+        out.extend(reduced);
+    }
+    let area = |points: &[[f64; 2]]| -> f64 {
+        points
+            .iter()
+            .zip(points.iter().cycle().skip(1))
+            .take(points.len())
+            .map(|(a, b)| a[0] * b[1] - b[0] * a[1])
+            .sum()
+    };
+    if out.len() < 3 || area(&out) * area(ring) <= 0.0 {
+        ring.to_vec()
+    } else {
+        out
+    }
 }
+
 pub fn polygons_svg(polygons: &[Vec<[f64; 2]>]) -> Result<String> {
     if polygons.iter().map(Vec::len).sum::<usize>() > 8000 {
         return Err("Limite: 8000 vértices editáveis.".into());
