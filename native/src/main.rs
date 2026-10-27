@@ -1,5 +1,7 @@
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 #![forbid(unsafe_code)]
+mod appearance;
+mod ribbon;
 use serde_json::json;
 use solidcraft_engine::Session;
 use solidcraft_ui_egui::{Services, SolveApp};
@@ -12,7 +14,11 @@ struct App {
     auto_size: bool,
     size: f64,
     threshold: u8,
-    pending: Option<mpsc::Receiver<rv_cutter_native::Result<(Vec<rv_cutter_native::Import>, Option<f64>)>>>,
+    simplify_px: f64,
+    min_area_px: f64,
+    pending: Option<
+        mpsc::Receiver<rv_cutter_native::Result<(Vec<rv_cutter_native::Import>, Option<f64>)>>,
+    >,
 }
 impl eframe::App for App {
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
@@ -31,7 +37,11 @@ impl eframe::App for App {
             if let Some(result) = ready {
                 self.pending = None;
                 match result.and_then(|(imports, size_mm)| {
-                    rv_cutter_native::import_into_with_size(&mut self.cad.session, &imports, size_mm)
+                    rv_cutter_native::import_into_with_size(
+                        &mut self.cad.session,
+                        &imports,
+                        size_mm,
+                    )
                 }) {
                     Ok(()) => {
                         self.cad.ui.tab = "SKETCH".into();
@@ -91,9 +101,6 @@ impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         ui.horizontal_wrapped(|ui| {
             ui.strong("RV CUTTER · NATIVO");
-            if ui.selectable_label(self.cutter_tab, "CORTADORES").on_hover_text("Nova área de fabricação RV: gerar cortador paramétrico do Sketch ativo.").clicked() {
-                self.cutter_tab = !self.cutter_tab;
-            }
             ui.label("Sketch / Parâmetros / Sólido");
             if ui.button("Novo Sketch XY").clicked() {
                 let finished = self.cad.session.active_sketch.is_none()
@@ -108,14 +115,21 @@ impl eframe::App for App {
             ui.label("Limiar");
             ui.add(egui::DragValue::new(&mut self.threshold));
             ui.checkbox(&mut self.auto_size, "Cota automática")
-                .on_hover_text("Imagem PNG/JPG: escala o maior lado para Imagem mm e registra uma cota dirigível no Sketch.");
-            if ui.add_enabled(self.pending.is_none(), egui::Button::new("Importar contornos"))
+                .on_hover_text("Imagem PNG/JPG: escala o maior lado para Imagem mm e registra relações proporcionais. Edite rv_tamanho em Parâmetros; desative para editar livremente. Limite: 256 curvas.");
+            ui.label("Simplificação (px)");
+            ui.add(egui::DragValue::new(&mut self.simplify_px).range(0.1..=3.0).speed(0.05));
+            ui.label("Ruído (px²)");
+            ui.add(egui::DragValue::new(&mut self.min_area_px).range(0.0..=1000.0));
+            let import_requested = ui.ctx().data_mut(|d| d.remove_temp::<bool>(egui::Id::new(ribbon::OPEN_IMPORT))).unwrap_or(false);
+            if self.pending.is_none() && (ui.add_enabled(self.pending.is_none(), egui::Button::new("Importar contornos"))
                 .on_hover_text("PNG/JPG: vetoriza em Rust. SVG: curvas nativas. Projeto RV antigo: somente contornos; suas cotas e operações não são migradas.")
-                .clicked()
+                .clicked() || import_requested)
             {
                 let (tx, rx) = mpsc::channel();
                 let size = self.size;
-                let threshold = self.threshold;
+                let options = rv_cutter_native::raster::TraceOptions {
+                    threshold: self.threshold, simplify_px: self.simplify_px, min_area_px: self.min_area_px,
+                };
                 let auto_size = self.auto_size;
                 let ctx = ui.ctx().clone();
                 self.pending = Some(rx);
@@ -127,7 +141,7 @@ impl eframe::App for App {
                         Some(path) => {
                             let raster = path.extension().and_then(|e| e.to_str()).is_some_and(|e|
                                 ["png", "jpg", "jpeg"].iter().any(|kind| e.eq_ignore_ascii_case(kind)));
-                            rv_cutter_native::prepare_import(&path, size, threshold)
+                            rv_cutter_native::prepare_import_with_options(&path, size, options)
                                 .map(|imports| (imports, if raster && auto_size { Some(size) } else { None }))
                         },
                         None => Err("Importação cancelada.".into()),
@@ -165,8 +179,18 @@ impl eframe::App for App {
             }
             ui.label("SolidCraft Rust / B-rep");
         });
+        ui.separator();
+        self.cad.ui(ui);
+        if ui
+            .ctx()
+            .data_mut(|d| d.remove_temp::<bool>(egui::Id::new(ribbon::OPEN_CUTTER)))
+            .unwrap_or(false)
+        {
+            self.cutter_tab = true;
+        }
         if self.cutter_tab {
-            ui.group(|ui| {
+            let mut open = true;
+            egui::Window::new("Gerar cortador paramétrico").open(&mut open).show(ui.ctx(), |ui| {
                 ui.horizontal_wrapped(|ui| {
                     ui.strong("CORTADORES DE BISCOITO");
                     ui.label("Lâmina (mm)");
@@ -196,9 +220,8 @@ impl eframe::App for App {
                     }
                 });
             });
+            self.cutter_tab = open;
         }
-        ui.separator();
-        self.cad.ui(ui);
     }
     fn save(&mut self, s: &mut dyn eframe::Storage) {
         s.set_string("rv-native-prefs", self.cad.prefs());
@@ -218,6 +241,7 @@ fn focus_sketch(cad: &mut SolveApp) {
 }
 fn services() -> Services {
     Services {
+        ribbon_tabs: vec![("CORTADORES", ribbon::draw)],
         pick_open: Some(Box::new(|exts| {
             let dialog = rfd::AsyncFileDialog::new().add_filter(
                 "CAD",
@@ -295,10 +319,15 @@ fn main() -> eframe::Result {
                 focus_sketch(&mut cad);
             }
             cad.fit_view();
+            if args.iter().any(|s| s == "--cortadores") {
+                cad.ui.tab = "CORTADORES".into();
+            }
             Ok(Box::new(App {
                 cad,
                 size: 75.0,
                 threshold: 180,
+                simplify_px: 0.35,
+                min_area_px: 0.0,
                 pending: None,
                 recipe_pending: None,
                 cutter_tab: false,
