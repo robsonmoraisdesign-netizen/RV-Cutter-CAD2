@@ -6,6 +6,9 @@ on:
     paths: ['native/**', '.github/workflows/native-rust-cad.yml']
   pull_request:
     paths: ['native/**', '.github/workflows/native-rust-cad.yml']
+concurrency:
+  group: native-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -15,17 +18,43 @@ jobs:
       RUSTFLAGS: '-C target-feature=+crt-static'
     steps:
       - uses: actions/checkout@v4
+      - run: python native/prepare-solidcraft.py
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: native
       - run: cargo test --locked --manifest-path native/Cargo.toml --no-default-features
       - run: cargo build --locked --manifest-path native/Cargo.toml --release
+      - name: Verify desktop startup
+        shell: pwsh
+        run: |
+          $app = Start-Process -FilePath native/target/release/RV-Cutter-Native.exe -ArgumentList '--demo','--cortadores' -PassThru
+          try {
+            $ready = $false
+            for ($attempt = 0; $attempt -lt 30; $attempt++) {
+              Start-Sleep -Seconds 1
+              $app.Refresh()
+              if ($app.HasExited) { throw "Desktop exited before startup: $($app.ExitCode)" }
+              if ($app.MainWindowHandle -ne 0) { $ready = $true; break }
+            }
+            if (-not $ready) { throw 'Desktop did not create a window in 30 seconds' }
+            Start-Sleep -Seconds 5
+            $app.Refresh()
+            if ($app.HasExited) { throw 'Desktop crashed after opening' }
+          } finally {
+            if (-not $app.HasExited) { Stop-Process -Id $app.Id }
+          }
+      - name: Stage portable package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path portable -Force
+          Copy-Item native/target/release/RV-Cutter-Native.exe portable/
+          Copy-Item native/README.md portable/LEIA-ME.md
+          Copy-Item native/SKETCH-COMANDOS.md portable/
+          Copy-Item native/examples portable/examples -Recurse
+          Copy-Item docs/licenses portable/licenses -Recurse
       - uses: actions/upload-artifact@v4
         with:
           name: RV-Cutter-Native-Windows-Alpha
-          path: |
-            native/target/release/RV-Cutter-Native.exe
-            native/README.md
-            docs/licenses/
+          path: portable/
           if-no-files-found: error
