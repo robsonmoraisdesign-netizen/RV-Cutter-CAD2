@@ -1,3 +1,20 @@
+## Correção de importação e seleção de Sketch
+
+- Simplificação padrão: **1,0 px**. O traçado mantém os extremos do desenho e
+  todos os contornos detectados. Se ultrapassar 8000 vértices, tenta simplificação
+  adaptativa até 3 px antes de rejeitar. Ruído continua desligado por padrão.
+- A cota proporcional opcional não bloqueia mais uma imagem válida: acima de 256
+  curvas (ou se o solver rejeitar a cota), preserva o Sketch no tamanho escolhido
+  e informa que a cota não foi aplicada. Isso não cria um parâmetro de escala
+  posterior para esses desenhos complexos.
+- **CORTADORES → Gerar cortador → Sketch de origem** lista os Sketches não
+  suprimidos do documento, incluindo os concluídos. Escolha um nome, ajuste as
+  quatro medidas e clique GERAR CORTADOR. Não é necessário abrir o Sketch antes.
+- O gerador ainda aceita até 800 curvas e usa os contornos do Sketch selecionado.
+  Importar uma ilustração inteira não equivale a escolher somente sua silhueta:
+  detalhes internos também fazem parte do Sketch. A seleção de regiões específicas
+  para fabricação continua pendente.
+
 ## Atualização em validação: ribbon e escala proporcional
 
 A aba CORTADORES integra o ribbon Design do SolidCraft. O motor permanece em Rust;
@@ -9,7 +26,7 @@ a extensão da interface usa a mesma revisão fixada do motor e não executa Jav
   O contorno fica totalmente restringido: para alterar livremente sua forma, desative
   Cota automática antes de importar ou edite/remova as relações pertinentes.
 - A restrição automática aceita até 256 curvas para limitar o custo do solver.
-  Contornos mais complexos podem ser importados sem essa opção ou simplificados.
+  Contornos mais complexos são importados sem essa cota, com aviso, ou podem ser simplificados.
 - PNG/JPG: até 64 milhões de pixels de entrada, dimensões até 16384 por eixo e arquivo
   até 32 MB; grade de traçado adaptativa até 4 MP. Simplificação é medida em pixels
   dessa grade; Ruído remove regiões e furos abaixo da área indicada. Zero preserva
@@ -121,7 +138,7 @@ e mais baixa unida à lâmina. Os quatro valores são parâmetros nomeados
 `rv_lamina_altura_<id>`, `rv_lamina_espessura_<id>`,
 `rv_base_altura_<id>` e `rv_base_largura_<id>`; alterá-los por
 **Parâmetros** recalcula o B-rep. A criação é uma transação desfeita
-por uma única operação de histórico. Apenas Sketches abertos com até
+por uma única operação de histórico. Sketches selecionados, abertos ou concluídos, com até
 800 curvas são aceitos nesta etapa; contornos desconectados, furos e
 geometrias excessivamente complexas podem exigir correção manual.
 
