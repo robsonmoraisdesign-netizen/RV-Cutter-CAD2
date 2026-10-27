@@ -1,3 +1,39 @@
+## Atualização em validação: ribbon e escala proporcional
+
+A aba CORTADORES integra o ribbon Design do SolidCraft. O motor permanece em Rust;
+a extensão da interface usa a mesma revisão fixada do motor e não executa JavaScript.
+
+- Imagem mm com Cota automática cria `rv_tamanho_<id>`. Edite esse parâmetro para
+  redimensionar o contorno e recalcular o cortador dependente proporcionalmente.
+- A cota proporcional usa restrições e expressões nativas, sem fixar todos os pontos.
+  O contorno fica totalmente restringido: para alterar livremente sua forma, desative
+  Cota automática antes de importar ou edite/remova as relações pertinentes.
+- A restrição automática aceita até 256 curvas para limitar o custo do solver.
+  Contornos mais complexos podem ser importados sem essa opção ou simplificados.
+- PNG/JPG: até 64 milhões de pixels de entrada, dimensões até 16384 por eixo e arquivo
+  até 32 MB; grade de traçado adaptativa até 4 MP. Simplificação é medida em pixels
+  dessa grade; Ruído remove regiões e furos abaixo da área indicada. Zero preserva
+  todas as regiões detectadas. A transparência é composta sobre branco antes da redução.
+- O traçado raster continua poligonal. Reconstrução analítica de arcos, prévia de
+  vetorização, lâminas procedurais, carimbos e rolos ainda não foram implementados.
+
+### Compilar esta revisão
+
+Execute `python native/prepare-solidcraft.py` na raiz antes dos comandos Cargo abaixo.
+Requer Python 3.12+ e Git apenas na compilação. A preparação baixa a revisão fixada
+SolidCraft e aplica `native/patches/solidcraft-host-ribbon.patch` somente à integração
+UI. O diretório gerado `native/vendor/` não deve ser versionado. Se o patch mudar,
+remova esse diretório gerado e prepare novamente.
+
+### Pacote Windows
+
+A CI executa os testes, compila e verifica se a aplicação cria uma janela e permanece
+aberta. Isso não equivale a testar interativamente todas as ferramentas. O artefato
+portátil coloca `RV-Cutter-Native.exe` na raiz: extraia o ZIP inteiro e execute-o.
+Não requer Rust, Python, Node ou Electron no computador do usuário.
+
+---
+
 # RV Cutter Native — 15.0.0 alpha 1
 
 Primeira etapa da reconstrução paramétrica em Rust. Aplicativo desktop nativo
