@@ -18,7 +18,7 @@ eframe = { version = "0.36", optional = true, default-features = false, features
 egui = { version = "0.36", optional = true }
 rfd = { version = "0.17", optional = true }
 solidcraft-engine = { git = "https://github.com/tangency-labs/solidcraft", rev = "fa691707c224cae580c42201ed3a22d5e4b8c716" }
-solidcraft-ui-egui = { git = "https://github.com/tangency-labs/solidcraft", rev = "fa691707c224cae580c42201ed3a22d5e4b8c716", optional = true }
+solidcraft-ui-egui = { path = "vendor/solidcraft/crates/ui-egui", optional = true }
 
 [patch.crates-io]
 truck-geometry = { git = "https://github.com/tangency-labs/solidcraft", rev = "fa691707c224cae580c42201ed3a22d5e4b8c716" }
