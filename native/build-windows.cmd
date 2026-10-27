@@ -8,6 +8,8 @@ if errorlevel 1 (
   exit /b 1
 )
 set "RUSTFLAGS=-C target-feature=+crt-static"
+python prepare-solidcraft.py
+if errorlevel 1 goto failed
 cargo test --locked --no-default-features
 if errorlevel 1 goto failed
 cargo build --locked --release
