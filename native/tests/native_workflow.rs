@@ -203,15 +203,23 @@ fn raster_over_four_megapixels_downsamples_and_keeps_physical_size() {
 
 #[test]
 fn importing_raster_adds_a_driving_dimension_to_longest_axis() {
-    let svg = raster::polygons_svg(&[
-        vec![[-20.0, -10.0], [20.0, -10.0], [20.0, 10.0], [-20.0, 10.0]],
-    ]).unwrap();
+    let svg = raster::polygons_svg(&[vec![
+        [-20.0, -10.0],
+        [20.0, -10.0],
+        [20.0, 10.0],
+        [-20.0, 10.0],
+    ]])
+    .unwrap();
     let mut s = Session::default();
     rv_cutter_native::import_into_with_size(
         &mut s,
-        &[Import { name: "Logo importada".into(), svg }],
-        Some(75.0)
-    ).unwrap();
+        &[Import {
+            name: "Logo importada".into(),
+            svg,
+        }],
+        Some(75.0),
+    )
+    .unwrap();
     let sk = s.doc.sketch(s.active_sketch.unwrap()).unwrap();
     assert!(sk.constraints.iter().any(|c| c.kind.is_dimension()));
     let bounds: Vec<_> = (0..sk.curves.len()).filter_map(|i| sk.shape(i)).collect();
@@ -222,8 +230,13 @@ fn importing_raster_adds_a_driving_dimension_to_longest_axis() {
 #[test]
 fn cookie_cutter_creates_parametric_thin_wall_and_base() {
     let mut s = Session::default();
-    s.execute("sketch.create", &json!({"plane":"XY","name":"Biscoito"})).unwrap();
-    s.execute("sketch.rectangle.two_point", &json!({"p0":[-20,-15],"p1":[20,15]})).unwrap();
+    s.execute("sketch.create", &json!({"plane":"XY","name":"Biscoito"}))
+        .unwrap();
+    s.execute(
+        "sketch.rectangle.two_point",
+        &json!({"p0":[-20,-15],"p1":[20,15]}),
+    )
+    .unwrap();
     let id = s.active_sketch.unwrap();
     let before = io::write_design(&s.doc);
     let cfg = rv_cutter_native::cutter::CutterSettings::default();
@@ -231,16 +244,116 @@ fn cookie_cutter_creates_parametric_thin_wall_and_base() {
     let initial = volume(&s);
     assert!(initial > 0.0, "Cortador nao criou B-rep fechado");
     assert_eq!(s.model.state().bodies.len(), 1);
-    s.execute("parameters.change", &json!({
-        "name": format!("rv_lamina_altura_{id}"),
-        "expression": "20 mm"
-    })).unwrap();
+    s.execute(
+        "parameters.change",
+        &json!({
+            "name": format!("rv_lamina_altura_{id}"),
+            "expression": "20 mm"
+        }),
+    )
+    .unwrap();
     assert!(volume(&s) > initial);
     // The manufacturing generator is a single undo operation, distinct from edits.
     s.execute("edit.undo", &json!({})).unwrap();
     s.execute("edit.undo", &json!({})).unwrap();
     assert_eq!(io::write_design(&s.doc), before);
-    assert!((rv_cutter_native::cutter::CutterSettings {
-        blade_height_mm: 3.0, ..cfg
-    }).validate().is_err());
+    assert!(
+        (rv_cutter_native::cutter::CutterSettings {
+            blade_height_mm: 3.0,
+            ..cfg
+        })
+        .validate()
+        .is_err()
+    );
+}
+
+#[test]
+fn proportional_import_rebuilds_cutter_and_survives_reopen() {
+    let mut s = Session::default();
+    let svg = raster::polygons_svg(&[vec![[0., 0.], [40., 0.], [40., 20.], [0., 20.]]]).unwrap();
+    rv_cutter_native::import_into_with_size(
+        &mut s,
+        &[Import {
+            name: "Proporcional".into(),
+            svg,
+        }],
+        Some(75.),
+    )
+    .unwrap();
+    let id = s.active_sketch.unwrap();
+    let lengths = |s: &Session| -> Vec<f64> {
+        let state = s.model.state();
+        let sk = state.sketch(id).unwrap();
+        (0..sk.curves.len())
+            .filter_map(|i| match sk.shape(i)? {
+                Shape::Line { a, b } => Some(a.dist(b)),
+                _ => None,
+            })
+            .collect()
+    };
+    let original = lengths(&s);
+    rv_cutter_native::cutter::create(&mut s, &Default::default()).unwrap();
+    let original_volume = volume(&s);
+    s.execute(
+        "parameters.change",
+        &json!({"name": format!("rv_tamanho_{id}"), "expression":"112.5 mm"}),
+    )
+    .unwrap();
+    for (before, after) in original.iter().zip(lengths(&s)) {
+        near(before * 1.5, after);
+    }
+    assert!(volume(&s) > original_volume);
+    let bytes = io::write_design_container(&s.doc).unwrap();
+    let reopened = Session::new(io::read_design(&bytes).unwrap());
+    near(volume(&reopened), volume(&s));
+    for (before, after) in original.iter().zip(lengths(&reopened)) {
+        near(before * 1.5, after);
+    }
+}
+
+#[test]
+fn raster_transparency_noise_and_invalid_options() {
+    let mut img = image::RgbaImage::from_pixel(32, 32, image::Rgba([0, 0, 0, 0]));
+    for y in 4..28 {
+        for x in 4..28 {
+            img.put_pixel(x, y, image::Rgba([0, 0, 0, 255]));
+        }
+    }
+    for y in 12..20 {
+        for x in 12..20 {
+            img.put_pixel(x, y, image::Rgba([0, 0, 0, 0]));
+        }
+    }
+    img.put_pixel(1, 1, image::Rgba([0, 0, 0, 255]));
+    let mut png = std::io::Cursor::new(Vec::new());
+    img.write_to(&mut png, image::ImageFormat::Png).unwrap();
+    assert_eq!(
+        raster::trace(png.get_ref(), 75., 180)
+            .unwrap()
+            .matches("<path")
+            .count(),
+        3
+    );
+    let options = raster::TraceOptions {
+        min_area_px: 2.,
+        ..Default::default()
+    };
+    assert_eq!(
+        raster::trace_with_options(png.get_ref(), 75., options)
+            .unwrap()
+            .matches("<path")
+            .count(),
+        2
+    );
+    assert!(
+        raster::trace_with_options(
+            png.get_ref(),
+            75.,
+            raster::TraceOptions {
+                simplify_px: f64::NAN,
+                ..options
+            }
+        )
+        .is_err()
+    );
 }
