@@ -10,6 +10,7 @@ struct App {
     cad: SolveApp,
     recipe_pending: Option<mpsc::Receiver<rv_cutter_native::Result<serde_json::Value>>>,
     cutter_tab: bool,
+    cutter_sketch: Option<u64>,
     cutter: rv_cutter_native::cutter::CutterSettings,
     auto_size: bool,
     size: f64,
@@ -37,19 +38,25 @@ impl eframe::App for App {
             if let Some(result) = ready {
                 self.pending = None;
                 match result.and_then(|(imports, size_mm)| {
-                    rv_cutter_native::import_into_with_size(
-                        &mut self.cad.session,
-                        &imports,
-                        size_mm,
-                    )
+                    rv_cutter_native::import_into_report(&mut self.cad.session, &imports, size_mm)
                 }) {
-                    Ok(()) => {
+                    Ok(report) => {
                         self.cad.ui.tab = "SKETCH".into();
                         self.cad.tool = None;
                         self.cad.dialog = None;
                         focus_sketch(&mut self.cad);
-                        self.cad
-                            .set_status("Sketch editável importado. Dimensão física automática aplicada quando ativada.", false);
+                        let message = report.notice.unwrap_or_else(|| {
+                            format!(
+                                "Sketch importado: {} curvas editáveis. {}",
+                                report.curves,
+                                if report.proportional_size {
+                                    "Cota proporcional aplicada."
+                                } else {
+                                    ""
+                                }
+                            )
+                        });
+                        self.cad.set_status(message, false);
                     }
                     Err(e) => self.cad.set_status(e, true),
                 }
@@ -187,14 +194,41 @@ impl eframe::App for App {
             .unwrap_or(false)
         {
             self.cutter_tab = true;
+            self.cutter_sketch = self.cad.session.active_sketch;
         }
         if self.cutter_tab {
+            let sketches: Vec<_> = self
+                .cad
+                .session
+                .doc
+                .features
+                .iter()
+                .filter(|feature| {
+                    !feature.suppressed && self.cad.session.doc.sketch(feature.id).is_ok()
+                })
+                .map(|feature| (feature.id, feature.name.clone()))
+                .collect();
+            if !sketches
+                .iter()
+                .any(|(id, _)| Some(*id) == self.cutter_sketch)
+            {
+                self.cutter_sketch = sketches.last().map(|(id, _)| *id);
+            }
             let mut open = true;
             let mut generated = false;
             egui::Window::new("Gerar cortador paramétrico")
                 .default_width(360.0).default_pos(egui::pos2(480.0, 220.0))
                 .open(&mut open).show(ui.ctx(), |ui| {
                 ui.strong("CORTADORES DE BISCOITO");
+                ui.label("Sketch de origem");
+                let selected_label = sketches.iter().find(|(id, _)| Some(*id) == self.cutter_sketch)
+                    .map(|(id, name)| format!("{name} (#{id})")).unwrap_or_else(|| "Nenhum Sketch disponível".into());
+                egui::ComboBox::from_id_salt("rv-cutter-source").selected_text(selected_label).width(320.0).show_ui(ui, |ui| {
+                    for (id, name) in &sketches {
+                        ui.selectable_value(&mut self.cutter_sketch, Some(*id), format!("{name} (#{id})"));
+                    }
+                });
+                ui.separator();
                 egui::Grid::new("rv-cutter-settings").num_columns(2).spacing([16.0, 10.0]).show(ui, |ui| {
                     ui.label("Lâmina (mm)");
                     ui.add(egui::DragValue::new(&mut self.cutter.blade_height_mm).range(4.0..=100.0).speed(0.1));
@@ -210,12 +244,14 @@ impl eframe::App for App {
                     ui.end_row();
                 });
                 ui.separator();
-                    let editing = self.cad.session.active_sketch.is_some();
-                    if ui.add_enabled(editing, egui::Button::new("GERAR CORTADOR"))
-                        .on_hover_text("Cria lâmina e reforço paramétricos a partir do Sketch ativo. Mantém histórico, permite desfazer e editar dimensões.")
+                    let available = self.cutter_sketch.is_some();
+                    if ui.add_enabled(available, egui::Button::new("GERAR CORTADOR"))
+                        .on_hover_text("Cria lâmina e reforço paramétricos a partir do Sketch selecionado. Mantém histórico, permite desfazer e editar dimensões.")
                         .clicked()
                     {
-                        match rv_cutter_native::cutter::create(&mut self.cad.session, &self.cutter) {
+                        let result = self.cutter_sketch.ok_or_else(|| "Escolha um Sketch.".to_string())
+                            .and_then(|id| rv_cutter_native::cutter::create_from_sketch(&mut self.cad.session, id, &self.cutter));
+                        match result {
                             Ok(()) => {
                                 self.cad.ui.tab = "SOLID".into();
                                 self.cad.fit_view();
@@ -225,8 +261,8 @@ impl eframe::App for App {
                             Err(e) => self.cad.set_status(e, true),
                         }
                     }
-                    if !editing {
-                        ui.weak("Abra ou importe um Sketch para criar o cortador.");
+                    if !available {
+                        ui.weak("Crie ou importe um Sketch para aparecer nesta lista.");
                     }
             });
             self.cutter_tab = open && !generated;
@@ -335,11 +371,12 @@ fn main() -> eframe::Result {
                 cad,
                 size: 75.0,
                 threshold: 180,
-                simplify_px: 0.35,
+                simplify_px: 1.0,
                 min_area_px: 0.0,
                 pending: None,
                 recipe_pending: None,
                 cutter_tab: false,
+                cutter_sketch: None,
                 cutter: rv_cutter_native::cutter::CutterSettings::default(),
                 auto_size: true,
             }))
