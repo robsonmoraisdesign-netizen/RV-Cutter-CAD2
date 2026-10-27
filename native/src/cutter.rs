@@ -52,15 +52,21 @@ impl CutterSettings {
 /// source Sketch without leaving half-built solids or orphan parameters.
 pub fn create(session: &mut Session, settings: &CutterSettings) -> Result<()> {
     settings.validate()?;
-    let sketch_id = session.active_sketch.ok_or(
-        "Abra ou importe um Sketch antes de criar um cortador."
-    )?;
-    let sketch = session.doc.sketch(sketch_id).map_err(|error| error.to_string())?;
+    let sketch_id = session
+        .active_sketch
+        .ok_or("Abra ou importe um Sketch antes de criar um cortador.")?;
+    let sketch = session
+        .doc
+        .sketch(sketch_id)
+        .map_err(|error| error.to_string())?;
     if sketch.curves.is_empty() {
         return Err("Desenhe ou importe ao menos um contorno no Sketch.".into());
     }
     if sketch.curves.len() > 800 {
-        return Err("Sketch complexo demais para converter automaticamente: simplifique os contornos.".into());
+        return Err(
+            "Sketch complexo demais para converter automaticamente: simplifique os contornos."
+                .into(),
+        );
     }
     let height = format!("rv_lamina_altura_{sketch_id}");
     let wall = format!("rv_lamina_espessura_{sketch_id}");
@@ -86,6 +92,7 @@ pub fn create(session: &mut Session, settings: &CutterSettings) -> Result<()> {
             {"command": "solid.extrude",
              "params": {"sketch": sketch_id, "thin": true, "thickness": base_width,
                          "side": "outside", "distance": base_height, "operation": "join",
+                         "targets": [format!("Cortador RV {sketch_id}")],
                          "name": format!("Base RV {sketch_id}")}}
         ]
     });
