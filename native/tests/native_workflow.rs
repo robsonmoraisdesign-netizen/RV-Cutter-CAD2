@@ -357,3 +357,101 @@ fn raster_transparency_noise_and_invalid_options() {
         .is_err()
     );
 }
+
+#[test]
+fn complex_import_survives_optional_auto_size_limit() {
+    let ring: Vec<_> = (0..300)
+        .map(|i| {
+            let a = i as f64 * std::f64::consts::TAU / 300.;
+            [37.5 * a.cos(), 37.5 * a.sin()]
+        })
+        .collect();
+    let mut s = Session::default();
+    let report = rv_cutter_native::import_into_report(
+        &mut s,
+        &[Import {
+            name: "Detalhado".into(),
+            svg: raster::polygons_svg(&[ring]).unwrap(),
+        }],
+        Some(75.),
+    )
+    .unwrap();
+    assert_eq!(report.curves, 300);
+    assert!(!report.proportional_size);
+    assert!(report.notice.is_some());
+    assert_eq!(s.undo.len(), 1);
+    let bytes = io::write_design_container(&s.doc).unwrap();
+    let reopened = Session::new(io::read_design(&bytes).unwrap());
+    assert_eq!(
+        reopened
+            .doc
+            .sketch(s.active_sketch.unwrap())
+            .unwrap()
+            .curves
+            .len(),
+        300
+    );
+    s.execute("edit.undo", &json!({})).unwrap();
+    assert!(s.doc.features.is_empty());
+}
+#[test]
+fn cutter_uses_selected_finished_sketch() {
+    let mut s = Session::default();
+    s.execute("sketch.create", &json!({"plane":"XY","name":"Escolhido"}))
+        .unwrap();
+    s.execute(
+        "sketch.rectangle.two_point",
+        &json!({"p0":[0,0],"p1":[40,30]}),
+    )
+    .unwrap();
+    let selected = s.active_sketch.unwrap();
+    s.execute("sketch.finish", &json!({})).unwrap();
+    s.execute("sketch.create", &json!({"plane":"XY","name":"Outro"}))
+        .unwrap();
+    s.execute(
+        "sketch.rectangle.two_point",
+        &json!({"p0":[100,100],"p1":[110,110]}),
+    )
+    .unwrap();
+    let active = s.active_sketch;
+    let before = io::write_design(&s.doc);
+    rv_cutter_native::cutter::create_from_sketch(&mut s, selected, &Default::default()).unwrap();
+    assert!(volume(&s) > 0.);
+    s.execute("edit.undo", &json!({})).unwrap();
+    assert_eq!(s.active_sketch, active);
+    assert_eq!(io::write_design(&s.doc), before);
+    assert!(
+        rv_cutter_native::cutter::create_from_sketch(&mut s, u64::MAX, &Default::default())
+            .is_err()
+    );
+    assert_eq!(io::write_design(&s.doc), before);
+}
+#[test]
+fn rounded_raster_adapts_without_dropping_holes() {
+    let img = image::GrayImage::from_fn(1200, 1200, |x, y| {
+        let dx = (x % 400) as f64 - 200.;
+        let dy = (y % 400) as f64 - 200.;
+        let d = dx * dx + dy * dy;
+        image::Luma([if (22500. ..=28900.).contains(&d) {
+            0
+        } else {
+            255
+        }])
+    });
+    let mut png = std::io::Cursor::new(Vec::new());
+    img.write_to(&mut png, image::ImageFormat::Png).unwrap();
+    let svg = raster::trace_with_options(
+        png.get_ref(),
+        75.,
+        raster::TraceOptions {
+            simplify_px: 0.35,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(svg.matches("<path").count(), 18);
+    assert!(svg.matches(" L").count() < 8000);
+    let svg = raster::trace(png.get_ref(), 75., 180).unwrap();
+    assert_eq!(svg.matches("<path").count(), 18);
+    assert!(svg.matches(" L").count() < 2500);
+}
