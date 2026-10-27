@@ -11,6 +11,9 @@ pub fn constrain_longest_axis(session: &mut Session, target_mm: f64) -> Result<(
     }
     let id = session.active_sketch.ok_or("Nao existe Sketch ativo.")?;
     let sketch = session.doc.sketch(id).map_err(|error| error.to_string())?;
+    if sketch.curves.len() > 256 {
+        return Err("Cota proporcional: limite de 256 curvas. Aumente a simplificação ou desative a cota automática para importar e editar o contorno.".into());
+    }
     let mut left: Option<(f64, String)> = None;
     let mut right: Option<(f64, String)> = None;
     let mut top: Option<(f64, String)> = None;
@@ -49,14 +52,55 @@ pub fn constrain_longest_axis(session: &mut Session, target_mm: f64) -> Result<(
     if a == b {
         return Err("O contorno nao tem dois pontos distintos para cotar.".into());
     }
-    session.execute(
-        "sketch.dimension",
-        &json!({
-            "entities": [a, b],
-            "type": kind,
-            "value": format!("{target_mm} mm"),
-            "scale_sketch": true
-        }),
-    ).map_err(|error| error.to_string())?;
+    let master = format!("rv_tamanho_{id}");
+    session
+        .execute(
+            "parameters.add",
+            &json!({
+                "name": master, "expression": format!("{target_mm} mm")
+            }),
+        )
+        .map_err(|e| e.to_string())?;
+    session
+        .execute(
+            "sketch.dimension",
+            &json!({
+                "entities": [a, b],
+                "type": kind,
+                "value": master,
+                "scale_sketch": true
+            }),
+        )
+        .map_err(|error| error.to_string())?;
+    // Infer only exact relationships: approximate snapping would change the logo.
+    let result = session
+        .execute(
+            "sketch.auto_constrain",
+            &json!({
+                "tolerance": 0.0000001, "angle_tolerance": 0.00001
+            }),
+        )
+        .map_err(|e| e.to_string())?;
+    if result["dof"].as_u64() != Some(0) {
+        return Err("Não foi possível restringir a forma proporcionalmente. Importe sem cota automática para editar o Sketch.".into());
+    }
+    let sketch = session.doc.sketch(id).map_err(|e| e.to_string())?;
+    let lengths: Vec<_> = sketch
+        .constraints
+        .iter()
+        .filter(|c| !c.driven && !c.kind.is_angle())
+        .filter_map(|c| Some((c.param.clone()?, c.kind.value()?)))
+        .filter(|(name, _)| name != &master)
+        .collect();
+    for (name, value) in lengths {
+        session
+            .execute(
+                "parameters.change",
+                &json!({
+                    "name": name, "expression": format!("{master} * {}", value / target_mm)
+                }),
+            )
+            .map_err(|e| e.to_string())?;
+    }
     Ok(())
 }
