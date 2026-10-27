@@ -1,0 +1,50 @@
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -18,10 +18,10 @@
+ solidcraft-sketch = { path = "crates/sketch" }
+ solidcraft-kernel = { path = "crates/kernel" }
+ solidcraft-render = { path = "crates/render" }
+-solidcraft-gpu = { path = "crates/gpu" }
++solidcraft-gpu = { git = "https://github.com/tangency-labs/solidcraft", rev = "fa691707c224cae580c42201ed3a22d5e4b8c716" }
+ solidcraft-doc = { path = "crates/doc" }
+ solidcraft-io = { path = "crates/io" }
+-solidcraft-engine = { path = "crates/engine" }
++solidcraft-engine = { git = "https://github.com/tangency-labs/solidcraft", rev = "fa691707c224cae580c42201ed3a22d5e4b8c716" }
+ solidcraft-ui-egui = { path = "crates/ui-egui" }
+ solidcraft-space-mouse = { path = "crates/space-mouse" }
+ solidcraft-mcp = { path = "crates/mcp" }
+--- a/crates/ui-egui/src/lib.rs
++++ b/crates/ui-egui/src/lib.rs
+@@ -255,6 +255,8 @@
+ /// Host services injected by the app so this crate stays portable.
+ #[derive(Default)]
+ pub struct Services {
++    /// Host-owned tabs rendered inside the native Design ribbon.
++    pub ribbon_tabs: Vec<(&'static str, fn(&mut SolveApp, &mut egui::Ui))>,
+     /// Ask for a file to open. The extensions are the file type the command reads, offered as
+     /// the picker's first filter (`&[]`: designs, CAD files and meshes, #1801).
+     pub pick_open: Option<Box<dyn Fn(&[&str]) -> FilePickerFuture>>,
+--- a/crates/ui-egui/src/toolbar.rs
++++ b/crates/ui-egui/src/toolbar.rs
+@@ -599,6 +599,7 @@
+             tabs.push("RENDER");
+         } else {
+             tabs.extend(TABS.iter());
++            tabs.extend(app.services.ribbon_tabs.iter().map(|(name, _)| *name));
+         }
+         for tab in tabs {
+             let display_tab = app.tr_label(tab);
+@@ -628,6 +629,13 @@
+         }
+         // Panels.
+         let tab = app.ui.tab.clone();
++        if let Some(draw) = app.services.ribbon_tabs.iter().find(|(name, _)| *name == tab).map(|(_, draw)| *draw) {
++            let bounds = Rect::from_min_max(pos2(r.left() + 112.0, r.top() + 26.0), pos2(r.right() - 8.0, r.bottom()));
++            let mut child = ui.new_child(egui::UiBuilder::new().max_rect(bounds));
++            child.set_clip_rect(bounds.intersect(ui.clip_rect()));
++            draw(app, &mut child);
++            return;
++        }
+         // The command whose tool or dialog is open right now, shown pressed in the toolbar.
+         let running: Option<String> = match (&app.tool, &app.dialog) {
+             (Some(tool), _) => Some(tool.cmd.to_string()),
