@@ -41,11 +41,12 @@ com documento, solver de Sketch e motor B-rep do SolidCraft, revisão
 fa691707c224cae580c42201ed3a22d5e4b8c716. Interface nativa SolidCraft/egui
 reaproveitada; sem Electron ou JavaScript neste aplicativo.
 
-## Executar
+## Compilar a partir do código-fonte
 Instale Rust estável (>=1.95) e, no Windows, Visual Studio Build Tools com C++.
 Na raiz do repositório:
 
 ```
+python native/prepare-solidcraft.py
 cargo run --manifest-path native/Cargo.toml --release
 cargo run --manifest-path native/Cargo.toml --release -- --demo
 cargo run --manifest-path native/Cargo.toml --release -- --import desenho.png
@@ -77,7 +78,7 @@ para proteger memória e tempo de processamento.
 
 ## Escopo e limitações
 - Esta alpha inicia a migração pelo Sketch e modelagem paramétrica nativa.
-- A interface e os geradores específicos de cortadores, carimbos, logotipos,
+- Cortadores têm uma primeira implementação nativa. Carimbos, logotipos,
   presets e lâminas procedurais do RV ainda não foram portados.
 - Projetos antigos `rv-cad-13` migram somente contornos avaliados; não recuperam
   automaticamente suas cotas, restrições ou histórico de operações.
@@ -87,7 +88,7 @@ para proteger memória e tempo de processamento.
 - O aplicativo Electron existente continua disponível como versão anterior.
 - Esta é uma versão de desenvolvimento; guarde cópias dos projetos originais.
 
-Licenças e atribuições: `../docs/licenses/`. SolidCraft é MIT OR Apache-2.0;
+Licenças e atribuições: `licenses/` no pacote portátil ou `docs/licenses/` no repositório. SolidCraft é MIT OR Apache-2.0;
 consulte também as licenças das dependências distribuídas.
 
 
@@ -113,7 +114,7 @@ Consulte SKETCH-COMANDOS.md para o inventário de ferramentas do motor incluído
 
 ## RV CORTADORES — primeira automação de fabricação
 
-Na barra RV, abra **CORTADORES**, crie/importe um Sketch fechado e
+No ribbon Design, abra **CORTADORES**, crie/importe um Sketch fechado e
 escolha **GERAR CORTADOR**. O gerador usa duas extrusões *Thin* nativas
 SolidCraft: uma lâmina de espessura/altura ajustáveis e uma base mais larga
 e mais baixa unida à lâmina. Os quatro valores são parâmetros nomeados
@@ -124,10 +125,8 @@ por uma única operação de histórico. Apenas Sketches abertos com até
 800 curvas são aceitos nesta etapa; contornos desconectados, furos e
 geometrias excessivamente complexas podem exigir correção manual.
 
-A ferramenta CORTADORES é um painel do shell RV sobre a interface egui
-SolidCraft, **ainda não** uma aba injetada diretamente no registro
-interno do ribbon da dependência SolidCraft. A integração visual como
-tab nativo independente está planejada sem alterar o design-system original.
+A aba CORTADORES usa uma extensão do ribbon da interface egui SolidCraft.
+Os controles compartilham o tema nativo; as métricas RV ficam em appearance.rs.
 
 ### Imagem → Sketch
 
@@ -137,7 +136,8 @@ as proporções e o tamanho físico selecionado em **Imagem mm**. O vetor
 gerado é Sketch nativo editável, não uma figura fixada no viewport.
 
 Com **Cota automática** ativa, aplica uma cota dirigível no maior eixo
-horizontal/vertical do contorno importado. Caso o solver rejeite cotas
+horizontal/vertical e vincula as demais medidas lineares ao parâmetro
+`rv_tamanho_<id>`, preservando as proporções nas alterações posteriores. Caso o solver rejeite cotas
 naquele contorno, desative a opção para importar sem cota, edite o Sketch
 e aplique dimensões manualmente. A seleção do tamanho físico continua
 funcionando independentemente da cota automática.
