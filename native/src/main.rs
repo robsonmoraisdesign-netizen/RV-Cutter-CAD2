@@ -190,17 +190,26 @@ impl eframe::App for App {
         }
         if self.cutter_tab {
             let mut open = true;
-            egui::Window::new("Gerar cortador paramétrico").open(&mut open).show(ui.ctx(), |ui| {
-                ui.horizontal_wrapped(|ui| {
-                    ui.strong("CORTADORES DE BISCOITO");
+            let mut generated = false;
+            egui::Window::new("Gerar cortador paramétrico")
+                .default_width(360.0).default_pos(egui::pos2(480.0, 220.0))
+                .open(&mut open).show(ui.ctx(), |ui| {
+                ui.strong("CORTADORES DE BISCOITO");
+                egui::Grid::new("rv-cutter-settings").num_columns(2).spacing([16.0, 10.0]).show(ui, |ui| {
                     ui.label("Lâmina (mm)");
                     ui.add(egui::DragValue::new(&mut self.cutter.blade_height_mm).range(4.0..=100.0).speed(0.1));
+                    ui.end_row();
                     ui.label("Espessura (mm)");
                     ui.add(egui::DragValue::new(&mut self.cutter.blade_thickness_mm).range(0.3..=5.0).speed(0.05));
+                    ui.end_row();
                     ui.label("Base altura (mm)");
                     ui.add(egui::DragValue::new(&mut self.cutter.base_height_mm).range(0.5..=20.0).speed(0.1));
+                    ui.end_row();
                     ui.label("Base largura (mm)");
                     ui.add(egui::DragValue::new(&mut self.cutter.base_width_mm).range(0.5..=20.0).speed(0.1));
+                    ui.end_row();
+                });
+                ui.separator();
                     let editing = self.cad.session.active_sketch.is_some();
                     if ui.add_enabled(editing, egui::Button::new("GERAR CORTADOR"))
                         .on_hover_text("Cria lâmina e reforço paramétricos a partir do Sketch ativo. Mantém histórico, permite desfazer e editar dimensões.")
@@ -210,6 +219,7 @@ impl eframe::App for App {
                             Ok(()) => {
                                 self.cad.ui.tab = "SOLID".into();
                                 self.cad.fit_view();
+                                generated = true;
                                 self.cad.set_status("Cortador RV criado com espessura, altura e base paramétricas.", false);
                             }
                             Err(e) => self.cad.set_status(e, true),
@@ -218,9 +228,8 @@ impl eframe::App for App {
                     if !editing {
                         ui.weak("Abra ou importe um Sketch para criar o cortador.");
                     }
-                });
             });
-            self.cutter_tab = open;
+            self.cutter_tab = open && !generated;
         }
     }
     fn save(&mut self, s: &mut dyn eframe::Storage) {
