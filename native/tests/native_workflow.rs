@@ -525,10 +525,13 @@ fn procedural_wave_preview_becomes_native_cutter() {
     cutter::create_from_sketch(&mut s, outline, &Default::default()).unwrap();
     assert!(volume(&s) > 0.);
     let before = volume(&s);
-    s.execute("parameters.change", &json!({"name":format!("rv_lamina_espessura_{outline}"),"expression":"1.2 mm"})).unwrap();
+    s.execute(
+        "parameters.change",
+        &json!({"name":format!("rv_lamina_espessura_{outline}"),"expression":"1.2 mm"}),
+    )
+    .unwrap();
     assert!(volume(&s) > before);
     let bytes = io::write_design_container(&s.doc).unwrap();
     let reopened = Session::new(io::read_design(&bytes).unwrap());
     near(volume(&s), volume(&reopened));
-
 }
