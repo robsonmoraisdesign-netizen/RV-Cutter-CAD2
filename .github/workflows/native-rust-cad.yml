@@ -42,6 +42,21 @@ jobs:
             Start-Sleep -Seconds 5
             $app.Refresh()
             if ($app.HasExited) { throw 'Desktop crashed after opening' }
+            Add-Type -AssemblyName System.Windows.Forms,System.Drawing
+            $shell = New-Object -ComObject WScript.Shell
+            $null = $shell.AppActivate($app.Id)
+            Start-Sleep -Seconds 2
+            New-Item -ItemType Directory -Path qa -Force | Out-Null
+            $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+            $capture = New-Object System.Drawing.Bitmap $bounds.Width,$bounds.Height
+            $graphics = [System.Drawing.Graphics]::FromImage($capture)
+            try {
+              $graphics.CopyFromScreen($bounds.Location,[System.Drawing.Point]::Empty,$bounds.Size)
+              $capture.Save((Join-Path $PWD 'qa/cutter-controls.png'),[System.Drawing.Imaging.ImageFormat]::Png)
+            } finally {
+              $graphics.Dispose()
+              $capture.Dispose()
+            }
           } finally {
             if (-not $app.HasExited) { Stop-Process -Id $app.Id }
           }
@@ -58,4 +73,10 @@ jobs:
         with:
           name: RV-Cutter-Native-Windows-Alpha
           path: portable/
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RV-Cutter-Native-UI-QA
+          path: qa/
           if-no-files-found: error
