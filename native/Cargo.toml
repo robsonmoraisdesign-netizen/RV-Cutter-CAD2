@@ -36,3 +36,6 @@ lto = false
 codegen-units = 16
 strip = true
 
+
+[patch."https://github.com/tangency-labs/solidcraft"]
+solidcraft-sketch = { path = "vendor/solidcraft/crates/sketch" }
