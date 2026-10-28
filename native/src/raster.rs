@@ -284,7 +284,7 @@ pub fn trace_with_options(bytes: &[u8], size: f64, options: TraceOptions) -> Res
 }
 
 // Retain extrema so simplification cannot change the selected physical size.
-fn simplify_ring(ring: &[[f64; 2]], tolerance: f64) -> Vec<[f64; 2]> {
+pub(crate) fn simplify_ring(ring: &[[f64; 2]], tolerance: f64) -> Vec<[f64; 2]> {
     if ring.len() < 4 {
         return ring.to_vec();
     }
