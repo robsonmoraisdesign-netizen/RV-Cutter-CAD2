@@ -9,10 +9,10 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parent
 REV = 'fa691707c224cae580c42201ed3a22d5e4b8c716'
-PATCH = ROOT / 'patches/solidcraft-host-ribbon.patch'
+PATCHES = [ROOT / 'patches/solidcraft-host-ribbon.patch', ROOT / 'patches/solidcraft-thin-closure.patch']
 DEST = ROOT / 'vendor/solidcraft'
 MARKER = DEST / 'RV-UPSTREAM.json'
-EXPECTED = {'revision': REV, 'patch_sha256': hashlib.sha256(PATCH.read_bytes()).hexdigest()}
+EXPECTED = {'revision': REV, 'patch_sha256': hashlib.sha256(b''.join(p.read_bytes() for p in PATCHES)).hexdigest()}
 
 
 def run(*args, cwd=None):
@@ -34,8 +34,9 @@ def main():
         DEST.mkdir(parents=True, exist_ok=True)
         with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
             tar.extractall(DEST, filter='data')
-    run('git', 'apply', '--check', str(PATCH), cwd=DEST)
-    run('git', 'apply', str(PATCH), cwd=DEST)
+    for patch in PATCHES:
+        run('git', 'apply', '--unidiff-zero', '--check', str(patch), cwd=DEST)
+        run('git', 'apply', '--unidiff-zero', str(patch), cwd=DEST)
     MARKER.write_text(json.dumps(EXPECTED, indent=2))
     print('Prepared SolidCraft UI:', REV)
 
