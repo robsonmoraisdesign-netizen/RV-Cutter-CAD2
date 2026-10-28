@@ -3084,7 +3084,6 @@ dependencies = [
 [[package]]
 name = "solidcraft-sketch"
 version = "0.15.0"
-source = "git+https://github.com/tangency-labs/solidcraft?rev=fa691707c224cae580c42201ed3a22d5e4b8c716#fa691707c224cae580c42201ed3a22d5e4b8c716"
 dependencies = [
  "serde",
  "solidcraft-geom",
@@ -3095,7 +3094,6 @@ dependencies = [
 [[package]]
 name = "solidcraft-ui-egui"
 version = "0.15.0"
-source = "git+https://github.com/tangency-labs/solidcraft?rev=fa691707c224cae580c42201ed3a22d5e4b8c716#fa691707c224cae580c42201ed3a22d5e4b8c716"
 dependencies = [
  "egui",
  "egui-wgpu",

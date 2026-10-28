@@ -2,10 +2,13 @@ name: RV Native Rust Windows
 on:
   workflow_dispatch:
   push:
-    branches: [feature/native-rust-cad, feature/native-rust-sketch-preview]
+    branches: [feature/native-rust-cad, feature/native-rust-sketch-preview, feature/rv-native-cookie-cutter-workspace]
     paths: ['native/**', '.github/workflows/native-rust-cad.yml']
   pull_request:
     paths: ['native/**', '.github/workflows/native-rust-cad.yml']
+concurrency:
+  group: native-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -15,17 +18,65 @@ jobs:
       RUSTFLAGS: '-C target-feature=+crt-static'
     steps:
       - uses: actions/checkout@v4
+      - run: python native/prepare-solidcraft.py
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: native
+      - run: cargo test --manifest-path native/vendor/solidcraft/crates/sketch/Cargo.toml rv_merge_gap_tests
       - run: cargo test --locked --manifest-path native/Cargo.toml --no-default-features
       - run: cargo build --locked --manifest-path native/Cargo.toml --release
+      - name: Verify desktop startup
+        shell: pwsh
+        run: |
+          $app = Start-Process -FilePath native/target/release/RV-Cutter-Native.exe -ArgumentList '--demo','--cortadores' -PassThru
+          try {
+            $ready = $false
+            for ($attempt = 0; $attempt -lt 30; $attempt++) {
+              Start-Sleep -Seconds 1
+              $app.Refresh()
+              if ($app.HasExited) { throw "Desktop exited before startup: $($app.ExitCode)" }
+              if ($app.MainWindowHandle -ne 0) { $ready = $true; break }
+            }
+            if (-not $ready) { throw 'Desktop did not create a window in 30 seconds' }
+            Start-Sleep -Seconds 5
+            $app.Refresh()
+            if ($app.HasExited) { throw 'Desktop crashed after opening' }
+            Add-Type -AssemblyName System.Windows.Forms,System.Drawing
+            $shell = New-Object -ComObject WScript.Shell
+            $null = $shell.AppActivate($app.Id)
+            Start-Sleep -Seconds 2
+            New-Item -ItemType Directory -Path qa -Force | Out-Null
+            $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+            $capture = New-Object System.Drawing.Bitmap $bounds.Width,$bounds.Height
+            $graphics = [System.Drawing.Graphics]::FromImage($capture)
+            try {
+              $graphics.CopyFromScreen($bounds.Location,[System.Drawing.Point]::Empty,$bounds.Size)
+              $capture.Save((Join-Path $PWD 'qa/cutter-controls.png'),[System.Drawing.Imaging.ImageFormat]::Png)
+            } finally {
+              $graphics.Dispose()
+              $capture.Dispose()
+            }
+          } finally {
+            if (-not $app.HasExited) { Stop-Process -Id $app.Id }
+          }
+      - name: Stage portable package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path portable -Force
+          Copy-Item native/target/release/RV-Cutter-Native.exe portable/
+          Copy-Item native/README.md portable/LEIA-ME.md
+          Copy-Item native/SKETCH-COMANDOS.md portable/
+          Copy-Item native/examples portable/examples -Recurse
+          Copy-Item docs/licenses portable/licenses -Recurse
       - uses: actions/upload-artifact@v4
         with:
           name: RV-Cutter-Native-Windows-Alpha
-          path: |
-            native/target/release/RV-Cutter-Native.exe
-            native/README.md
-            docs/licenses/
+          path: portable/
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RV-Cutter-Native-UI-QA
+          path: qa/
           if-no-files-found: error

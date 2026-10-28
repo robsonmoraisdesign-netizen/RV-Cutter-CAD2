@@ -1,0 +1,84 @@
+--- a/crates/sketch/src/thin.rs
++++ b/crates/sketch/src/thin.rs
+@@ -136,7 +136,46 @@
+     if kept.is_empty() {
+         return Err(bad("the wall has no area"));
+     }
+-    Ok(merge_regions(&kept))
++    let mut regions = merge_regions(&kept);
++    for region in &mut regions {
++        close_linear_merge_gaps(&mut region.outer)?;
++        for hole in &mut region.holes {
++            close_linear_merge_gaps(hole)?;
++        }
++    }
++    Ok(regions)
++}
++
++/// Region union joins vertices within 10 * MERGE_TOL. Its line segments can
++/// retain their pre-merge endpoints, leaving micron gaps rejected by the B-rep
++/// builder (1 * MERGE_TOL). Weld only linear loops within that existing union
++/// tolerance; never bridge an actual open contour or approximate analytic arcs.
++fn close_linear_merge_gaps(lp: &mut Loop2) -> Result<()> {
++    if lp.is_closed(MERGE_TOL) || !lp.segs.iter().all(|s| matches!(s, Seg2::Line { .. })) {
++        return Ok(());
++    }
++    let n = lp.segs.len();
++    if n < 3 {
++        return Err(bad("thin wall has a degenerate boundary"));
++    }
++    let mut joints = Vec::with_capacity(n);
++    for i in 0..n {
++        let previous = lp.segs.get((i + n - 1) % n).ok_or_else(|| bad("wall boundary"))?;
++        let current = lp.segs.get(i).ok_or_else(|| bad("wall boundary"))?;
++        let (a, b) = (previous.end(), current.start());
++        if a.dist(b) > MERGE_TOL * 10.0 + 1e-12 {
++            return Err(bad("thin wall boundary has a gap beyond merge tolerance"));
++        }
++        joints.push((a + b) * 0.5);
++    }
++    let rebuilt = Loop2::polygon(&joints);
++    if rebuilt.segs.iter().any(|s| s.length() <= 1e-9)
++        || rebuilt.signed_area() * lp.signed_area() <= 0.0
++    {
++        return Err(bad("thin wall boundary collapsed during vertex merge"));
++    }
++    *lp = rebuilt;
++    Ok(())
+ }
+ 
+ fn seg_is_finite(s: &Seg2) -> bool {
+@@ -385,3 +424,28 @@
+     }
+     Ok(sk)
+ }
++
++#[cfg(test)]
++mod rv_merge_gap_tests {
++    use super::*;
++    fn sample(gap: f64) -> Loop2 {
++        let mut lp = Loop2::polygon(&[Vec2::new(0., 0.), Vec2::new(20., 0.), Vec2::new(20., 20.), Vec2::new(0., 20.)]);
++        lp.segs[0] = Seg2::Line { a: Vec2::new(0., 0.), b: Vec2::new(20. + gap, 0.) };
++        lp
++    }
++    #[test]
++    fn welds_only_existing_union_tolerance() {
++        let mut lp = sample(4e-6);
++        assert!(!lp.is_closed(1e-6));
++        close_linear_merge_gaps(&mut lp).unwrap();
++        assert!(lp.is_closed(1e-12));
++        assert!((lp.signed_area() - 400.).abs() < 1e-4);
++    }
++    #[test]
++    fn rejects_real_gap_without_mutation() {
++        let mut lp = sample(2e-5);
++        let before = lp.clone();
++        assert!(close_linear_merge_gaps(&mut lp).is_err());
++        assert_eq!(lp, before);
++    }
++}
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -17 +17 @@
+-solidcraft-geom = { path = "crates/geom" }
++solidcraft-geom = { git = "https://github.com/tangency-labs/solidcraft", rev = "fa691707c224cae580c42201ed3a22d5e4b8c716" }

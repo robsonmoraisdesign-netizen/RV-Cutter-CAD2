@@ -1,6 +1,9 @@
 //! Native RV document, Sketch and B-rep integration. No JavaScript runtime.
 #![forbid(unsafe_code)]
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+pub mod border;
+pub mod cutter;
+pub mod dimensions;
 pub mod raster;
 pub mod recipe;
 use serde_json::{Value, json};
@@ -13,6 +16,20 @@ pub struct Import {
     pub svg: String,
 }
 pub fn prepare_import(path: &Path, size: f64, threshold: u8) -> Result<Vec<Import>> {
+    prepare_import_with_options(
+        path,
+        size,
+        raster::TraceOptions {
+            threshold,
+            ..Default::default()
+        },
+    )
+}
+pub fn prepare_import_with_options(
+    path: &Path,
+    size: f64,
+    options: raster::TraceOptions,
+) -> Result<Vec<Import>> {
     if std::fs::metadata(path).map_err(|e| e.to_string())?.len() > 32 * 1024 * 1024 {
         return Err("Arquivo excede 32 MB.".into());
     }
@@ -35,7 +52,7 @@ pub fn prepare_import(path: &Path, size: f64, threshold: u8) -> Result<Vec<Impor
         }]),
         "png" | "jpg" | "jpeg" => Ok(vec![Import {
             name,
-            svg: raster::trace(&bytes, size, threshold)?,
+            svg: raster::trace_with_options(&bytes, size, options)?,
         }]),
         "rvcad" | "json" => legacy_outlines(&bytes),
         _ => Err("Use PNG, JPG, SVG ou projeto RV .rvcad.".into()),
@@ -102,6 +119,34 @@ pub fn legacy_outlines(bytes: &[u8]) -> Result<Vec<Import>> {
 }
 /// Import is one undo step, and rolls back the whole batch on failure.
 pub fn import_into(s: &mut Session, imports: &[Import]) -> Result<()> {
+    import_into_with_size(s, imports, None)
+}
+
+/// Raster imports can include an editable size dimension in the same undo step.
+/// SVG/legacy imports keep their original native dimensions by default.
+pub fn import_into_with_size(
+    s: &mut Session,
+    imports: &[Import],
+    raster_size_mm: Option<f64>,
+) -> Result<()> {
+    import_into_report(s, imports, raster_size_mm).map(|_| ())
+}
+#[derive(Debug, Default)]
+pub struct ImportReport {
+    pub curves: usize,
+    pub proportional_size: bool,
+    pub notice: Option<String>,
+}
+/// Keep valid imported geometry if optional proportional constraints cannot run.
+pub fn import_into_report(
+    s: &mut Session,
+    imports: &[Import],
+    raster_size_mm: Option<f64>,
+) -> Result<ImportReport> {
+    if raster_size_mm.is_some_and(|v| !v.is_finite() || !(0.1..=100_000.0).contains(&v)) {
+        return Err("Tamanho físico inválido.".into());
+    }
+    let mut report = ImportReport::default();
     if imports.is_empty() {
         return Err("Nada para importar.".into());
     }
@@ -119,7 +164,7 @@ pub fn import_into(s: &mut Session, imports: &[Import]) -> Result<()> {
                 .map_err(|e| e.to_string())?;
         }
         let mut last = None;
-        for item in imports {
+        for (index, item) in imports.iter().enumerate() {
             let r = s
                 .execute(
                     "sketch.insert_svg",
@@ -127,12 +172,40 @@ pub fn import_into(s: &mut Session, imports: &[Import]) -> Result<()> {
                 )
                 .map_err(|e| e.to_string())?;
             last = r.get("sketch").and_then(Value::as_u64);
-            s.execute("sketch.finish", &json!({}))
-                .map_err(|e| e.to_string())?;
+            if index + 1 < imports.len() {
+                s.execute("sketch.finish", &json!({}))
+                    .map_err(|e| e.to_string())?;
+            }
         }
         if let Some(id) = last {
-            s.execute("sketch.edit", &json!({"sketch":id}))
-                .map_err(|e| e.to_string())?;
+            report.curves = s.doc.sketch(id).map_err(|e| e.to_string())?.curves.len();
+            if let Some(size) = raster_size_mm {
+                if report.curves > 256 {
+                    report.notice = Some(format!(
+                        "Importado: {} curvas no tamanho escolhido. Cota proporcional não aplicada acima de 256 curvas; Sketch editável.",
+                        report.curves
+                    ));
+                } else {
+                    let size_checkpoint = s.checkpoint();
+                    let size_result = dimensions::constrain_longest_axis(s, size);
+                    let restore_result = if size_result.is_err() {
+                        s.restore_checkpoint(size_checkpoint)
+                            .map_err(|e| e.to_string())
+                    } else {
+                        Ok(())
+                    };
+                    s.drop_checkpoint(size_checkpoint);
+                    restore_result?;
+                    match size_result {
+                        Ok(()) => report.proportional_size = true,
+                        Err(error) => {
+                            report.notice = Some(format!(
+                                "Contorno importado; cota proporcional não aplicada: {error}"
+                            ))
+                        }
+                    }
+                }
+            }
         }
         Ok(())
     })();
@@ -148,7 +221,7 @@ pub fn import_into(s: &mut Session, imports: &[Import]) -> Result<()> {
     s.undo.truncate(n);
     s.undo.push(snapshot);
     s.redo.clear();
-    Ok(())
+    Ok(report)
 }
 /// Reference parametric document: dimensions and extrusion driven by named expressions.
 pub fn demo(s: &mut Session) -> Result<()> {

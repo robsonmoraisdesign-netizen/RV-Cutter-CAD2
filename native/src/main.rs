@@ -1,5 +1,7 @@
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 #![forbid(unsafe_code)]
+mod appearance;
+mod ribbon;
 use serde_json::json;
 use solidcraft_engine::Session;
 use solidcraft_ui_egui::{Services, SolveApp};
@@ -7,9 +9,19 @@ use std::sync::mpsc;
 struct App {
     cad: SolveApp,
     recipe_pending: Option<mpsc::Receiver<rv_cutter_native::Result<serde_json::Value>>>,
+    cutter_tab: bool,
+    cutter_sketch: Option<u64>,
+    cutter: rv_cutter_native::cutter::CutterSettings,
+    border: rv_cutter_native::border::Border,
+    border_tolerance: f64,
+    auto_size: bool,
     size: f64,
     threshold: u8,
-    pending: Option<mpsc::Receiver<rv_cutter_native::Result<Vec<rv_cutter_native::Import>>>>,
+    simplify_px: f64,
+    min_area_px: f64,
+    pending: Option<
+        mpsc::Receiver<rv_cutter_native::Result<(Vec<rv_cutter_native::Import>, Option<f64>)>>,
+    >,
 }
 impl eframe::App for App {
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
@@ -27,16 +39,29 @@ impl eframe::App for App {
         if self.pending.is_some() {
             if let Some(result) = ready {
                 self.pending = None;
-                match result.and_then(|imports| {
-                    rv_cutter_native::import_into(&mut self.cad.session, &imports)
+                match result.and_then(|(imports, size_mm)| {
+                    rv_cutter_native::import_into_report(&mut self.cad.session, &imports, size_mm)
                 }) {
-                    Ok(()) => {
+                    Ok(report) => {
+                        if self.cutter_tab {
+                            self.cutter_sketch = self.cad.session.active_sketch;
+                        }
                         self.cad.ui.tab = "SKETCH".into();
                         self.cad.tool = None;
                         self.cad.dialog = None;
                         focus_sketch(&mut self.cad);
-                        self.cad
-                            .set_status("Contornos importados como Sketch nativo editável.", false);
+                        let message = report.notice.unwrap_or_else(|| {
+                            format!(
+                                "Sketch importado: {} curvas editáveis. {}",
+                                report.curves,
+                                if report.proportional_size {
+                                    "Cota proporcional aplicada."
+                                } else {
+                                    ""
+                                }
+                            )
+                        });
+                        self.cad.set_status(message, false);
                     }
                     Err(e) => self.cad.set_status(e, true),
                 }
@@ -101,13 +126,23 @@ impl eframe::App for App {
             ui.add(egui::DragValue::new(&mut self.size).range(1.0..=10000.0));
             ui.label("Limiar");
             ui.add(egui::DragValue::new(&mut self.threshold));
-            if ui.add_enabled(self.pending.is_none(), egui::Button::new("Importar contornos"))
+            ui.checkbox(&mut self.auto_size, "Cota automática")
+                .on_hover_text("Imagem PNG/JPG: escala o maior lado para Imagem mm e registra relações proporcionais. Edite rv_tamanho em Parâmetros; desative para editar livremente. Limite: 256 curvas.");
+            ui.label("Simplificação (px)");
+            ui.add(egui::DragValue::new(&mut self.simplify_px).range(0.1..=3.0).speed(0.05));
+            ui.label("Ruído (px²)");
+            ui.add(egui::DragValue::new(&mut self.min_area_px).range(0.0..=1000.0));
+            let import_requested = ui.ctx().data_mut(|d| d.remove_temp::<bool>(egui::Id::new(ribbon::OPEN_IMPORT))).unwrap_or(false);
+            if self.pending.is_none() && (ui.add_enabled(self.pending.is_none(), egui::Button::new("Importar contornos"))
                 .on_hover_text("PNG/JPG: vetoriza em Rust. SVG: curvas nativas. Projeto RV antigo: somente contornos; suas cotas e operações não são migradas.")
-                .clicked()
+                .clicked() || import_requested)
             {
                 let (tx, rx) = mpsc::channel();
                 let size = self.size;
-                let threshold = self.threshold;
+                let options = rv_cutter_native::raster::TraceOptions {
+                    threshold: self.threshold, simplify_px: self.simplify_px, min_area_px: self.min_area_px,
+                };
+                let auto_size = self.auto_size;
                 let ctx = ui.ctx().clone();
                 self.pending = Some(rx);
                 std::thread::spawn(move || {
@@ -115,7 +150,12 @@ impl eframe::App for App {
                         .add_filter("Contornos / projeto RV", &["png", "jpg", "jpeg", "svg", "rvcad", "json"])
                         .pick_file()
                     {
-                        Some(path) => rv_cutter_native::prepare_import(&path, size, threshold),
+                        Some(path) => {
+                            let raster = path.extension().and_then(|e| e.to_str()).is_some_and(|e|
+                                ["png", "jpg", "jpeg"].iter().any(|kind| e.eq_ignore_ascii_case(kind)));
+                            rv_cutter_native::prepare_import_with_options(&path, size, options)
+                                .map(|imports| (imports, if raster && auto_size { Some(size) } else { None }))
+                        },
                         None => Err("Importação cancelada.".into()),
                     };
                     let _ = tx.send(result);
@@ -153,6 +193,128 @@ impl eframe::App for App {
         });
         ui.separator();
         self.cad.ui(ui);
+        if ui
+            .ctx()
+            .data_mut(|d| d.remove_temp::<bool>(egui::Id::new(ribbon::OPEN_CUTTER)))
+            .unwrap_or(false)
+        {
+            self.cutter_tab = true;
+            self.cutter_sketch = self.cad.session.active_sketch;
+        }
+        if self.cutter_tab {
+            let sketches: Vec<_> = self
+                .cad
+                .session
+                .doc
+                .features
+                .iter()
+                .filter(|feature| {
+                    !feature.suppressed && self.cad.session.doc.sketch(feature.id).is_ok()
+                })
+                .map(|feature| (feature.id, feature.name.clone()))
+                .collect();
+            if !sketches
+                .iter()
+                .any(|(id, _)| Some(*id) == self.cutter_sketch)
+            {
+                self.cutter_sketch = sketches.last().map(|(id, _)| *id);
+            }
+            let mut open = true;
+            let mut generated = false;
+            egui::Window::new("Gerar cortador paramétrico")
+                .default_width(440.0).default_pos(egui::pos2(440.0, 120.0)).vscroll(true)
+                .open(&mut open).show(ui.ctx(), |ui| {
+                ui.strong("CORTADORES DE BISCOITO");
+                if ui.add_enabled(self.pending.is_none(), egui::Button::new("Importar imagem / contornos")).clicked() {
+                    ui.ctx().data_mut(|d| d.insert_temp(egui::Id::new(ribbon::OPEN_IMPORT), true));
+                }
+                ui.label("Sketch de origem");
+                let selected_label = sketches.iter().find(|(id, _)| Some(*id) == self.cutter_sketch)
+                    .map(|(id, name)| format!("{name} (#{id})")).unwrap_or_else(|| "Nenhum Sketch disponível".into());
+                egui::ComboBox::from_id_salt("rv-cutter-source").selected_text(selected_label).width(320.0).show_ui(ui, |ui| {
+                    for (id, name) in &sketches {
+                        ui.selectable_value(&mut self.cutter_sketch, Some(*id), format!("{name} (#{id})"));
+                    }
+                });
+                ui.separator();
+                egui::CollapsingHeader::new("Contorno externo / personalizar borda (experimental)").default_open(true).show(ui, |ui| {
+                    ui.label("PNG/JPG vetorizado: usa o maior contorno fechado por área.");
+                    ui.weak("Partes separadas menores e detalhes internos não entram na lâmina.");
+                    egui::ComboBox::from_label("Padrão").selected_text(match self.border.pattern {
+                        rv_cutter_native::border::Pattern::Smooth => "Liso",
+                        rv_cutter_native::border::Pattern::Wave => "Ondulado",
+                        rv_cutter_native::border::Pattern::Saw => "Serrilhado",
+                    }).show_ui(ui, |ui| {
+                        use rv_cutter_native::border::Pattern;
+                        ui.selectable_value(&mut self.border.pattern, Pattern::Smooth, "Liso");
+                        ui.selectable_value(&mut self.border.pattern, Pattern::Wave, "Ondulado");
+                        ui.selectable_value(&mut self.border.pattern, Pattern::Saw, "Serrilhado");
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Repetições");
+                        ui.add(egui::DragValue::new(&mut self.border.repeats).range(1..=80));
+                        ui.label("Profundidade mm");
+                        ui.add(egui::DragValue::new(&mut self.border.depth_mm).range(-20.0..=20.0).speed(0.05));
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Tolerância mm");
+                        ui.add(egui::DragValue::new(&mut self.border_tolerance).range(0.001..=0.2).speed(0.001));
+                    });
+                    ui.weak("Positivo: para fora. Negativo: para dentro. Confira a prévia antes de gerar.");
+                    ui.weak("Nesta etapa a borda é uma cópia editável, sem atualização automática do original.");
+                    if ui.add_enabled(self.cutter_sketch.is_some(), egui::Button::new("PREPARAR BORDA COMO NOVO SKETCH")).clicked() {
+                        let result = self.cutter_sketch.ok_or_else(|| "Escolha um Sketch.".to_string())
+                            .and_then(|id| rv_cutter_native::cutter::prepare_outer_outline(&self.cad.session,id,self.border,self.border_tolerance))
+                            .and_then(|import| rv_cutter_native::import_into(&mut self.cad.session,&[import]));
+                        match result {
+                            Ok(()) => {
+                                self.cutter_sketch=self.cad.session.active_sketch;
+                                focus_sketch(&mut self.cad);
+                                self.cad.fit_view();
+                                self.cad.set_status("Borda preparada e selecionada. Confira o novo Sketch e clique GERAR CORTADOR. Original preservado.",false);
+                            }
+                            Err(error) => self.cad.set_status(error,true),
+                        }
+                    }
+                });
+                egui::Grid::new("rv-cutter-settings").num_columns(2).spacing([16.0, 10.0]).show(ui, |ui| {
+                    ui.label("Lâmina (mm)");
+                    ui.add(egui::DragValue::new(&mut self.cutter.blade_height_mm).range(4.0..=100.0).speed(0.1));
+                    ui.end_row();
+                    ui.label("Espessura (mm)");
+                    ui.add(egui::DragValue::new(&mut self.cutter.blade_thickness_mm).range(0.3..=5.0).speed(0.05));
+                    ui.end_row();
+                    ui.label("Base altura (mm)");
+                    ui.add(egui::DragValue::new(&mut self.cutter.base_height_mm).range(0.5..=20.0).speed(0.1));
+                    ui.end_row();
+                    ui.label("Base largura (mm)");
+                    ui.add(egui::DragValue::new(&mut self.cutter.base_width_mm).range(0.5..=20.0).speed(0.1));
+                    ui.end_row();
+                });
+                ui.separator();
+                    let available = self.cutter_sketch.is_some();
+                    if ui.add_enabled(available, egui::Button::new("GERAR CORTADOR"))
+                        .on_hover_text("Cria lâmina e reforço paramétricos a partir do Sketch selecionado. Mantém histórico, permite desfazer e editar dimensões.")
+                        .clicked()
+                    {
+                        let result = self.cutter_sketch.ok_or_else(|| "Escolha um Sketch.".to_string())
+                            .and_then(|id| rv_cutter_native::cutter::create_from_sketch(&mut self.cad.session, id, &self.cutter));
+                        match result {
+                            Ok(()) => {
+                                self.cad.ui.tab = "SOLID".into();
+                                self.cad.fit_view();
+                                generated = true;
+                                self.cad.set_status("Cortador RV criado com espessura, altura e base paramétricas.", false);
+                            }
+                            Err(e) => self.cad.set_status(e, true),
+                        }
+                    }
+                    if !available {
+                        ui.weak("Crie ou importe um Sketch para aparecer nesta lista.");
+                    }
+            });
+            self.cutter_tab = open && !generated;
+        }
     }
     fn save(&mut self, s: &mut dyn eframe::Storage) {
         s.set_string("rv-native-prefs", self.cad.prefs());
@@ -172,6 +334,7 @@ fn focus_sketch(cad: &mut SolveApp) {
 }
 fn services() -> Services {
     Services {
+        ribbon_tabs: vec![("CORTADORES", ribbon::draw)],
         pick_open: Some(Box::new(|exts| {
             let dialog = rfd::AsyncFileDialog::new().add_filter(
                 "CAD",
@@ -249,12 +412,23 @@ fn main() -> eframe::Result {
                 focus_sketch(&mut cad);
             }
             cad.fit_view();
+            if args.iter().any(|s| s == "--cortadores") {
+                cad.ui.tab = "CORTADORES".into();
+            }
             Ok(Box::new(App {
                 cad,
                 size: 75.0,
                 threshold: 180,
+                simplify_px: 1.0,
+                min_area_px: 0.0,
                 pending: None,
                 recipe_pending: None,
+                cutter_tab: args.iter().any(|s| s == "--cortadores"),
+                cutter_sketch: None,
+                cutter: rv_cutter_native::cutter::CutterSettings::default(),
+                border: rv_cutter_native::border::Border::default(),
+                border_tolerance: 0.05,
+                auto_size: true,
             }))
         }),
     )
