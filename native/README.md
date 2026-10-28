@@ -166,3 +166,26 @@ Um desenho muito ruidoso pode exceder os limites de complexidade
 mesmo com redimensionamento automático.
 
 Migração progressiva: ver `MIGRATION-RV-ROADMAP.md`.
+
+## Em desenvolvimento: contorno externo e borda procedural
+
+No diálogo CORTADORES → Gerar cortador é possível importar uma imagem e abrir
+**Contorno externo / personalizar borda (experimental)**. Selecione o Sketch da
+imagem, o padrão Liso/Ondulado/Serrilhado, a quantidade de repetições e a
+profundidade em mm (positiva para fora, negativa para dentro). A tolerância de
+simplificação é explícita, de 0,001 a 0,2 mm. **Preparar borda como novo Sketch**
+seleciona uma cópia editável para conferir no viewport; depois use Gerar cortador.
+
+O processamento é Rust nativo. A imagem original permanece no projeto. O algoritmo
+reconstrói anéis fechados, seleciona o maior por área, simplifica e distribui ciclos
+pelo comprimento do contorno. Rejeita caminhos abertos/ramificados e bordas que se
+cruzam. Isso permite excluir detalhes internos antes do limite de 800 segmentos
+do gerador, sem aumentar esse limite indiscriminadamente.
+
+Limitações desta etapa: apenas sketches poligonais XY (como PNG/JPG vetorizados);
+partes separadas menores são excluídas. A cópia **ainda não é associativa**: alterações
+na imagem ou no padrão exigem preparar uma nova borda a partir do Sketch original.
+Ondas são amostradas em segmentos, não arcos de raio exato. Raios alternados,
+seleção por trechos, margem constante, escolha de múltiplas silhuetas e atualização
+paramétrica persistente da borda ainda estão pendentes. O kernel pode rejeitar uma
+lâmina/base cuja espessura não caiba nos detalhes; a criação existente é transacional.
