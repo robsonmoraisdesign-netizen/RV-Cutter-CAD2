@@ -222,7 +222,7 @@ impl eframe::App for App {
             let mut open = true;
             let mut generated = false;
             egui::Window::new("Gerar cortador paramétrico")
-                .default_width(360.0).default_pos(egui::pos2(480.0, 220.0))
+                .default_width(440.0).default_pos(egui::pos2(440.0, 120.0)).vscroll(true)
                 .open(&mut open).show(ui.ctx(), |ui| {
                 ui.strong("CORTADORES DE BISCOITO");
                 if ui.add_enabled(self.pending.is_none(), egui::Button::new("Importar imagem / contornos")).clicked() {
@@ -237,7 +237,7 @@ impl eframe::App for App {
                     }
                 });
                 ui.separator();
-                ui.collapsing("Contorno externo / personalizar borda (experimental)", |ui| {
+                egui::CollapsingHeader::new("Contorno externo / personalizar borda (experimental)").default_open(true).show(ui, |ui| {
                     ui.label("PNG/JPG vetorizado: usa o maior contorno fechado por área.");
                     ui.weak("Partes separadas menores e detalhes internos não entram na lâmina.");
                     egui::ComboBox::from_label("Padrão").selected_text(match self.border.pattern {
@@ -423,7 +423,7 @@ fn main() -> eframe::Result {
                 min_area_px: 0.0,
                 pending: None,
                 recipe_pending: None,
-                cutter_tab: false,
+                cutter_tab: args.iter().any(|s| s == "--cortadores"),
                 cutter_sketch: None,
                 cutter: rv_cutter_native::cutter::CutterSettings::default(),
                 border: rv_cutter_native::border::Border::default(),
