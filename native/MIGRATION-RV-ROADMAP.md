@@ -36,17 +36,24 @@
 4. Conversão nativa Sketch → duas extrusões finas com uma transação/undo.
 5. Testes automatizados de traçado de imagem grande, cota e volume
    dependente de parâmetro.
+6. Aba CORTADORES integrada ao ribbon nativo e seletor de Sketch de origem.
+7. Extração experimental do maior contorno fechado de sketches poligonais XY,
+   preservando o original; simplificação explícita antes do limite de 800 curvas.
+8. Borda lisa, ondulada ou serrilhada, com quantidade e profundidade, em Rust.
+   O resultado desta etapa é uma cópia editável, ainda não associativa.
+9. Correção de folgas numéricas na união de segmentos da parede, limitada à
+   tolerância existente de 0,00001 mm; contornos realmente abertos são recusados.
 
 ## Etapas seguintes (não implementadas)
 
-- Transformar o painel CORTADORES em tab de primeira classe do **ribbon**
-  SolidCraft por extensão estável ou derivação controlada do `ui-egui`,
-  sem sobreposições por coordenadas nem hardcode de cores.
+- Persistir a definição procedural da borda como feature associativa, com
+  atualização automática a partir da origem e dos parâmetros, undo e reabertura.
 - Pré-tratamento de imagens: limiar automático por histograma/Otsu,
   remoção opcional de ruído, preservação de detalhes e ajuste de curvas.
-- Reconhecimento de contorno externo x traços internos para diferenciar
-  lâmina e carimbo, com componentes e corpos separados.
-- Bordas de corte procedurais, chanfros, reforços e proteção de cantos.
+- Ampliar a seleção de silhuetas: múltiplos componentes, união controlada e
+  escolha por trechos; detalhes internos separados para carimbo.
+- Bordas por arcos de raio exato/alternado, margem constante, chanfros,
+  reforços e proteção de cantos. Ondas atuais são aproximações poligonais.
 - Gerador de carimbo, relevo e logomarca associativos com plano de
   manutenção de equivalência ao antigo RV.
 - Presets e biblioteca nativa; migração de histórico e parâmetros
