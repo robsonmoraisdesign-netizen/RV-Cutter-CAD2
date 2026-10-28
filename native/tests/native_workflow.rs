@@ -455,3 +455,73 @@ fn rounded_raster_adapts_without_dropping_holes() {
     assert_eq!(svg.matches("<path").count(), 18);
     assert!(svg.matches(" L").count() < 2500);
 }
+
+#[test]
+fn complex_image_outline_preserves_original_and_generates_cutter() {
+    use rv_cutter_native::{border::Border, cutter};
+    let mut polygons = vec![vec![[-40., -40.], [40., -40.], [40., 40.], [-40., 40.]]];
+    for y in 0..15 {
+        for x in 0..15 {
+            let (x, y) = (-35. + x as f64 * 4., -35. + y as f64 * 4.);
+            polygons.push(vec![[x, y], [x + 1., y], [x + 1., y + 1.], [x, y + 1.]]);
+        }
+    }
+    let mut s = Session::default();
+    import_into(
+        &mut s,
+        &[Import {
+            name: "Imagem detalhada".into(),
+            svg: raster::polygons_svg(&polygons).unwrap(),
+        }],
+    )
+    .unwrap();
+    let source = s.active_sketch.unwrap();
+    let source_count = s.doc.sketch(source).unwrap().curves.len();
+    assert!(source_count > 800);
+    assert!(cutter::create_from_sketch(&mut s, source, &Default::default()).is_err());
+    let preview = cutter::prepare_outer_outline(&s, source, Border::default(), 0.05).unwrap();
+    import_into(&mut s, &[preview]).unwrap();
+    let outline = s.active_sketch.unwrap();
+    assert_eq!(s.doc.sketch(outline).unwrap().curves.len(), 4);
+    assert_eq!(s.doc.sketch(source).unwrap().curves.len(), source_count);
+    cutter::create_from_sketch(&mut s, outline, &Default::default()).unwrap();
+    assert!(volume(&s) > 0.);
+    let bytes = io::write_design_container(&s.doc).unwrap();
+    let reopened = Session::new(io::read_design(&bytes).unwrap());
+    near(volume(&s), volume(&reopened));
+    s.execute("edit.undo", &json!({})).unwrap();
+    assert_eq!(s.doc.sketch(source).unwrap().curves.len(), source_count);
+}
+
+#[test]
+fn procedural_wave_preview_becomes_native_cutter() {
+    use rv_cutter_native::{
+        border::{Border, Pattern},
+        cutter,
+    };
+    let mut s = Session::default();
+    import_into(
+        &mut s,
+        &[Import {
+            name: "Quadrado".into(),
+            svg: raster::polygons_svg(&[vec![[0., 0.], [80., 0.], [80., 80.], [0., 80.]]]).unwrap(),
+        }],
+    )
+    .unwrap();
+    let source = s.active_sketch.unwrap();
+    let preview = cutter::prepare_outer_outline(
+        &s,
+        source,
+        Border {
+            pattern: Pattern::Wave,
+            repeats: 4,
+            depth_mm: 0.25,
+        },
+        0.05,
+    )
+    .unwrap();
+    import_into(&mut s, &[preview]).unwrap();
+    let outline = s.active_sketch.unwrap();
+    cutter::create_from_sketch(&mut s, outline, &Default::default()).unwrap();
+    assert!(volume(&s) > 0.);
+}
