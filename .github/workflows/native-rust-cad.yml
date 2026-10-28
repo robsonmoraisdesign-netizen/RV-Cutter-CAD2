@@ -23,7 +23,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: native
-      - run: cargo test --locked --manifest-path native/Cargo.toml -p solidcraft-sketch rv_merge_gap_tests
+      - run: cargo test --manifest-path native/vendor/solidcraft/crates/sketch/Cargo.toml rv_merge_gap_tests
       - run: cargo test --locked --manifest-path native/Cargo.toml --no-default-features
       - run: cargo build --locked --manifest-path native/Cargo.toml --release
       - name: Verify desktop startup
