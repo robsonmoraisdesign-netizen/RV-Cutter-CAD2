@@ -12,6 +12,8 @@ struct App {
     cutter_tab: bool,
     cutter_sketch: Option<u64>,
     cutter: rv_cutter_native::cutter::CutterSettings,
+    border: rv_cutter_native::border::Border,
+    border_tolerance: f64,
     auto_size: bool,
     size: f64,
     threshold: u8,
@@ -41,6 +43,9 @@ impl eframe::App for App {
                     rv_cutter_native::import_into_report(&mut self.cad.session, &imports, size_mm)
                 }) {
                     Ok(report) => {
+                        if self.cutter_tab {
+                            self.cutter_sketch = self.cad.session.active_sketch;
+                        }
                         self.cad.ui.tab = "SKETCH".into();
                         self.cad.tool = None;
                         self.cad.dialog = None;
@@ -220,6 +225,9 @@ impl eframe::App for App {
                 .default_width(360.0).default_pos(egui::pos2(480.0, 220.0))
                 .open(&mut open).show(ui.ctx(), |ui| {
                 ui.strong("CORTADORES DE BISCOITO");
+                if ui.add_enabled(self.pending.is_none(), egui::Button::new("Importar imagem / contornos")).clicked() {
+                    ui.ctx().data_mut(|d| d.insert_temp(egui::Id::new(ribbon::OPEN_IMPORT), true));
+                }
                 ui.label("Sketch de origem");
                 let selected_label = sketches.iter().find(|(id, _)| Some(*id) == self.cutter_sketch)
                     .map(|(id, name)| format!("{name} (#{id})")).unwrap_or_else(|| "Nenhum Sketch disponível".into());
@@ -229,6 +237,46 @@ impl eframe::App for App {
                     }
                 });
                 ui.separator();
+                ui.collapsing("Contorno externo / personalizar borda (experimental)", |ui| {
+                    ui.label("PNG/JPG vetorizado: usa o maior contorno fechado por área.");
+                    ui.weak("Partes separadas menores e detalhes internos não entram na lâmina.");
+                    egui::ComboBox::from_label("Padrão").selected_text(match self.border.pattern {
+                        rv_cutter_native::border::Pattern::Smooth => "Liso",
+                        rv_cutter_native::border::Pattern::Wave => "Ondulado",
+                        rv_cutter_native::border::Pattern::Saw => "Serrilhado",
+                    }).show_ui(ui, |ui| {
+                        use rv_cutter_native::border::Pattern;
+                        ui.selectable_value(&mut self.border.pattern, Pattern::Smooth, "Liso");
+                        ui.selectable_value(&mut self.border.pattern, Pattern::Wave, "Ondulado");
+                        ui.selectable_value(&mut self.border.pattern, Pattern::Saw, "Serrilhado");
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Repetições");
+                        ui.add(egui::DragValue::new(&mut self.border.repeats).range(1..=80));
+                        ui.label("Profundidade mm");
+                        ui.add(egui::DragValue::new(&mut self.border.depth_mm).range(-20.0..=20.0).speed(0.05));
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Tolerância mm");
+                        ui.add(egui::DragValue::new(&mut self.border_tolerance).range(0.001..=0.2).speed(0.001));
+                    });
+                    ui.weak("Positivo: para fora. Negativo: para dentro. Confira a prévia antes de gerar.");
+                    ui.weak("Nesta etapa a borda é uma cópia editável, sem atualização automática do original.");
+                    if ui.add_enabled(self.cutter_sketch.is_some(), egui::Button::new("PREPARAR BORDA COMO NOVO SKETCH")).clicked() {
+                        let result = self.cutter_sketch.ok_or_else(|| "Escolha um Sketch.".to_string())
+                            .and_then(|id| rv_cutter_native::cutter::prepare_outer_outline(&self.cad.session,id,self.border,self.border_tolerance))
+                            .and_then(|import| rv_cutter_native::import_into(&mut self.cad.session,&[import]));
+                        match result {
+                            Ok(()) => {
+                                self.cutter_sketch=self.cad.session.active_sketch;
+                                focus_sketch(&mut self.cad);
+                                self.cad.fit_view();
+                                self.cad.set_status("Borda preparada e selecionada. Confira o novo Sketch e clique GERAR CORTADOR. Original preservado.",false);
+                            }
+                            Err(error) => self.cad.set_status(error,true),
+                        }
+                    }
+                });
                 egui::Grid::new("rv-cutter-settings").num_columns(2).spacing([16.0, 10.0]).show(ui, |ui| {
                     ui.label("Lâmina (mm)");
                     ui.add(egui::DragValue::new(&mut self.cutter.blade_height_mm).range(4.0..=100.0).speed(0.1));
@@ -378,6 +426,8 @@ fn main() -> eframe::Result {
                 cutter_tab: false,
                 cutter_sketch: None,
                 cutter: rv_cutter_native::cutter::CutterSettings::default(),
+                border: rv_cutter_native::border::Border::default(),
+                border_tolerance: 0.05,
                 auto_size: true,
             }))
         }),
