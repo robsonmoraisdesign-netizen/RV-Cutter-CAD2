@@ -113,3 +113,61 @@ pub fn create_from_sketch(
     });
     recipe::apply(session, &recipe)
 }
+
+/// Prepare a separate editable outline. The original image Sketch is preserved.
+/// This first-stage preview is an evaluated copy, not an associative CAD feature.
+pub fn prepare_outer_outline(
+    session: &Session,
+    sketch_id: u64,
+    border: crate::border::Border,
+    tolerance_mm: f64,
+) -> Result<crate::Import> {
+    use solidcraft_engine::sketch::Shape;
+    if !tolerance_mm.is_finite() || !(0.001..=0.2).contains(&tolerance_mm) {
+        return Err("Precisão do contorno: use de 0,001 a 0,2 mm.".into());
+    }
+    if session.doc.feature(sketch_id).is_none_or(|f| f.suppressed) {
+        return Err("Sketch ausente ou suprimido.".into());
+    }
+    use solidcraft_engine::doc::{FeatureKind, PlaneRef};
+    if !matches!(session.doc.feature(sketch_id).map(|f| &f.kind),
+        Some(FeatureKind::Sketch {plane: PlaneRef::Origin {name}, ..}) if name == "XY")
+    {
+        return Err("Nesta etapa, prepare a borda de um Sketch no plano XY.".into());
+    }
+    let sketch = session.doc.sketch(sketch_id).map_err(|e| e.to_string())?;
+    let mut lines = Vec::new();
+    for (index, curve) in sketch.curves.iter().enumerate() {
+        if curve.construction {
+            continue;
+        }
+        match sketch.shape(index) {
+            Some(Shape::Line { a, b }) => lines.push(([a.x, a.y], [b.x, b.y])),
+            _ => {
+                return Err(
+                    "Contorno externo: nesta etapa use linhas de uma imagem PNG/JPG vetorizada."
+                        .into(),
+                );
+            }
+        }
+    }
+    let rings = crate::border::rings_from_lines(&lines)?;
+    let outer = rings.first().ok_or("Nenhum contorno fechado.")?;
+    let simplified = crate::raster::simplify_ring(outer, tolerance_mm);
+    let points = crate::border::generate(&simplified, border)?;
+    if points.len() > 800 {
+        return Err(format!(
+            "A borda tem {} segmentos. Reduza repetições ou aumente a tolerância (máximo 0,2 mm).",
+            points.len()
+        ));
+    }
+    // Native Sketch is Y-up; SVG coordinates are Y-down.
+    let svg_points = points.into_iter().map(|p| [p[0], -p[1]]).collect();
+    Ok(crate::Import {
+        name: format!(
+            "Borda externa de #{sketch_id} ({:?}, {} rep., {} mm)",
+            border.pattern, border.repeats, border.depth_mm
+        ),
+        svg: crate::raster::polygons_svg(&[svg_points])?,
+    })
+}
