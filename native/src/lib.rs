@@ -1,6 +1,7 @@
 //! Native RV document, Sketch and B-rep integration. No JavaScript runtime.
 #![forbid(unsafe_code)]
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+pub mod border;
 pub mod cutter;
 pub mod dimensions;
 pub mod raster;
