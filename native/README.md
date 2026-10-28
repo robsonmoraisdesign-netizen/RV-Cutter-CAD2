@@ -189,3 +189,10 @@ Ondas são amostradas em segmentos, não arcos de raio exato. Raios alternados,
 seleção por trechos, margem constante, escolha de múltiplas silhuetas e atualização
 paramétrica persistente da borda ainda estão pendentes. O kernel pode rejeitar uma
 lâmina/base cuja espessura não caiba nos detalhes; a criação existente é transacional.
+
+
+A dependência SolidCraft usa uma correção Rust local para unir extremidades de
+linhas da parede que a união de regiões já considera coincidentes (até 0,00001 mm).
+Folgas maiores continuam sendo recusadas. A correção está versionada em
+`patches/solidcraft-thin-closure.patch`, aplicada ao código-fonte fixado pelo
+preparador de build; não depende de JavaScript ou de Python durante o uso.
